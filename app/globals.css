@@ -1,26 +1,190 @@
 @import "tailwindcss";
 
+/* ---------- Tokens base (light) ---------- */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a; /* slate-900 */
+
+  --muted: #f1f5f9; /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+  --border: #e2e8f0; /* slate-200 */
+  --input: #e2e8f0;
+  --ring: #2563eb; /* blue-600 */
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  --primary: #0f172a;
+  --primary-foreground: #f8fafc;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #dc2626;
+  --destructive-foreground: #f8fafc;
+
+  /* Brand "Se Tu For, Eu Vou" */
+  --brand-dark: #0d2b22;
+  --brand-lime: #c8f135;
+
+  /* Semantic palette (UX da planilha) */
+  --editavel-50: #eff6ff;
+  --editavel-100: #dbeafe;
+  --editavel-600: #2563eb;
+  --auto-50: #f8fafc;
+  --auto-100: #f1f5f9;
+  --auto-600: #475569;
+  --vinculado-50: #ecfdf5;
+  --vinculado-100: #d1fae5;
+  --vinculado-600: #059669;
+  --atencao-50: #fffbeb;
+  --atencao-100: #fef3c7;
+  --atencao-600: #d97706;
+  --critico-50: #fef2f2;
+  --critico-100: #fee2e2;
+  --critico-600: #dc2626;
+  --lista-50: #f5f3ff;
+  --lista-100: #ede9fe;
+  --lista-600: #7c3aed;
+}
+
+[data-theme="dark"] {
+  --background: #0a0f0d;
+  --foreground: #e2e8f0;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #3b82f6;
+
+  --card: #0f1614;
+  --card-foreground: #e2e8f0;
+
+  --primary: #f8fafc;
+  --primary-foreground: #0f172a;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+
+  --editavel-50: #0c1a33;
+  --editavel-100: #1e3a8a;
+  --editavel-600: #60a5fa;
+  --auto-50: #0f172a;
+  --auto-100: #1e293b;
+  --auto-600: #94a3b8;
+  --vinculado-50: #022c1e;
+  --vinculado-100: #064e3b;
+  --vinculado-600: #34d399;
+  --atencao-50: #1f1305;
+  --atencao-100: #422006;
+  --atencao-600: #fbbf24;
+  --critico-50: #1f0808;
+  --critico-100: #450a0a;
+  --critico-600: #f87171;
+  --lista-50: #170e2e;
+  --lista-100: #312e81;
+  --lista-600: #a78bfa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-lime: var(--brand-lime);
+
+  --color-editavel-50: var(--editavel-50);
+  --color-editavel-100: var(--editavel-100);
+  --color-editavel-600: var(--editavel-600);
+  --color-auto-50: var(--auto-50);
+  --color-auto-100: var(--auto-100);
+  --color-auto-600: var(--auto-600);
+  --color-vinculado-50: var(--vinculado-50);
+  --color-vinculado-100: var(--vinculado-100);
+  --color-vinculado-600: var(--vinculado-600);
+  --color-atencao-50: var(--atencao-50);
+  --color-atencao-100: var(--atencao-100);
+  --color-atencao-600: var(--atencao-600);
+  --color-critico-50: var(--critico-50);
+  --color-critico-100: var(--critico-100);
+  --color-critico-600: var(--critico-600);
+  --color-lista-50: var(--lista-50);
+  --color-lista-100: var(--lista-100);
+  --color-lista-600: var(--lista-600);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Tabela densa */
+.table-dense th,
+.table-dense td {
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.table-dense tr {
+  height: 32px;
+}
+
+/* Foco visível para a11y */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Scrollbar discreta */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+/* Animações utilitárias */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 180ms ease-out; }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slideInRight 200ms ease-out; }
