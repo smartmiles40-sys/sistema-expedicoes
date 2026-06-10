@@ -4,14 +4,19 @@ import { useRouter } from "next/navigation";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Badge } from "@/components/ui/Badge";
+import { FilterPopover } from "@/components/ui/FilterPopover";
 import { ExpedicoesTable } from "@/components/tables/ExpedicoesTable";
 import { NovaExpedicaoDrawer } from "./NovaExpedicaoDrawer";
+import { EditarExpedicaoDrawer } from "./EditarExpedicaoDrawer";
 import { STATUS_EXPEDICAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { ExpedicaoComAgregados } from "@/types/database";
 import type { Tables } from "@/types/database";
 import { daysUntil } from "@/lib/utils";
+import { reordenarExpedicoes } from "./actions";
+import { toast } from "sonner";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { LiveBadge } from "@/components/ui/LiveBadge";
 
 type PeriodoFiltro = "todos" | "30" | "60" | "90" | "ano";
 
@@ -36,8 +41,13 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
   const [periodo, setPeriodo] = React.useState<PeriodoFiltro>("todos");
   const [responsavelOp, setResponsavelOp] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editandoId, setEditandoId] = React.useState<string | null>(null);
   const [selecionada, setSelecionada] = React.useState<number>(-1);
   const buscaRef = React.useRef<HTMLInputElement>(null);
+
+  const realtimeStatus = useRealtimeRefresh({
+    subscriptions: [{ table: "expedicoes" }],
+  });
 
   const destinos = React.useMemo(
     () => Array.from(new Set(expedicoes.map((e) => e.destino))).sort(),
@@ -80,6 +90,23 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
 
   const ativaCount = statusSel.size + destinoSel.size + (periodo !== "todos" ? 1 : 0) + (responsavelOp ? 1 : 0);
 
+  const agrupadoPorAno = React.useMemo(() => {
+    const grupos = new Map<number | "sem-data", ExpedicaoComAgregados[]>();
+    for (const e of filtradas) {
+      const key: number | "sem-data" = e.data_embarque
+        ? new Date(e.data_embarque).getFullYear()
+        : "sem-data";
+      const arr = grupos.get(key) ?? [];
+      arr.push(e);
+      grupos.set(key, arr);
+    }
+    return Array.from(grupos.entries()).sort(([a], [b]) => {
+      if (a === "sem-data") return 1;
+      if (b === "sem-data") return -1;
+      return a - b;
+    });
+  }, [filtradas]);
+
   // Atalhos
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -118,7 +145,10 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">Expedições</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">Expedições</h1>
+            <LiveBadge status={realtimeStatus} />
+          </div>
           <p className="text-xs text-muted-foreground">
             {filtradas.length} de {expedicoes.length} {expedicoes.length === 1 ? "expedição" : "expedições"}
             {ativaCount > 0 && ` · ${ativaCount} filtro${ativaCount > 1 ? "s" : ""} ativo${ativaCount > 1 ? "s" : ""}`}
@@ -145,83 +175,234 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
         </div>
       </div>
 
-      {/* Filtros chips */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <FilterGroup label="Status">
-          {STATUS_EXPEDICAO.map((s) => (
-            <FilterChip
-              key={s}
-              active={statusSel.has(s)}
-              onClick={() => setStatusSel(toggle(statusSel, s))}
-            >
-              {s}
-            </FilterChip>
-          ))}
-        </FilterGroup>
+      {/* Filtros (popovers colapsáveis) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterPopover label="Status" count={statusSel.size} active={statusSel.size > 0}>
+          <div className="flex flex-col gap-0.5">
+            {STATUS_EXPEDICAO.map((s) => {
+              const sel = statusSel.has(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusSel(toggle(statusSel, s))}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 text-[12px] rounded-md text-left",
+                    "hover:bg-muted transition-colors",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-3.5 w-3.5 rounded border-2 flex items-center justify-center shrink-0",
+                      sel ? "bg-foreground border-foreground" : "border-border",
+                    )}
+                  >
+                    {sel && <X className="h-2.5 w-2.5 text-background rotate-45 -rotate-45" strokeWidth={3} />}
+                  </span>
+                  <span className={cn(sel && "font-semibold")}>{s}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FilterPopover>
 
         {destinos.length > 0 && (
-          <FilterGroup label="Destino">
-            {destinos.map((d) => (
-              <FilterChip
-                key={d}
-                active={destinoSel.has(d)}
-                onClick={() => setDestinoSel(toggle(destinoSel, d))}
-              >
-                {d}
-              </FilterChip>
-            ))}
-          </FilterGroup>
+          <FilterPopover
+            label="Destino"
+            count={destinoSel.size}
+            active={destinoSel.size > 0}
+          >
+            <div className="flex flex-col gap-0.5 max-h-72 overflow-y-auto">
+              {destinos.map((d) => {
+                const sel = destinoSel.has(d);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setDestinoSel(toggle(destinoSel, d))}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-[12px] rounded-md text-left",
+                      "hover:bg-muted transition-colors",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-3.5 w-3.5 rounded border-2 shrink-0",
+                        sel ? "bg-foreground border-foreground" : "border-border",
+                      )}
+                    />
+                    <span className={cn(sel && "font-semibold")}>{d}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </FilterPopover>
         )}
 
-        <FilterGroup label="Período">
-          {PERIODOS.map((p) => (
-            <FilterChip
-              key={p.value}
-              active={periodo === p.value}
-              onClick={() => setPeriodo(p.value)}
-            >
-              {p.label}
-            </FilterChip>
-          ))}
-        </FilterGroup>
+        <FilterPopover
+          label="Período"
+          count={periodo !== "todos" ? 1 : 0}
+          active={periodo !== "todos"}
+          preview={periodo !== "todos" ? PERIODOS.find((p) => p.value === periodo)?.label : undefined}
+        >
+          <div className="flex flex-col gap-0.5">
+            {PERIODOS.map((p) => {
+              const sel = periodo === p.value;
+              return (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriodo(p.value)}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 text-[12px] rounded-md text-left",
+                    "hover:bg-muted transition-colors",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                      sel ? "border-foreground" : "border-border",
+                    )}
+                  >
+                    {sel && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                  </span>
+                  <span className={cn(sel && "font-semibold")}>{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FilterPopover>
 
-        <FilterGroup label="Resp. Op">
-          <FilterChip
-            active={responsavelOp === null}
-            onClick={() => setResponsavelOp(null)}
-          >
-            Todos
-          </FilterChip>
-          {usuarios.filter((u) => u.papel === "operacional" || u.papel === "admin").map((u) => (
-            <FilterChip
-              key={u.id}
-              active={responsavelOp === u.id}
-              onClick={() => setResponsavelOp(responsavelOp === u.id ? null : u.id)}
+        <FilterPopover
+          label="Resp. Op"
+          count={responsavelOp ? 1 : 0}
+          active={!!responsavelOp}
+          preview={
+            responsavelOp
+              ? usuarios.find((u) => u.id === responsavelOp)?.nome.split(" ")[0]
+              : undefined
+          }
+        >
+          <div className="flex flex-col gap-0.5">
+            <button
+              onClick={() => setResponsavelOp(null)}
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-[12px] rounded-md text-left",
+                "hover:bg-muted transition-colors",
+              )}
             >
-              {u.nome.split(" ")[0]}
-            </FilterChip>
-          ))}
-        </FilterGroup>
+              <span
+                className={cn(
+                  "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                  responsavelOp === null ? "border-foreground" : "border-border",
+                )}
+              >
+                {responsavelOp === null && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+              </span>
+              <span className={cn(responsavelOp === null && "font-semibold")}>Todos</span>
+            </button>
+            {usuarios
+              .filter((u) => u.papel === "operacional" || u.papel === "admin")
+              .map((u) => {
+                const sel = responsavelOp === u.id;
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => setResponsavelOp(sel ? null : u.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 text-[12px] rounded-md text-left",
+                      "hover:bg-muted transition-colors",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0",
+                        sel ? "border-foreground" : "border-border",
+                      )}
+                    >
+                      {sel && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                    </span>
+                    <span className={cn(sel && "font-semibold")}>{u.nome}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </FilterPopover>
 
         {ativaCount > 0 && (
           <button
             onClick={limparFiltros}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            className="ml-1 text-[12px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 h-7 px-2"
           >
-            <X className="h-3 w-3" /> Limpar
+            <X className="h-3 w-3" /> Limpar filtros
           </button>
         )}
       </div>
 
-      {/* Tabela */}
+      {/* Tabela agrupada por ano */}
       {expedicoes.length === 0 ? (
         <EmptyState onCreate={() => setDrawerOpen(true)} />
+      ) : filtradas.length === 0 ? (
+        <div className="text-xs text-muted-foreground py-10 text-center border border-dashed border-border rounded-lg">
+          Nenhuma expedição com os filtros atuais.
+        </div>
       ) : (
-        <ExpedicoesTable
-          expedicoes={filtradas}
-          selecionada={selecionada}
-          onRowClick={(e) => router.push(`/expedicoes/${e.id}`)}
-        />
+        <div className="space-y-8">
+          {(() => {
+            let offset = 0;
+            return agrupadoPorAno.map(([ano, lista]) => {
+              const offsetGrupo = offset;
+              offset += lista.length;
+              const statusCount = lista.reduce<Record<string, number>>((acc, e) => {
+                acc[e.status] = (acc[e.status] ?? 0) + 1;
+                return acc;
+              }, {});
+              return (
+                <section key={String(ano)} className="space-y-2">
+                  <header className="flex items-end justify-between gap-3 border-b-2 border-foreground/80 pb-2 sticky top-0 bg-background z-10">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-3xl font-bold tabular-nums tracking-tight">
+                        {ano === "sem-data" ? "Sem data" : ano}
+                      </h2>
+                      <span className="text-sm text-muted-foreground">
+                        {lista.length} {lista.length === 1 ? "expedição" : "expedições"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      {Object.entries(statusCount).map(([s, n]) => (
+                        <span
+                          key={s}
+                          className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 bg-muted/40"
+                        >
+                          <span className="text-muted-foreground">{s}</span>
+                          <span className="font-semibold tabular-nums">{n}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </header>
+                  <ExpedicoesTable
+                    expedicoes={lista}
+                    selecionada={
+                      selecionada >= offsetGrupo && selecionada < offsetGrupo + lista.length
+                        ? selecionada - offsetGrupo
+                        : -1
+                    }
+                    onRowClick={(e) => router.push(`/expedicoes/${e.id}`)}
+                    onEdit={(e) => setEditandoId(e.id)}
+                    onReorder={async (novaOrdemDoAno) => {
+                      const ordemGlobal = agrupadoPorAno.flatMap(([anoG, listaG]) =>
+                        anoG === ano ? novaOrdemDoAno : listaG.map((x) => x.id),
+                      );
+                      const r = await reordenarExpedicoes(ordemGlobal);
+                      if (!r.ok) {
+                        toast.error("Erro ao salvar nova ordem", { description: r.error });
+                      } else {
+                        router.refresh();
+                      }
+                    }}
+                  />
+                </section>
+              );
+            });
+          })()}
+        </div>
       )}
 
       <NovaExpedicaoDrawer
@@ -229,40 +410,13 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
         onOpenChange={setDrawerOpen}
         usuarios={usuarios}
       />
-    </div>
-  );
-}
 
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}:</span>
-      <div className="flex flex-wrap gap-1">{children}</div>
+      <EditarExpedicaoDrawer
+        expedicao={editandoId ? expedicoes.find((e) => e.id === editandoId) ?? null : null}
+        onOpenChange={(open) => !open && setEditandoId(null)}
+        usuarios={usuarios}
+      />
     </div>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors",
-        active
-          ? "bg-foreground text-background border-foreground"
-          : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

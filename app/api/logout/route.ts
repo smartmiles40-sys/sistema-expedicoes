@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { DEV_BYPASS } from "@/lib/dev-mode";
+import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST() {
-  if (!DEV_BYPASS) {
+  if (!DEV_AUTH_BYPASS) {
     const supabase = await createClient();
     await supabase.auth.signOut();
   }

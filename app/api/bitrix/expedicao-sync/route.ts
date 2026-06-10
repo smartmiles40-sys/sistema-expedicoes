@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { expedicaoSyncSchema } from "@/lib/bitrix/validators";
-import { DEV_BYPASS } from "@/lib/dev-mode";
+import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockExpedicoes } from "@/lib/mock-data";
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
-  if (DEV_BYPASS) {
+  if (DEV_USE_MOCK_DATA) {
     const existente = mockExpedicoes.find((e) => e.bitrix_pipeline_id === data.bitrix_pipeline_id || e.codigo === data.codigo);
     if (existente) {
       Object.assign(existente, {
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       pax_cortesia: 0,
       preco_venda_brl: data.preco_venda_brl ?? 0,
       bitrix_pipeline_id: data.bitrix_pipeline_id,
+      ordem: null,
       observacoes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

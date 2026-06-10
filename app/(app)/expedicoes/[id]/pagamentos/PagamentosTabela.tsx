@@ -1,10 +1,18 @@
 "use client";
 import * as React from "react";
+import { Pencil, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { excluirPagamento } from "@/app/(app)/expedicoes/actions";
 import { formatMoney, formatDate, daysUntil, cn } from "@/lib/utils";
 import { STATUS_PAGAMENTO } from "@/lib/constants";
 import type { PagamentoRow, CustoRow, FornecedorRow, StatusPagamento } from "@/types/database";
+import { NovoPagamentoDrawer } from "./NovoPagamentoDrawer";
+import { EditarPagamentoDrawer } from "./EditarPagamentoDrawer";
+import { LiveBadge } from "@/components/ui/LiveBadge";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 
 const STATUS_VARIANT: Record<StatusPagamento, "auto" | "lista" | "vinculado" | "atencao" | "critico"> = {
   Pendente: "auto",
@@ -16,14 +24,35 @@ const STATUS_VARIANT: Record<StatusPagamento, "auto" | "lista" | "vinculado" | "
 };
 
 interface Props {
+  expedicaoId: string;
   pagamentos: PagamentoRow[];
   custos: CustoRow[];
   fornecedores: FornecedorRow[];
 }
 
-export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
+export function PagamentosTabela({ expedicaoId, pagamentos, custos, fornecedores }: Props) {
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [busca, setBusca] = React.useState("");
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  const pagamentoEditando = editandoId ? pagamentos.find((p) => p.id === editandoId) ?? null : null;
+
+  // Pagamentos não têm expedicao_id direto, só custo_id. Filtramos client-side
+  // checando se o custo_id do payload pertence aos custos desta expedição.
+  const custoIds = React.useMemo(() => new Set(custos.map((c) => c.id)), [custos]);
+  const realtimeStatus = useRealtimeRefresh({
+    subscriptions: [
+      {
+        table: "pagamentos",
+        onChange: (payload) => {
+          const row = (payload.new ?? payload.old) as { custo_id?: string };
+          return row?.custo_id ? custoIds.has(row.custo_id) : true;
+        },
+      },
+      // Custos podem mudar (status, valor) e refletir aqui via custo_id.
+      { table: "custos", filter: `expedicao_id=eq.${expedicaoId}` },
+    ],
+  });
 
   const fornecedoresById = new Map(fornecedores.map((f) => [f.id, f]));
 
@@ -70,6 +99,7 @@ export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs">
+          <LiveBadge status={realtimeStatus} />
           {totaisPorMoeda.map(([moeda, t]) => (
             <div key={moeda} className="flex flex-col items-end">
               <span className="text-[10px] uppercase text-muted-foreground">{moeda}</span>
@@ -78,6 +108,9 @@ export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
               </span>
             </div>
           ))}
+          <Button size="sm" onClick={() => setDrawerOpen(true)}>
+            <Plus className="h-3 w-3" /> Novo Pagamento
+          </Button>
         </div>
       </div>
 
@@ -95,12 +128,13 @@ export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
                 <Th>Vencimento</Th>
                 <Th className="text-right">Dias</Th>
                 <Th>Status</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center text-muted-foreground py-8">
+                  <td colSpan={10} className="text-center text-muted-foreground py-8">
                     Sem pagamentos nesse filtro.
                   </td>
                 </tr>
@@ -142,6 +176,26 @@ export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
                       <td className="px-2.5">
                         <Badge variant={STATUS_VARIANT[p.status]}>{p.status}</Badge>
                       </td>
+                      <td className="w-16 px-1">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditandoId(p.id)}
+                            aria-label="Editar pagamento"
+                            title="Editar"
+                            className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <ConfirmDeleteButton
+                            ariaLabel="Excluir pagamento"
+                            title={`Excluir pagamento "${p.servico}"?`}
+                            description="Esta ação não pode ser desfeita."
+                            successMessage="Pagamento excluído"
+                            onConfirm={() => excluirPagamento(p.id, expedicaoId)}
+                          />
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -150,11 +204,26 @@ export function PagamentosTabela({ pagamentos, custos, fornecedores }: Props) {
           </table>
         </div>
       </div>
+
+      <NovoPagamentoDrawer
+        expedicaoId={expedicaoId}
+        custos={custos}
+        fornecedores={fornecedores}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
+
+      <EditarPagamentoDrawer
+        expedicaoId={expedicaoId}
+        pagamento={pagamentoEditando}
+        fornecedores={fornecedores}
+        onOpenChange={(open) => !open && setEditandoId(null)}
+      />
     </div>
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
       className={cn(

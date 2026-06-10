@@ -21,7 +21,13 @@ export type StatusFornecedor = "Ativo" | "Pausado" | "Bloqueado";
 export type CategoriaCusto = "Hotelaria" | "Aéreo" | "Terrestre" | "Ingressos" | "Guias" | "Seguro" | "Taxas" | "Brindes" | "Outros";
 export type StatusCusto = "A programar" | "Programado" | "Pago" | "Parcial" | "Vencido";
 export type StatusPagamento = "Pendente" | "Programado" | "Pago" | "Parcial" | "Vencido" | "Cancelado";
-export type EtapaChecklist = "Pós-venda" | "Pré-viagem" | "Operação" | "Pós-viagem";
+export type EtapaChecklist =
+  | "Após o fechamento"
+  | "12 a 6 meses"
+  | "6 a 2 meses"
+  | "2 meses a 15 dias"
+  | "Na semana"
+  | "Pós-viagem";
 export type StatusChecklist = "Pendente" | "Em andamento" | "Atenção" | "Concluído" | "Bloqueado";
 export type Prioridade = "Baixa" | "Média" | "Alta" | "Crítica";
 export type TipoQuarto = "Single" | "Duplo" | "Twin" | "Triplo" | "Compartilhado" | "Líder";
@@ -77,6 +83,7 @@ export type ExpedicaoRow = {
   preco_venda_brl: number;
   bitrix_pipeline_id: string | null;
   observacoes: string | null;
+  ordem: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +91,7 @@ export type ExpedicaoRow = {
 export type PassageiroRow = {
   id: string;
   expedicao_id: string;
+  grupo_id: string | null;
   bitrix_contact_id: string | null;
   bitrix_deal_id: string | null;
   nome_completo: string;
@@ -100,6 +108,44 @@ export type PassageiroRow = {
   localizador: string | null;
   quarto_id: string | null;
   observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CategoriaArquivo =
+  | "Aéreos"
+  | "Documentos pessoais"
+  | "Bilhetes"
+  | "Vistos"
+  | "Seguros"
+  | "Hospedagem"
+  | "Vouchers"
+  | "Outros";
+
+export type ArquivoRow = {
+  id: string;
+  expedicao_id: string;
+  passageiro_id: string | null;
+  categoria: CategoriaArquivo;
+  nome: string;
+  descricao: string | null;
+  mime: string | null;
+  tamanho_bytes: number | null;
+  storage_path: string;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GrupoExpedicaoRow = {
+  id: string;
+  expedicao_id: string;
+  nome: string;
+  data_embarque: string | null;
+  data_retorno: string | null;
+  pax_planejados: number;
+  observacoes: string | null;
+  ordem: number;
   created_at: string;
   updated_at: string;
 }
@@ -165,9 +211,21 @@ export type ChecklistItemRow = {
   prazo: string | null;
   prioridade: Prioridade;
   dependencia_id: string | null;
+  parent_id: string | null; // subtarefa: aponta pro item pai
+  ordem: number; // ordem dentro da fase (ou dentro do pai)
   evidencia_url: string | null;
   bitrix_task_id: string | null;
   observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LinkExpedicaoRow = {
+  id: string;
+  expedicao_id: string;
+  label: string;
+  url: string;
+  ordem: number;
   created_at: string;
   updated_at: string;
 }
@@ -206,11 +264,14 @@ export type Database = {
       cambios: { Row: CambioRow; Insert: { moeda: string; taxa_brl: number; atualizado_em?: string }; Update: Partial<CambioRow> };
       expedicoes: { Row: ExpedicaoRow; Insert: Partial<ExpedicaoRow> & Pick<ExpedicaoRow, "codigo" | "nome" | "destino" | "data_embarque" | "data_retorno">; Update: Partial<ExpedicaoRow> };
       passageiros: { Row: PassageiroRow; Insert: Partial<PassageiroRow> & Pick<PassageiroRow, "expedicao_id" | "nome_completo">; Update: Partial<PassageiroRow> };
+      grupos_expedicao: { Row: GrupoExpedicaoRow; Insert: Partial<GrupoExpedicaoRow> & Pick<GrupoExpedicaoRow, "expedicao_id" | "nome">; Update: Partial<GrupoExpedicaoRow> };
+      arquivos: { Row: ArquivoRow; Insert: Partial<ArquivoRow> & Pick<ArquivoRow, "expedicao_id" | "nome" | "storage_path">; Update: Partial<ArquivoRow> };
       quartos: { Row: QuartoRow; Insert: Partial<QuartoRow> & Pick<QuartoRow, "expedicao_id" | "numero" | "tipo">; Update: Partial<QuartoRow> };
       custos: { Row: CustoRow; Insert: Partial<CustoRow> & Pick<CustoRow, "expedicao_id" | "categoria" | "servico" | "moeda" | "valor_planejado">; Update: Partial<CustoRow> };
       pagamentos: { Row: PagamentoRow; Insert: Partial<PagamentoRow> & Pick<PagamentoRow, "custo_id" | "servico" | "moeda" | "valor_total">; Update: Partial<PagamentoRow> };
       checklist_itens: { Row: ChecklistItemRow; Insert: Partial<ChecklistItemRow> & Pick<ChecklistItemRow, "expedicao_id" | "etapa" | "tarefa">; Update: Partial<ChecklistItemRow> };
       documentos: { Row: DocumentoRow; Insert: Partial<DocumentoRow> & Pick<DocumentoRow, "passageiro_id">; Update: Partial<DocumentoRow> };
+      links_expedicao: { Row: LinkExpedicaoRow; Insert: Partial<LinkExpedicaoRow> & Pick<LinkExpedicaoRow, "expedicao_id" | "label" | "url">; Update: Partial<LinkExpedicaoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };
     };
     Views: Record<string, never>;

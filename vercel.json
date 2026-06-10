@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cambios/sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/expedicoes/atualizar-status",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

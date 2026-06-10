@@ -5,7 +5,9 @@
 import type {
   Tables,
   ExpedicaoComAgregados,
+  EtapaChecklist,
 } from "@/types/database";
+import { construirChecklistPadrao } from "@/lib/processos/template";
 
 const today = new Date();
 const iso = (d: Date) => d.toISOString();
@@ -165,6 +167,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     pax_cortesia: 2,
     preco_venda_brl: 18900,
     bitrix_pipeline_id: "PIPE-001",
+    ordem: 1,
     observacoes: "Grupo + Trekking 4 dias.",
     created_at: pastDate(60),
     updated_at: pastDate(2),
@@ -184,6 +187,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     pax_cortesia: 1,
     preco_venda_brl: 22500,
     bitrix_pipeline_id: "PIPE-002",
+    ordem: 2,
     observacoes: null,
     created_at: pastDate(50),
     updated_at: pastDate(5),
@@ -203,6 +207,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     pax_cortesia: 1,
     preco_venda_brl: 38900,
     bitrix_pipeline_id: "PIPE-003",
+    ordem: 3,
     observacoes: null,
     created_at: pastDate(20),
     updated_at: pastDate(1),
@@ -222,6 +227,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     pax_cortesia: 2,
     preco_venda_brl: 27800,
     bitrix_pipeline_id: "PIPE-004",
+    ordem: 4,
     observacoes: "DMC sendo selecionado.",
     created_at: pastDate(40),
     updated_at: pastDate(7),
@@ -230,21 +236,21 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
 
 export const mockPassageiros: Tables<"passageiros">[] = [
   // Peru
-  { id: "p0000001", expedicao_id: "e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1001", bitrix_deal_id: "BX-D-1001", nome_completo: "Mariana Silva", tipo: "Pagante", cpf: "111.222.333-44", passaporte: "FA123456", data_nascimento: "1988-03-12", validade_passaporte: futureDate(800), email: "mari@gmail.com", telefone: "+55 11 99999-1111", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: "LATAM", localizador: "ABC123", quarto_id: null, observacoes: null, created_at: pastDate(50), updated_at: pastDate(2) },
-  { id: "p0000002", expedicao_id: "e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1002", bitrix_deal_id: "BX-D-1002", nome_completo: "João Pereira", tipo: "Pagante", cpf: "222.333.444-55", passaporte: "FB234567", data_nascimento: "1990-07-22", validade_passaporte: futureDate(120), email: "jp@gmail.com", telefone: "+55 11 98888-2222", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: "Vegetariano", created_at: pastDate(48), updated_at: pastDate(2) },
-  { id: "p0000003", expedicao_id: "e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1003", bitrix_deal_id: "BX-D-1003", nome_completo: "Letícia Souza", tipo: "Pagante", cpf: "333.444.555-66", passaporte: null, data_nascimento: "1985-11-30", validade_passaporte: null, email: "le@gmail.com", telefone: "+55 21 97777-3333", status_reserva: "Pré-reserva", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(3) },
-  { id: "p0000004", expedicao_id: "e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1004", bitrix_deal_id: "BX-D-1004", nome_completo: "Rafael Tonin", tipo: "Pagante", cpf: "444.555.666-77", passaporte: "FC345678", data_nascimento: "1992-05-18", validade_passaporte: futureDate(60), email: "rafa@gmail.com", telefone: "+55 11 95555-4444", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "LATAM", localizador: "DEF456", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(2) },
-  { id: "p0000005", expedicao_id: "e0000000-0000-0000-0000-000000000001", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Ana Costa", tipo: "Líder", cpf: "555.666.777-88", passaporte: "FD456789", data_nascimento: "1987-09-08", validade_passaporte: futureDate(900), email: "ana.op@setur.com", telefone: "+55 11 94444-5555", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: "LATAM", localizador: "GHI789", quarto_id: null, observacoes: "Líder do grupo", created_at: pastDate(60), updated_at: pastDate(1) },
+  { id: "p0000001", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1001", bitrix_deal_id: "BX-D-1001", nome_completo: "Mariana Silva", tipo: "Pagante", cpf: "111.222.333-44", passaporte: "FA123456", data_nascimento: "1988-03-12", validade_passaporte: futureDate(800), email: "mari@gmail.com", telefone: "+55 11 99999-1111", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: "LATAM", localizador: "ABC123", quarto_id: null, observacoes: null, created_at: pastDate(50), updated_at: pastDate(2) },
+  { id: "p0000002", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1002", bitrix_deal_id: "BX-D-1002", nome_completo: "João Pereira", tipo: "Pagante", cpf: "222.333.444-55", passaporte: "FB234567", data_nascimento: "1990-07-22", validade_passaporte: futureDate(120), email: "jp@gmail.com", telefone: "+55 11 98888-2222", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: "Vegetariano", created_at: pastDate(48), updated_at: pastDate(2) },
+  { id: "p0000003", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1003", bitrix_deal_id: "BX-D-1003", nome_completo: "Letícia Souza", tipo: "Pagante", cpf: "333.444.555-66", passaporte: null, data_nascimento: "1985-11-30", validade_passaporte: null, email: "le@gmail.com", telefone: "+55 21 97777-3333", status_reserva: "Pré-reserva", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(3) },
+  { id: "p0000004", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1004", bitrix_deal_id: "BX-D-1004", nome_completo: "Rafael Tonin", tipo: "Pagante", cpf: "444.555.666-77", passaporte: "FC345678", data_nascimento: "1992-05-18", validade_passaporte: futureDate(60), email: "rafa@gmail.com", telefone: "+55 11 95555-4444", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "LATAM", localizador: "DEF456", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(2) },
+  { id: "p0000005", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Ana Costa", tipo: "Líder", cpf: "555.666.777-88", passaporte: "FD456789", data_nascimento: "1987-09-08", validade_passaporte: futureDate(900), email: "ana.op@setur.com", telefone: "+55 11 94444-5555", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: "LATAM", localizador: "GHI789", quarto_id: null, observacoes: "Líder do grupo", created_at: pastDate(60), updated_at: pastDate(1) },
   // Patagônia
-  { id: "p0000006", expedicao_id: "e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2001", bitrix_deal_id: "BX-D-2001", nome_completo: "Camila Rocha", tipo: "Pagante", cpf: "666.777.888-99", passaporte: "FE567890", data_nascimento: "1991-02-14", validade_passaporte: futureDate(700), email: "ca@gmail.com", telefone: "+55 11 93333-6666", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(45), updated_at: pastDate(5) },
-  { id: "p0000007", expedicao_id: "e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2002", bitrix_deal_id: "BX-D-2002", nome_completo: "Fernando Lima", tipo: "Pagante", cpf: "777.888.999-00", passaporte: "FF678901", data_nascimento: "1983-12-03", validade_passaporte: futureDate(500), email: "fer@gmail.com", telefone: "+55 11 92222-7777", status_reserva: "Lead", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "p0000008", expedicao_id: "e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2003", bitrix_deal_id: "BX-D-2003", nome_completo: "Patrícia Nunes", tipo: "Pagante", cpf: "888.999.000-11", passaporte: null, data_nascimento: "1989-06-25", validade_passaporte: null, email: "pa@gmail.com", telefone: "+55 11 91111-8888", status_reserva: "Pré-reserva", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(18), updated_at: pastDate(3) },
+  { id: "p0000006", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2001", bitrix_deal_id: "BX-D-2001", nome_completo: "Camila Rocha", tipo: "Pagante", cpf: "666.777.888-99", passaporte: "FE567890", data_nascimento: "1991-02-14", validade_passaporte: futureDate(700), email: "ca@gmail.com", telefone: "+55 11 93333-6666", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(45), updated_at: pastDate(5) },
+  { id: "p0000007", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2002", bitrix_deal_id: "BX-D-2002", nome_completo: "Fernando Lima", tipo: "Pagante", cpf: "777.888.999-00", passaporte: "FF678901", data_nascimento: "1983-12-03", validade_passaporte: futureDate(500), email: "fer@gmail.com", telefone: "+55 11 92222-7777", status_reserva: "Lead", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "p0000008", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-2003", bitrix_deal_id: "BX-D-2003", nome_completo: "Patrícia Nunes", tipo: "Pagante", cpf: "888.999.000-11", passaporte: null, data_nascimento: "1989-06-25", validade_passaporte: null, email: "pa@gmail.com", telefone: "+55 11 91111-8888", status_reserva: "Pré-reserva", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(18), updated_at: pastDate(3) },
   // Japão
-  { id: "p0000009", expedicao_id: "e0000000-0000-0000-0000-000000000003", bitrix_contact_id: "BX-3001", bitrix_deal_id: "BX-D-3001", nome_completo: "Marcos Tavares", tipo: "Pagante", cpf: "999.000.111-22", passaporte: "FG789012", data_nascimento: "1980-04-09", validade_passaporte: futureDate(1200), email: "ma@gmail.com", telefone: "+55 11 90000-9999", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(15), updated_at: pastDate(1) },
-  { id: "p0000010", expedicao_id: "e0000000-0000-0000-0000-000000000003", bitrix_contact_id: "BX-3002", bitrix_deal_id: "BX-D-3002", nome_completo: "Bianca Andrade", tipo: "Pagante", cpf: "000.111.222-33", passaporte: null, data_nascimento: "1995-08-17", validade_passaporte: null, email: "bi@gmail.com", telefone: "+55 11 99876-5432", status_reserva: "Lead", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(8), updated_at: pastDate(1) },
+  { id: "p0000009", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000003", bitrix_contact_id: "BX-3001", bitrix_deal_id: "BX-D-3001", nome_completo: "Marcos Tavares", tipo: "Pagante", cpf: "999.000.111-22", passaporte: "FG789012", data_nascimento: "1980-04-09", validade_passaporte: futureDate(1200), email: "ma@gmail.com", telefone: "+55 11 90000-9999", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(15), updated_at: pastDate(1) },
+  { id: "p0000010", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000003", bitrix_contact_id: "BX-3002", bitrix_deal_id: "BX-D-3002", nome_completo: "Bianca Andrade", tipo: "Pagante", cpf: "000.111.222-33", passaporte: null, data_nascimento: "1995-08-17", validade_passaporte: null, email: "bi@gmail.com", telefone: "+55 11 99876-5432", status_reserva: "Lead", voo_nacional_necessario: true, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: pastDate(8), updated_at: pastDate(1) },
   // Egito
-  { id: "p0000011", expedicao_id: "e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4001", bitrix_deal_id: "BX-D-4001", nome_completo: "Roberto Carvalho", tipo: "Pagante", cpf: "111.000.222-44", passaporte: "FH890123", data_nascimento: "1978-01-19", validade_passaporte: futureDate(300), email: "ro@gmail.com", telefone: "+55 11 98765-1234", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4001", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(7) },
-  { id: "p0000012", expedicao_id: "e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4002", bitrix_deal_id: "BX-D-4002", nome_completo: "Helena Castro", tipo: "Pagante", cpf: "222.111.333-55", passaporte: "FI901234", data_nascimento: "1986-10-05", validade_passaporte: futureDate(400), email: "he@gmail.com", telefone: "+55 11 91234-5678", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4002", quarto_id: null, observacoes: null, created_at: pastDate(33), updated_at: pastDate(7) },
+  { id: "p0000011", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4001", bitrix_deal_id: "BX-D-4001", nome_completo: "Roberto Carvalho", tipo: "Pagante", cpf: "111.000.222-44", passaporte: "FH890123", data_nascimento: "1978-01-19", validade_passaporte: futureDate(300), email: "ro@gmail.com", telefone: "+55 11 98765-1234", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4001", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(7) },
+  { id: "p0000012", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4002", bitrix_deal_id: "BX-D-4002", nome_completo: "Helena Castro", tipo: "Pagante", cpf: "222.111.333-55", passaporte: "FI901234", data_nascimento: "1986-10-05", validade_passaporte: futureDate(400), email: "he@gmail.com", telefone: "+55 11 91234-5678", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4002", quarto_id: null, observacoes: null, created_at: pastDate(33), updated_at: pastDate(7) },
 ];
 
 export const mockQuartos: Tables<"quartos">[] = [
@@ -269,15 +275,60 @@ export const mockPagamentos: Tables<"pagamentos">[] = [
   { id: "pg004", custo_id: "c0004", fornecedor_id: "f0000000-0000-0000-0000-000000000001", servico: "Ingressos Machu Picchu", moeda: "USD", valor_total: 1200, entrada: 0, saldo: 1200, vencimento_saldo: futureDate(80), status: "Pendente", observacoes: null, created_at: pastDate(8), updated_at: pastDate(8) },
 ];
 
-export const mockChecklistItens: Tables<"checklist_itens">[] = [
-  { id: "ck001", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pós-venda", tarefa: "Enviar manual de embarque por email", responsavel_id: "00000000-0000-0000-0000-000000000002", status: "Concluído", prazo: pastDate(20), prioridade: "Alta", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(20) },
-  { id: "ck002", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pré-viagem", tarefa: "Coletar passaportes (validade > 6m)", responsavel_id: "00000000-0000-0000-0000-000000000002", status: "Em andamento", prazo: futureDate(20), prioridade: "Crítica", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: "2 pax pendentes", created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "ck003", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pré-viagem", tarefa: "Confirmar voos nacionais", responsavel_id: "00000000-0000-0000-0000-000000000002", status: "Pendente", prazo: futureDate(40), prioridade: "Alta", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: null, created_at: pastDate(28), updated_at: pastDate(5) },
-  { id: "ck004", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pré-viagem", tarefa: "Reunião pré-embarque (Zoom)", responsavel_id: "00000000-0000-0000-0000-000000000003", status: "Pendente", prazo: futureDate(80), prioridade: "Média", dependencia_id: "ck003", evidencia_url: null, bitrix_task_id: null, observacoes: null, created_at: pastDate(28), updated_at: pastDate(5) },
-  { id: "ck005", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Operação", tarefa: "Check-in voo internacional", responsavel_id: "00000000-0000-0000-0000-000000000002", status: "Pendente", prazo: futureDate(94), prioridade: "Crítica", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: null, created_at: pastDate(28), updated_at: pastDate(5) },
-  { id: "ck006", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pós-viagem", tarefa: "Coletar feedback NPS", responsavel_id: "00000000-0000-0000-0000-000000000003", status: "Pendente", prazo: futureDate(110), prioridade: "Média", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: null, created_at: pastDate(28), updated_at: pastDate(5) },
-  { id: "ck007", expedicao_id: "e0000000-0000-0000-0000-000000000001", etapa: "Pré-viagem", tarefa: "Solicitar vistos (não aplicável)", responsavel_id: "00000000-0000-0000-0000-000000000002", status: "Atenção", prazo: pastDate(5), prioridade: "Baixa", dependencia_id: null, evidencia_url: null, bitrix_task_id: null, observacoes: "Peru não exige visto", created_at: pastDate(28), updated_at: pastDate(5) },
-];
+// Checklist da expedição Peru = os 31 processos reais do SOP (ClickUp),
+// gerados a partir do template com prazos calculados do embarque (futureDate(95)).
+// Embarque a ~95 dias ⇒ fase atual "6 a 2 meses": as fases anteriores aparecem
+// concluídas, a atual em andamento e as seguintes pendentes (demo realista).
+export const mockChecklistItens: Tables<"checklist_itens">[] = (() => {
+  const peruId = "e0000000-0000-0000-0000-000000000001";
+  const peru = mockExpedicoes.find((e) => e.id === peruId);
+  if (!peru) return [];
+
+  const itens = construirChecklistPadrao({
+    expedicaoId: peruId,
+    dataEmbarque: peru.data_embarque,
+    responsavelPorPapel: {
+      admin: "00000000-0000-0000-0000-000000000001",
+      operacional: "00000000-0000-0000-0000-000000000002",
+      comercial: "00000000-0000-0000-0000-000000000003",
+      financeiro: "00000000-0000-0000-0000-000000000004",
+    },
+    idPrefix: "ckperu",
+    createdAt: pastDate(80),
+  });
+
+  // Simula progresso: fases passadas concluídas, fase atual mista, futuras pendentes.
+  const concluidas = new Set<EtapaChecklist>(["Após o fechamento", "12 a 6 meses"]);
+  const idStatus = new Map<string, Tables<"checklist_itens">["status"]>();
+  for (const it of itens) {
+    if (it.parent_id) continue; // decide status pelo pai; filho herda abaixo
+    if (concluidas.has(it.etapa)) {
+      idStatus.set(it.id, "Concluído");
+    } else if (it.etapa === "6 a 2 meses") {
+      // 7 processos: 2 concluídos, 1 em andamento, 1 atenção, resto pendente
+      const s =
+        it.ordem <= 2 ? "Concluído" :
+        it.ordem === 3 ? "Em andamento" :
+        it.ordem === 4 ? "Atenção" : "Pendente";
+      idStatus.set(it.id, s);
+    } else {
+      idStatus.set(it.id, "Pendente");
+    }
+  }
+  for (const it of itens) {
+    const ref = it.parent_id ?? it.id;
+    const parentStatus = idStatus.get(ref) ?? "Pendente";
+    if (it.parent_id) {
+      // filhos: se pai concluído todos concluídos; se em andamento, parte feita
+      it.status = parentStatus === "Concluído" ? "Concluído"
+        : parentStatus === "Em andamento" ? (it.ordem <= 2 ? "Concluído" : "Pendente")
+        : "Pendente";
+    } else {
+      it.status = parentStatus;
+    }
+  }
+  return itens;
+})();
 
 export const mockDocumentos: Tables<"documentos">[] = [
   { id: "d001", passageiro_id: "p0000001", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Emitido", apolice_url: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(2) },
@@ -285,6 +336,8 @@ export const mockDocumentos: Tables<"documentos">[] = [
   { id: "d003", passageiro_id: "p0000003", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Pendente", apolice_url: null, observacoes: "Aguardando passaporte", created_at: pastDate(35), updated_at: pastDate(2) },
   { id: "d004", passageiro_id: "p0000004", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Solicitado", apolice_url: null, observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
 ];
+
+export const mockLinksExpedicao: Tables<"links_expedicao">[] = [];
 
 export function getExpedicoesComAgregados(): ExpedicaoComAgregados[] {
   const usuariosById = new Map(mockUsuarios.map((u) => [u.id, u]));

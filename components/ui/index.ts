@@ -10,3 +10,5 @@ export * from "./Select";
 export * from "./Skeleton";
 export * from "./Avatar";
 export * from "./Checkbox";
+export * from "./ConfirmDeleteButton";
+export * from "./LiveBadge";

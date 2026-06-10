@@ -11,6 +11,7 @@ const TABS = [
   { slug: "pagamentos", label: "Pagamentos" },
   { slug: "checklist", label: "Checklist" },
   { slug: "documentos", label: "Documentos" },
+  { slug: "links", label: "Links" },
 ];
 
 export function ExpedicaoTabsNav({ expedicaoId }: { expedicaoId: string }) {

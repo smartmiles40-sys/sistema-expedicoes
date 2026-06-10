@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { CompassIcon } from "lucide-react";
-import { DEV_BYPASS } from "@/lib/dev-mode";
+import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
 import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage() {
-  if (DEV_BYPASS) {
+  if (DEV_AUTH_BYPASS) {
     redirect("/dashboard");
   }
 

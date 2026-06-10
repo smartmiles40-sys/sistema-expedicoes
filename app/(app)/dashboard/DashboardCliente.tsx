@@ -4,8 +4,8 @@ import {
   Plane,
   TrendingUp,
   AlertTriangle,
-  FileText,
   ArrowRight,
+  ListChecks,
 } from "lucide-react";
 import {
   BarChart,
@@ -19,15 +19,40 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { LiveBadge } from "@/components/ui/LiveBadge";
 import { formatBRL, formatPercent, formatDate, daysUntil } from "@/lib/utils";
 import { MARGEM_MINIMA, MARGEM_IDEAL } from "@/lib/constants";
 import type { ExpedicaoComAgregados } from "@/types/database";
+import type { ResumoProcessoExpedicao } from "@/lib/data/expedicoes";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 
 interface Props {
   expedicoes: ExpedicaoComAgregados[];
+  processos: ResumoProcessoExpedicao[];
 }
 
-export function DashboardCliente({ expedicoes }: Props) {
+export function DashboardCliente({ expedicoes, processos }: Props) {
+  // Dashboard depende de várias tabelas. Debounce maior (1s) pra agrupar
+  // múltiplos eventos quando alguém edita várias coisas em sequência.
+  const realtimeStatus = useRealtimeRefresh({
+    debounceMs: 1000,
+    subscriptions: [
+      { table: "expedicoes" },
+      { table: "passageiros" },
+      { table: "custos" },
+      { table: "pagamentos" },
+      { table: "checklist_itens" },
+    ],
+  });
+
+  // Processos (checklist) cross-expedição
+  const comProcessos = processos.filter((p) => p.total > 0);
+  const totalAtrasados = comProcessos.reduce((s, p) => s + p.atrasados, 0);
+  const totalProximos = comProcessos.reduce((s, p) => s + p.proximos7d, 0);
+  const processosOrdenados = [...comProcessos].sort(
+    (a, b) => b.atrasados - a.atrasados || b.proximos7d - a.proximos7d,
+  );
+
   const ativas = expedicoes.filter(
     (e) => e.status === "Vendas Abertas" || e.status === "Em andamento" || e.status === "Planejamento",
   );
@@ -58,7 +83,10 @@ export function DashboardCliente({ expedicoes }: Props) {
   return (
     <div className="p-4 space-y-4">
       <div>
-        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold">Dashboard</h1>
+          <LiveBadge status={realtimeStatus} />
+        </div>
         <p className="text-xs text-muted-foreground">
           Visão executiva de {ativas.length} expediç{ativas.length === 1 ? "ão" : "ões"} ativa{ativas.length === 1 ? "" : "s"}
         </p>
@@ -88,9 +116,9 @@ export function DashboardCliente({ expedicoes }: Props) {
         <KpiCard
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Atenção requerida"
-          value={String(totalPagamentosVencidos + totalDocsPendentes)}
-          sub={`${totalPagamentosVencidos} pagto vencidos, ${totalDocsPendentes} docs pendentes`}
-          variant={totalPagamentosVencidos + totalDocsPendentes > 0 ? "atencao" : "auto"}
+          value={String(totalPagamentosVencidos + totalDocsPendentes + totalAtrasados)}
+          sub={`${totalAtrasados} processos atrasados · ${totalPagamentosVencidos} pagtos · ${totalDocsPendentes} docs`}
+          variant={totalPagamentosVencidos + totalDocsPendentes + totalAtrasados > 0 ? "atencao" : "auto"}
         />
       </div>
 
@@ -130,6 +158,59 @@ export function DashboardCliente({ expedicoes }: Props) {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Processos (checklist) cross-expedição */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="flex items-center gap-1.5">
+            <ListChecks className="h-4 w-4 text-editavel-600" /> Processos das expedições
+          </CardTitle>
+          <div className="flex items-center gap-1.5">
+            {totalAtrasados > 0 && <Badge variant="critico">{totalAtrasados} atrasado{totalAtrasados > 1 ? "s" : ""}</Badge>}
+            {totalProximos > 0 && <Badge variant="atencao">{totalProximos} vencem em 7d</Badge>}
+            {totalAtrasados === 0 && totalProximos === 0 && <Badge variant="vinculado">Em dia</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {processosOrdenados.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4">
+              Nenhuma expedição com checklist. Gere o checklist padrão na aba de cada expedição.
+            </p>
+          ) : (
+            processosOrdenados.map((p) => {
+              const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/expedicoes/${p.id}/checklist`}
+                  className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors group"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[13px] font-medium">{p.nome}</span>
+                      {p.faseAtual && <Badge variant="lista">{p.faseAtual}</Badge>}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={pct === 100 ? "h-full rounded-full bg-vinculado-500" : "h-full rounded-full bg-editavel-600"}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">{p.concluidos}/{p.total}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {p.atrasados > 0 && <Badge variant="critico">{p.atrasados} atrasado{p.atrasados > 1 ? "s" : ""}</Badge>}
+                    {p.proximos7d > 0 && <Badge variant="atencao">{p.proximos7d} em 7d</Badge>}
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </Link>
+              );
+            })
+          )}
         </CardContent>
       </Card>
 

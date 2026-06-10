@@ -1,5 +1,4 @@
-import { listChecklist } from "@/lib/data/expedicoes";
-import { listUsuarios } from "@/lib/data/expedicoes";
+import { listChecklist, listUsuarios, getExpedicao } from "@/lib/data/expedicoes";
 import { ChecklistTabela } from "./ChecklistTabela";
 
 export default async function ChecklistPage({
@@ -8,10 +7,19 @@ export default async function ChecklistPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [itens, usuarios] = await Promise.all([listChecklist(id), listUsuarios()]);
+  const [itens, usuarios, expedicao] = await Promise.all([
+    listChecklist(id),
+    listUsuarios(),
+    getExpedicao(id),
+  ]);
   return (
     <div className="p-4">
-      <ChecklistTabela itens={itens} usuarios={usuarios} />
+      <ChecklistTabela
+        expedicaoId={id}
+        itens={itens}
+        usuarios={usuarios}
+        dataEmbarque={expedicao?.data_embarque ?? null}
+      />
     </div>
   );
 }

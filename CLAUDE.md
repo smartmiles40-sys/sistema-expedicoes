@@ -166,6 +166,34 @@ Detalhes: `docs/N8N_INTEGRATION.md`.
 | P5 | Dashboard exec + Fornecedores + Câmbios + Config | ✅ |
 | P6 | Command palette + atalhos + dark mode + realtime | ✅ |
 | P7 | Webhooks Bitrix | ✅ |
+| P8 | Motor de Processos (checklist = SOP real do ClickUp) | ✅ |
+
+## ✅ Checklist = Motor de Processos (P8)
+
+O checklist espelha o **SOP real da agência** (ClickUp "Processos - Expedição"):
+**31 processos canônicos em 5 fases por ANTECEDÊNCIA ao embarque** (+ "Pós-viagem"
+opcional). Não é mais uma lista genérica por categoria.
+
+- **Fases** (`ETAPA_CHECKLIST` em `lib/constants.ts`, na ordem da timeline):
+  `Após o fechamento` → `12 a 6 meses` → `6 a 2 meses` → `2 meses a 15 dias` →
+  `Na semana` → `Pós-viagem`. Metadados (janela de dias, prazo de referência) em
+  `FASES_CHECKLIST`; `faseAtualChecklist(diasAteEmbarque)` calcula a fase corrente.
+- **Catálogo:** `lib/processos/template.ts` (`PROCESSOS_EXPEDICAO`, 31 itens verbatim
+  do ClickUp + subtarefas) e o builder puro `construirChecklistPadrao()` que instancia
+  os itens calculando `prazo = data_embarque − offset`.
+- **Seeding:** server action `gerarChecklistPadrao(expedicaoId)` (em
+  `app/(app)/expedicoes/actions.ts`). Disparada pelo empty-state da aba checklist e
+  pelo toggle "Gerar checklist padrão" do `NovaExpedicaoDrawer`. No Supabase insere
+  pais e depois filhos (FK `parent_id`).
+- **Subtarefas:** coluna `parent_id` (self-FK) + `ordem` — migration
+  `0009_checklist_processos.sql`. UI com linhas expansíveis e progresso por pai.
+- **UI:** `ChecklistTabela.tsx` agrupa por fase, mostra timeline, barra de progresso por
+  fase, destaque da fase atual, checkbox de conclusão e status editável inline.
+- **Dashboard:** card "Processos das expedições" + KPI de atrasados/próximos
+  (`getResumoProcessos()` em `lib/data/expedicoes.ts`).
+
+⚠️ Ao mexer no checklist: as 4 etapas antigas (`Pós-venda/Pré-viagem/Operação/Pós-viagem`)
+**não existem mais** — use os valores de `ETAPA_CHECKLIST`.
 
 ## 🧪 Como rodar
 

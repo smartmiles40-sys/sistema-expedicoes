@@ -15,7 +15,12 @@ export default async function PagamentosPage({
   ]);
   return (
     <div className="p-4">
-      <PagamentosTabela pagamentos={pagamentos} custos={custos} fornecedores={fornecedores} />
+      <PagamentosTabela
+        expedicaoId={id}
+        pagamentos={pagamentos}
+        custos={custos}
+        fornecedores={fornecedores}
+      />
     </div>
   );
 }

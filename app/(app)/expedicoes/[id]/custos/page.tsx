@@ -16,7 +16,7 @@ export default async function CustosPage({
   ]);
   return (
     <div className="p-4">
-      <CustosTabela custos={custos} fornecedores={fornecedores} cambios={cambios} />
+      <CustosTabela expedicaoId={id} custos={custos} fornecedores={fornecedores} cambios={cambios} />
     </div>
   );
 }

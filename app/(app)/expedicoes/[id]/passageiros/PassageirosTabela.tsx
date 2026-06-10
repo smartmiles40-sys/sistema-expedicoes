@@ -1,15 +1,20 @@
 "use client";
 import * as React from "react";
-import { Download, Plus, RefreshCw, Search } from "lucide-react";
+import { Download, Pencil, Plus, RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EditableCell } from "@/components/tables/EditableCell";
-import { atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
+import { atualizarPassageiroCampo, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { LiveBadge } from "@/components/ui/LiveBadge";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import { STATUS_RESERVA, TIPO_PASSAGEIRO } from "@/lib/constants";
-import type { PassageiroRow, QuartoRow, StatusReserva } from "@/types/database";
+import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva } from "@/types/database";
 import { toast } from "sonner";
+import { NovoPassageiroDrawer } from "./NovoPassageiroDrawer";
+import { EditarPassageiroDrawer } from "./EditarPassageiroDrawer";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -22,13 +27,31 @@ interface Props {
   expedicaoId: string;
   passageiros: PassageiroRow[];
   quartos: QuartoRow[];
+  arquivos: ArquivoRow[];
   dataEmbarque: string;
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbarque }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque }: Props) {
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  const passageiroEditando = editandoId ? passageiros.find((p) => p.id === editandoId) ?? null : null;
+
+  const realtimeStatus = useRealtimeRefresh({
+    subscriptions: [
+      { table: "passageiros", filter: `expedicao_id=eq.${expedicaoId}` },
+      { table: "arquivos", filter: `expedicao_id=eq.${expedicaoId}` },
+    ],
+  });
+
+  const indiceById = React.useMemo(() => {
+    const ordenados = [...passageiros].sort((a, b) =>
+      (a.created_at ?? "").localeCompare(b.created_at ?? ""),
+    );
+    return new Map(ordenados.map((p, i) => [p.id, i + 1]));
+  }, [passageiros]);
 
   const filtrados = passageiros.filter((p) => {
     if (statusFiltro && p.status_reserva !== statusFiltro) return false;
@@ -93,6 +116,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
           />
         </div>
         <div className="flex items-center gap-2">
+          <LiveBadge status={realtimeStatus} />
           <Button
             variant="outline"
             size="sm"
@@ -103,7 +127,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
           <Button variant="outline" size="sm" onClick={exportarCSV}>
             <Download className="h-3 w-3" /> Exportar
           </Button>
-          <Button size="sm" onClick={() => toast.info("Drawer 'Adicionar manualmente' a implementar")}>
+          <Button size="sm" onClick={() => setDrawerOpen(true)}>
             <Plus className="h-3 w-3" /> Adicionar
           </Button>
         </div>
@@ -114,6 +138,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
           <table className="w-full table-dense">
             <thead className="bg-muted/40 border-b border-border">
               <tr>
+                <Th>ID</Th>
                 <Th>Nome</Th>
                 <Th>Tipo</Th>
                 <Th>CPF</Th>
@@ -123,12 +148,13 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
                 <Th>Voo</Th>
                 <Th>Status</Th>
                 <Th>Observações</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center text-muted-foreground py-8">
+                  <td colSpan={11} className="text-center text-muted-foreground py-8">
                     Nenhum passageiro encontrado.
                   </td>
                 </tr>
@@ -142,7 +168,18 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
                   const quarto = p.quarto_id ? quartosById.get(p.quarto_id) : null;
                   return (
                     <tr key={p.id} className="border-b border-border hover:bg-accent/30">
-                      <td className="font-medium px-2.5">{p.nome_completo}</td>
+                      <td className="px-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+                        #{String(indiceById.get(p.id) ?? "").padStart(3, "0")}
+                      </td>
+                      <td className="font-medium px-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditandoId(p.id)}
+                          className="text-left hover:underline"
+                        >
+                          {p.nome_completo}
+                        </button>
+                      </td>
                       <td className="px-2.5">
                         <Badge variant={p.tipo === "Líder" ? "lista" : p.tipo === "Cortesia" ? "auto" : "vinculado"}>
                           {p.tipo}
@@ -182,6 +219,26 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
                           placeholder="—"
                         />
                       </td>
+                      <td className="w-16 px-1">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditandoId(p.id)}
+                            aria-label="Editar passageiro"
+                            title="Editar / Arquivos"
+                            className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <ConfirmDeleteButton
+                            ariaLabel="Excluir passageiro"
+                            title={`Excluir "${p.nome_completo}"?`}
+                            description="Esta ação não pode ser desfeita. Arquivos vinculados continuarão no storage."
+                            successMessage="Passageiro excluído"
+                            onConfirm={() => excluirPassageiro(p.id, expedicaoId)}
+                          />
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -194,11 +251,24 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, dataEmbar
       <p className="text-[11px] text-muted-foreground">
         Clique numa célula azul pra editar. Enter salva, Esc cancela, Tab vai pra próxima.
       </p>
+
+      <NovoPassageiroDrawer
+        expedicaoId={expedicaoId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
+
+      <EditarPassageiroDrawer
+        expedicaoId={expedicaoId}
+        passageiro={passageiroEditando}
+        arquivos={arquivos}
+        onOpenChange={(open) => !open && setEditandoId(null)}
+      />
     </div>
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function Th({ children }: { children?: React.ReactNode }) {
   return (
     <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap px-2.5">
       {children}

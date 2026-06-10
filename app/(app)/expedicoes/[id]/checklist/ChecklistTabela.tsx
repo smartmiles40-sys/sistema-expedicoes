@@ -1,17 +1,30 @@
 "use client";
 import * as React from "react";
-import { LayoutGrid, List as ListIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { LayoutGrid, List as ListIcon, Plus, ChevronRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { EditableCell } from "@/components/tables/EditableCell";
-import { atualizarChecklistCampo } from "@/app/(app)/expedicoes/actions";
+import { EditableSelectCell, type SelectOption } from "@/components/tables/EditableSelectCell";
+import {
+  atualizarChecklistCampo,
+  excluirChecklistItem,
+  gerarChecklistPadrao,
+} from "@/app/(app)/expedicoes/actions";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
-import { ETAPA_CHECKLIST } from "@/lib/constants";
+import { ETAPA_CHECKLIST, FASES_CHECKLIST, STATUS_CHECKLIST, faseAtualChecklist } from "@/lib/constants";
+import { NovoChecklistDrawer } from "./NovoChecklistDrawer";
+import { LiveBadge } from "@/components/ui/LiveBadge";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import type {
   ChecklistItemRow,
   UsuarioRow,
   StatusChecklist,
   Prioridade,
+  EtapaChecklist,
 } from "@/types/database";
 
 const STATUS_VARIANT: Record<StatusChecklist, "auto" | "lista" | "atencao" | "vinculado" | "critico"> = {
@@ -21,6 +34,20 @@ const STATUS_VARIANT: Record<StatusChecklist, "auto" | "lista" | "atencao" | "vi
   Concluído: "vinculado",
   Bloqueado: "critico",
 };
+
+const STATUS_DOT: Record<StatusChecklist, string> = {
+  Pendente: "bg-muted-foreground/40",
+  "Em andamento": "bg-lista-500",
+  Atenção: "bg-atencao-500",
+  Concluído: "bg-vinculado-500",
+  Bloqueado: "bg-critico-500",
+};
+
+const STATUS_OPTIONS: SelectOption[] = STATUS_CHECKLIST.map((s) => ({
+  value: s,
+  label: s,
+  dotClassName: STATUS_DOT[s],
+}));
 
 const PRIORIDADE_VARIANT: Record<Prioridade, "auto" | "lista" | "atencao" | "critico"> = {
   Baixa: "auto",
@@ -37,65 +64,289 @@ const KANBAN_COLUNAS: { titulo: string; statuses: StatusChecklist[] }[] = [
 ];
 
 interface Props {
+  expedicaoId: string;
   itens: ChecklistItemRow[];
   usuarios: UsuarioRow[];
+  dataEmbarque: string | null;
 }
 
-export function ChecklistTabela({ itens, usuarios }: Props) {
+export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: Props) {
   const [view, setView] = React.useState<"tabela" | "kanban">("tabela");
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
   const usuariosById = new Map(usuarios.map((u) => [u.id, u]));
+
+  const realtimeStatus = useRealtimeRefresh({
+    subscriptions: [
+      { table: "checklist_itens", filter: `expedicao_id=eq.${expedicaoId}` },
+    ],
+  });
+
+  const diasAteEmbarque = daysUntil(dataEmbarque);
+  const faseAtual = faseAtualChecklist(diasAteEmbarque);
+
+  const topLevel = itens.filter((i) => !i.parent_id);
+  const concluidosTop = topLevel.filter((i) => i.status === "Concluído").length;
+
+  if (itens.length === 0) {
+    return (
+      <ChecklistVazio
+        expedicaoId={expedicaoId}
+        temEmbarque={!!dataEmbarque}
+        onNova={() => setDrawerOpen(true)}
+        drawerSlot={
+          <NovoChecklistDrawer
+            expedicaoId={expedicaoId}
+            usuarios={usuarios}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+          />
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Checklist</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold">Checklist de processos</h2>
+            <LiveBadge status={realtimeStatus} />
+          </div>
           <p className="text-xs text-muted-foreground">
-            {itens.filter((i) => i.status === "Concluído").length}/{itens.length} concluídos
+            {concluidosTop}/{topLevel.length} processos concluídos
+            {faseAtual && (
+              <> · fase atual: <span className="font-medium text-foreground">{faseAtual}</span></>
+            )}
           </p>
         </div>
-        <div className="inline-flex border border-border rounded-md overflow-hidden">
-          <button
-            className={cn(
-              "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
-              view === "tabela" ? "bg-foreground text-background" : "hover:bg-accent",
-            )}
-            onClick={() => setView("tabela")}
-          >
-            <ListIcon className="h-3 w-3" /> Tabela
-          </button>
-          <button
-            className={cn(
-              "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
-              view === "kanban" ? "bg-foreground text-background" : "hover:bg-accent",
-            )}
-            onClick={() => setView("kanban")}
-          >
-            <LayoutGrid className="h-3 w-3" /> Kanban
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex border border-border rounded-md overflow-hidden">
+            <button
+              className={cn(
+                "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
+                view === "tabela" ? "bg-foreground text-background" : "hover:bg-accent",
+              )}
+              onClick={() => setView("tabela")}
+            >
+              <ListIcon className="h-3 w-3" /> Timeline
+            </button>
+            <button
+              className={cn(
+                "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
+                view === "kanban" ? "bg-foreground text-background" : "hover:bg-accent",
+              )}
+              onClick={() => setView("kanban")}
+            >
+              <LayoutGrid className="h-3 w-3" /> Kanban
+            </button>
+          </div>
+          <Button size="sm" onClick={() => setDrawerOpen(true)}>
+            <Plus className="h-3 w-3" /> Nova tarefa
+          </Button>
         </div>
       </div>
 
+      <FaseTimeline itens={topLevel} faseAtual={faseAtual} />
+
       {view === "tabela" ? (
-        <ChecklistTable itens={itens} usuariosById={usuariosById} />
+        <ChecklistTable
+          expedicaoId={expedicaoId}
+          itens={itens}
+          usuariosById={usuariosById}
+          faseAtual={faseAtual}
+        />
       ) : (
-        <ChecklistKanban itens={itens} usuariosById={usuariosById} />
+        <ChecklistKanban itens={topLevel} usuariosById={usuariosById} />
       )}
+
+      <NovoChecklistDrawer
+        expedicaoId={expedicaoId}
+        usuarios={usuarios}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
+    </div>
+  );
+}
+
+/* ───────────────────────── Empty state ───────────────────────── */
+
+function ChecklistVazio({
+  expedicaoId,
+  temEmbarque,
+  onNova,
+  drawerSlot,
+}: {
+  expedicaoId: string;
+  temEmbarque: boolean;
+  onNova: () => void;
+  drawerSlot: React.ReactNode;
+}) {
+  const router = useRouter();
+  const [gerando, setGerando] = React.useState(false);
+
+  async function gerar() {
+    setGerando(true);
+    const r = await gerarChecklistPadrao(expedicaoId);
+    setGerando(false);
+    if (r.ok) {
+      toast.success(`Checklist criado · ${r.total} itens`);
+      router.refresh();
+    } else {
+      toast.error("Não foi possível gerar", { description: r.error });
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-center">
+      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-editavel-50 text-editavel-600 dark:bg-editavel-600/15">
+        <Sparkles className="h-5 w-5" />
+      </div>
+      <h3 className="text-sm font-semibold">Nenhum processo cadastrado</h3>
+      <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+        Gere o checklist padrão com os <strong>31 processos</strong> da expedição, organizados nas 5 fases
+        de antecedência. Os prazos são calculados automaticamente a partir da data de embarque.
+      </p>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        <Button size="sm" onClick={gerar} disabled={gerando}>
+          <Sparkles className="h-3 w-3" /> {gerando ? "Gerando..." : "Gerar checklist padrão"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={onNova}>
+          <Plus className="h-3 w-3" /> Tarefa avulsa
+        </Button>
+      </div>
+      {!temEmbarque && (
+        <p className="mt-3 text-[11px] text-atencao-600">
+          Defina a data de embarque da expedição para prazos precisos.
+        </p>
+      )}
+      {drawerSlot}
+    </div>
+  );
+}
+
+/* ───────────────────────── Timeline de fases ───────────────────────── */
+
+function FaseTimeline({
+  itens,
+  faseAtual,
+}: {
+  itens: ChecklistItemRow[];
+  faseAtual: EtapaChecklist | null;
+}) {
+  const faseAtualIdx = faseAtual ? ETAPA_CHECKLIST.indexOf(faseAtual) : -1;
+  const fasesComItens = FASES_CHECKLIST.filter((f) =>
+    itens.some((i) => i.etapa === f.etapa),
+  );
+  if (fasesComItens.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {fasesComItens.map((f) => {
+        const items = itens.filter((i) => i.etapa === f.etapa);
+        const done = items.filter((i) => i.status === "Concluído").length;
+        const idx = ETAPA_CHECKLIST.indexOf(f.etapa);
+        const isAtual = f.etapa === faseAtual;
+        const isPassada = faseAtualIdx >= 0 && idx < faseAtualIdx;
+        const completa = done === items.length;
+        return (
+          <div
+            key={f.etapa}
+            title={f.descricao}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]",
+              isAtual
+                ? "border-editavel-600 bg-editavel-50 text-editavel-700 dark:bg-editavel-600/15 dark:text-editavel-300"
+                : completa
+                  ? "border-vinculado-500/40 bg-vinculado-50 text-vinculado-700 dark:bg-vinculado-600/10 dark:text-vinculado-300"
+                  : isPassada
+                    ? "border-border bg-muted/40 text-muted-foreground"
+                    : "border-border text-muted-foreground",
+            )}
+          >
+            {completa ? (
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
+            ) : (
+              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", isAtual ? "bg-editavel-600" : "bg-muted-foreground/40")} />
+            )}
+            <span className="font-medium">{f.etapa}</span>
+            <span className="tabular-nums opacity-70">{done}/{items.length}</span>
+            {isAtual && <span className="rounded bg-editavel-600 px-1 text-[9px] font-bold uppercase text-white">agora</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ───────────────────────── Tabela por fase ───────────────────────── */
+
+function ProgressBar({ value, total }: { value: number; total: number }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn("h-full rounded-full transition-all", pct === 100 ? "bg-vinculado-500" : "bg-editavel-600")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
     </div>
   );
 }
 
 function ChecklistTable({
+  expedicaoId,
   itens,
   usuariosById,
+  faseAtual,
 }: {
+  expedicaoId: string;
   itens: ChecklistItemRow[];
   usuariosById: Map<string, UsuarioRow>;
+  faseAtual: EtapaChecklist | null;
 }) {
-  const grupos = ETAPA_CHECKLIST.map((e) => ({
-    etapa: e,
-    items: itens.filter((i) => i.etapa === e),
+  const router = useRouter();
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+
+  const childrenByParent = React.useMemo(() => {
+    const m = new Map<string, ChecklistItemRow[]>();
+    for (const it of itens) {
+      if (it.parent_id) {
+        const arr = m.get(it.parent_id) ?? [];
+        arr.push(it);
+        m.set(it.parent_id, arr);
+      }
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.ordem - b.ordem);
+    return m;
+  }, [itens]);
+
+  const grupos = ETAPA_CHECKLIST.map((etapa) => ({
+    etapa,
+    descricao: FASES_CHECKLIST.find((f) => f.etapa === etapa)?.descricao ?? "",
+    items: itens
+      .filter((i) => !i.parent_id && i.etapa === etapa)
+      .sort((a, b) => a.ordem - b.ordem),
   })).filter((g) => g.items.length > 0);
+
+  function toggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function salvarCampo(id: string, campo: string, valor: unknown) {
+    const r = await atualizarChecklistCampo(id, campo, valor);
+    if (!r.ok) toast.error("Erro ao salvar", { description: r.error });
+    router.refresh();
+    return r;
+  }
 
   return (
     <div className="rounded-md border border-border overflow-hidden bg-background">
@@ -103,64 +354,190 @@ function ChecklistTable({
         <table className="w-full table-dense">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
-              <Th>Tarefa</Th>
+              <Th className="w-8"></Th>
+              <Th>Processo</Th>
               <Th>Responsável</Th>
               <Th>Prazo</Th>
               <Th className="text-right">Dias</Th>
               <Th>Prioridade</Th>
               <Th>Status</Th>
               <Th>Observações</Th>
+              <Th></Th>
             </tr>
           </thead>
           <tbody>
-            {grupos.map(({ etapa, items }) => (
-              <React.Fragment key={etapa}>
-                <tr className="bg-muted/30">
-                  <td colSpan={7} className="px-2.5 font-semibold text-[12px]">
-                    {etapa} <span className="text-muted-foreground font-normal">({items.length})</span>
-                  </td>
-                </tr>
-                {items.map((it) => {
-                  const dias = daysUntil(it.prazo);
-                  const isVencido = dias != null && dias < 0 && it.status !== "Concluído";
-                  return (
-                    <tr key={it.id} className={cn("border-b border-border", isVencido && "bg-critico-50 dark:bg-critico-50/30")}>
-                      <td className="px-2.5">{it.tarefa}</td>
-                      <td className="px-2.5 text-muted-foreground">
-                        {it.responsavel_id ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Avatar nome={usuariosById.get(it.responsavel_id)?.nome ?? "?"} size={20} />
-                            {usuariosById.get(it.responsavel_id)?.nome.split(" ")[0]}
-                          </span>
-                        ) : "—"}
-                      </td>
-                      <td className="px-2.5 tabular-nums">{formatDate(it.prazo)}</td>
-                      <td className="px-2.5 text-right tabular-nums">
-                        {dias == null ? <span className="text-muted-foreground">—</span> :
-                          <span className={cn(isVencido && "text-critico-600", !isVencido && dias < 7 && "text-atencao-600")}>
-                            {dias < 0 ? `${-dias}d atraso` : `${dias}d`}
-                          </span>
-                        }
-                      </td>
-                      <td className="px-2.5"><Badge variant={PRIORIDADE_VARIANT[it.prioridade]}>{it.prioridade}</Badge></td>
-                      <td className="px-2.5"><Badge variant={STATUS_VARIANT[it.status]}>{it.status}</Badge></td>
-                      <td>
-                        <EditableCell
-                          value={it.observacoes}
-                          onSave={(v) => atualizarChecklistCampo(it.id, "observacoes", v)}
+            {grupos.map(({ etapa, descricao, items }) => {
+              const done = items.filter((i) => i.status === "Concluído").length;
+              const isAtual = etapa === faseAtual;
+              return (
+                <React.Fragment key={etapa}>
+                  <tr className={cn("border-y border-border", isAtual ? "bg-editavel-50/60 dark:bg-editavel-600/10" : "bg-muted/30")}>
+                    <td colSpan={9} className="px-2.5 py-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-semibold text-[12px]">{etapa}</span>
+                          {isAtual && <Badge variant="editavel">fase atual</Badge>}
+                          <span className="truncate text-[11px] text-muted-foreground font-normal">{descricao}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] text-muted-foreground tabular-nums">{done}/{items.length}</span>
+                          <ProgressBar value={done} total={items.length} />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                  {items.map((it) => {
+                    const filhos = childrenByParent.get(it.id) ?? [];
+                    const isOpen = expanded.has(it.id);
+                    return (
+                      <React.Fragment key={it.id}>
+                        <ItemRow
+                          it={it}
+                          filhos={filhos}
+                          isOpen={isOpen}
+                          onToggle={() => toggle(it.id)}
+                          usuariosById={usuariosById}
+                          expedicaoId={expedicaoId}
+                          salvarCampo={salvarCampo}
                         />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+                        {isOpen &&
+                          filhos.map((sub) => (
+                            <ItemRow
+                              key={sub.id}
+                              it={sub}
+                              filhos={[]}
+                              isOpen={false}
+                              onToggle={() => {}}
+                              usuariosById={usuariosById}
+                              expedicaoId={expedicaoId}
+                              salvarCampo={salvarCampo}
+                              isSub
+                            />
+                          ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </div>
   );
 }
+
+function ItemRow({
+  it,
+  filhos,
+  isOpen,
+  onToggle,
+  usuariosById,
+  expedicaoId,
+  salvarCampo,
+  isSub = false,
+}: {
+  it: ChecklistItemRow;
+  filhos: ChecklistItemRow[];
+  isOpen: boolean;
+  onToggle: () => void;
+  usuariosById: Map<string, UsuarioRow>;
+  expedicaoId: string;
+  salvarCampo: (id: string, campo: string, valor: unknown) => Promise<{ ok: boolean; error?: string }>;
+  isSub?: boolean;
+}) {
+  const dias = daysUntil(it.prazo);
+  const isVencido = dias != null && dias < 0 && it.status !== "Concluído";
+  const concluido = it.status === "Concluído";
+  const subDone = filhos.filter((f) => f.status === "Concluído").length;
+
+  return (
+    <tr className={cn("border-b border-border", isVencido && "bg-critico-50 dark:bg-critico-50/30", isSub && "bg-muted/10")}>
+      <td className="px-2 align-middle">
+        <div className={cn("flex items-center", isSub && "pl-4")}>
+          {!isSub && filhos.length > 0 ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="mr-0.5 rounded p-0.5 text-muted-foreground hover:bg-muted"
+              aria-label={isOpen ? "Recolher subtarefas" : "Expandir subtarefas"}
+            >
+              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
+            </button>
+          ) : (
+            <span className="w-[18px]" />
+          )}
+          <input
+            type="checkbox"
+            checked={concluido}
+            onChange={(e) =>
+              salvarCampo(it.id, "status", e.target.checked ? "Concluído" : "Pendente")
+            }
+            className="h-3.5 w-3.5 accent-vinculado-600 cursor-pointer"
+            aria-label="Concluir"
+          />
+        </div>
+      </td>
+      <td className="px-2.5">
+        <span className={cn(isSub && "text-[12px] text-muted-foreground", concluido && "line-through text-muted-foreground")}>
+          {it.tarefa}
+        </span>
+        {!isSub && filhos.length > 0 && (
+          <span className="ml-2 rounded bg-muted px-1 text-[10px] tabular-nums text-muted-foreground">
+            {subDone}/{filhos.length}
+          </span>
+        )}
+      </td>
+      <td className="px-2.5 text-muted-foreground">
+        {it.responsavel_id ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Avatar nome={usuariosById.get(it.responsavel_id)?.nome ?? "?"} size={20} />
+            <span className="text-[12px]">{usuariosById.get(it.responsavel_id)?.nome.split(" ")[0]}</span>
+          </span>
+        ) : "—"}
+      </td>
+      <td className="px-2.5 tabular-nums text-[12px]">{formatDate(it.prazo)}</td>
+      <td className="px-2.5 text-right tabular-nums text-[12px]">
+        {dias == null ? <span className="text-muted-foreground">—</span> : (
+          <span className={cn(isVencido && "text-critico-600 font-medium", !isVencido && dias < 7 && "text-atencao-600")}>
+            {dias < 0 ? `${-dias}d atraso` : `${dias}d`}
+          </span>
+        )}
+      </td>
+      <td className="px-2.5"><Badge variant={PRIORIDADE_VARIANT[it.prioridade]}>{it.prioridade}</Badge></td>
+      <td className="px-2.5">
+        <EditableSelectCell
+          value={it.status}
+          options={STATUS_OPTIONS}
+          heading="Status"
+          onSave={(v) => salvarCampo(it.id, "status", v)}
+          renderValue={(opt) => (
+            <Badge variant={STATUS_VARIANT[(opt?.value as StatusChecklist) ?? it.status]}>
+              {opt?.label ?? it.status}
+            </Badge>
+          )}
+        />
+      </td>
+      <td>
+        <EditableCell
+          value={it.observacoes}
+          onSave={(v) => atualizarChecklistCampo(it.id, "observacoes", v)}
+        />
+      </td>
+      <td className="w-9 px-1">
+        <ConfirmDeleteButton
+          ariaLabel="Excluir tarefa"
+          title={`Excluir "${it.tarefa}"?`}
+          description={filhos.length > 0 ? `Isto remove também ${filhos.length} subtarefa(s).` : "Esta ação não pode ser desfeita."}
+          successMessage="Tarefa excluída"
+          onConfirm={() => excluirChecklistItem(it.id, expedicaoId)}
+        />
+      </td>
+    </tr>
+  );
+}
+
+/* ───────────────────────── Kanban ───────────────────────── */
 
 function ChecklistKanban({
   itens,
@@ -196,7 +573,7 @@ function ChecklistKanban({
                     >
                       <div className="text-[12px] font-medium leading-tight mb-1">{it.tarefa}</div>
                       <div className="flex items-center justify-between gap-1">
-                        <Badge variant={PRIORIDADE_VARIANT[it.prioridade]}>{it.prioridade}</Badge>
+                        <Badge variant="lista">{it.etapa}</Badge>
                         <span className="text-[10px] text-muted-foreground">{formatDate(it.prazo)}</span>
                       </div>
                       {it.responsavel_id && (
@@ -219,7 +596,7 @@ function ChecklistKanban({
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th className={cn("text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap px-2.5", className)}>
       {children}

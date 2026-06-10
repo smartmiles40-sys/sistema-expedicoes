@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { passageiroSyncSchema } from "@/lib/bitrix/validators";
 import { mapBitrixStage } from "@/lib/bitrix/stage-mapping";
-import { DEV_BYPASS } from "@/lib/dev-mode";
+import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockExpedicoes, mockPassageiros } from "@/lib/mock-data";
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const status_reserva = mapBitrixStage(data.estagio_deal);
 
   // ========== DEV MODE: usa mocks ==========
-  if (DEV_BYPASS) {
+  if (DEV_USE_MOCK_DATA) {
     const expedicao = mockExpedicoes.find((e) => e.codigo === data.expedicao_codigo);
     if (!expedicao) {
       return NextResponse.json(
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     const novo = {
       id: `p${Math.random().toString(36).slice(2, 14)}`,
       expedicao_id: expedicao.id,
+      grupo_id: null,
       bitrix_contact_id: data.bitrix_contact_id ?? null,
       bitrix_deal_id: data.bitrix_deal_id,
       nome_completo: data.nome_completo,

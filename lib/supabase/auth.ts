@@ -1,4 +1,4 @@
-import { DEV_BYPASS, MOCK_USER } from "@/lib/dev-mode";
+import { DEV_AUTH_BYPASS, MOCK_USER } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import type { PapelUsuario, UsuarioRow } from "@/types/database";
 
@@ -14,7 +14,7 @@ export interface CurrentUser {
  * Devolve o usuario logado + papel. Em dev (sem Supabase), retorna mock user.
  */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  if (DEV_BYPASS) return MOCK_USER;
+  if (DEV_AUTH_BYPASS) return MOCK_USER;
 
   const supabase = await getServerClient();
   const {

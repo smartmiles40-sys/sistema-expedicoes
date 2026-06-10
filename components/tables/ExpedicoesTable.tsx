@@ -1,12 +1,30 @@
 "use client";
 import * as React from "react";
-import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "./DataTable";
+import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Pencil } from "lucide-react";
+import { EditableSelectCell, type SelectOption } from "./EditableSelectCell";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatBRL, formatDate, formatPercent, daysUntil } from "@/lib/utils";
-import { MARGEM_MINIMA, MARGEM_IDEAL } from "@/lib/constants";
+import { MARGEM_MINIMA, MARGEM_IDEAL, STATUS_EXPEDICAO } from "@/lib/constants";
 import type { ExpedicaoComAgregados, StatusExpedicao } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { atualizarExpedicaoCampo, excluirExpedicao } from "@/app/(app)/expedicoes/actions";
 
 const STATUS_VARIANT: Record<StatusExpedicao, "lista" | "vinculado" | "atencao" | "auto" | "critico"> = {
   Planejamento: "lista",
@@ -16,105 +34,228 @@ const STATUS_VARIANT: Record<StatusExpedicao, "lista" | "vinculado" | "atencao" 
   Cancelada: "critico",
 };
 
+const STATUS_DOT: Record<StatusExpedicao, string> = {
+  Planejamento: "bg-lista-500",
+  "Vendas Abertas": "bg-vinculado-500",
+  "Em andamento": "bg-atencao-500",
+  Concluída: "bg-auto-500",
+  Cancelada: "bg-critico-500",
+};
+
+const STATUS_OPTIONS: SelectOption[] = STATUS_EXPEDICAO.map((s) => ({
+  value: s,
+  label: s,
+  dotClassName: STATUS_DOT[s],
+}));
+
+const HEADERS = [
+  { key: "drag", label: "" },
+  { key: "nome", label: "Nome" },
+  { key: "destino", label: "Destino" },
+  { key: "data_embarque", label: "Embarque" },
+  { key: "data_retorno", label: "Retorno" },
+  { key: "status", label: "Status" },
+  { key: "pax", label: "Pax" },
+  { key: "preco", label: "Preço (BRL)" },
+  { key: "receita", label: "Receita prev." },
+  { key: "margem", label: "Margem %" },
+  { key: "acoes", label: "" },
+];
+
 interface Props {
   expedicoes: ExpedicaoComAgregados[];
   selecionada?: number;
   onRowClick?: (e: ExpedicaoComAgregados) => void;
+  onEdit?: (e: ExpedicaoComAgregados) => void;
+  /** Chamado depois de cada reorder com a nova ordem de ids. */
+  onReorder?: (ids: string[]) => void;
 }
 
-export function ExpedicoesTable({ expedicoes, selecionada = -1, onRowClick }: Props) {
-  const columns = React.useMemo<ColumnDef<ExpedicaoComAgregados>[]>(
-    () => [
-      {
-        accessorKey: "codigo",
-        header: "Código",
-        cell: ({ row }) => (
-          <span className="font-mono text-[12px] tabular-nums">{row.original.codigo}</span>
-        ),
-      },
-      {
-        accessorKey: "nome",
-        header: "Nome",
-        cell: ({ row }) => <span className="font-medium">{row.original.nome}</span>,
-      },
-      { accessorKey: "destino", header: "Destino" },
-      {
-        accessorKey: "data_embarque",
-        header: "Embarque",
-        cell: ({ row }) => {
-          const dias = daysUntil(row.original.data_embarque);
-          return (
-            <div className="flex flex-col leading-tight">
-              <span className="tabular-nums">{formatDate(row.original.data_embarque)}</span>
-              {dias != null && dias >= 0 && (
-                <span className={cn("text-[10px]", dias < 30 ? "text-atencao-600" : "text-muted-foreground")}>
-                  em {dias}d
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => (
-          <Badge variant={STATUS_VARIANT[row.original.status]}>{row.original.status}</Badge>
-        ),
-      },
-      {
-        id: "pax",
-        header: "Pax",
-        cell: ({ row }) => (
-          <span className="tabular-nums">
-            <strong>{row.original.pax_confirmados}</strong>/{row.original.pax_planejados}
-          </span>
-        ),
-      },
-      {
-        id: "receita",
-        header: "Receita prev.",
-        cell: ({ row }) => (
-          <span className="tabular-nums">{formatBRL(row.original.receita_prevista_brl, 0)}</span>
-        ),
-      },
-      {
-        id: "margem",
-        header: "Margem %",
-        cell: ({ row }) => {
-          const m = row.original.margem_prevista;
-          const variant = m < MARGEM_MINIMA ? "critico" : m < MARGEM_IDEAL ? "atencao" : "vinculado";
-          return <Badge variant={variant}>{formatPercent(m)}</Badge>;
-        },
-      },
-      {
-        id: "pagto_venc",
-        header: "Pagto venc.",
-        cell: ({ row }) => {
-          const n = row.original.pagamentos_vencidos;
-          if (n === 0) return <span className="text-muted-foreground">—</span>;
-          return <Badge variant="critico">{n}</Badge>;
-        },
-      },
-      {
-        id: "docs_pend",
-        header: "Docs pend.",
-        cell: ({ row }) => {
-          const n = row.original.docs_pendentes;
-          if (n === 0) return <span className="text-muted-foreground">—</span>;
-          return <Badge variant="atencao">{n}</Badge>;
-        },
-      },
-      {
-        id: "responsavel_op",
-        header: "Resp. Op",
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">{row.original.responsavel_op_nome ?? "—"}</span>
-        ),
-      },
-    ],
-    [],
+export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder }: Props) {
+  const [items, setItems] = React.useState(expedicoes);
+
+  React.useEffect(() => {
+    setItems(expedicoes);
+  }, [expedicoes]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  return <DataTable columns={columns} data={expedicoes} onRowClick={onRowClick} emptyMessage="Nenhuma expedição encontrada com os filtros atuais." />;
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = items.findIndex((e) => e.id === active.id);
+    const newIdx = items.findIndex((e) => e.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const next = arrayMove(items, oldIdx, newIdx);
+    setItems(next);
+    onReorder?.(next.map((e) => e.id));
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border border-border bg-background py-8 text-center text-muted-foreground text-sm">
+        Nenhuma expedição encontrada com os filtros atuais.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-border overflow-hidden bg-background">
+      <div className="overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <table className="w-full table-dense border-collapse">
+            <thead className="bg-muted/40">
+              <tr className="border-b border-border">
+                {HEADERS.map((h) => (
+                  <th
+                    key={h.key}
+                    className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground select-none whitespace-nowrap px-2"
+                  >
+                    {h.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <SortableContext items={items.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {items.map((e) => (
+                  <SortableRow key={e.id} expedicao={e} onRowClick={onRowClick} onEdit={onEdit} />
+                ))}
+              </tbody>
+            </SortableContext>
+          </table>
+        </DndContext>
+      </div>
+    </div>
+  );
+}
+
+function SortableRow({
+  expedicao,
+  onRowClick,
+  onEdit,
+}: {
+  expedicao: ExpedicaoComAgregados;
+  onRowClick?: (e: ExpedicaoComAgregados) => void;
+  onEdit?: (e: ExpedicaoComAgregados) => void;
+}) {
+  const router = useRouter();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: expedicao.id,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: "relative",
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const dias = daysUntil(expedicao.data_embarque);
+  const m = expedicao.margem_prevista;
+  const margemVariant = m < MARGEM_MINIMA ? "critico" : m < MARGEM_IDEAL ? "atencao" : "vinculado";
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "border-b border-border transition-colors",
+        onRowClick && "cursor-pointer hover:bg-accent/50",
+        isDragging && "bg-accent/70 shadow-lg",
+      )}
+      onClick={onRowClick ? () => onRowClick(expedicao) : undefined}
+    >
+      <td className="w-7 pl-1 pr-0" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label="Arrastar para reordenar"
+          className="flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+      </td>
+
+      <td className="px-2 font-medium">{expedicao.nome}</td>
+
+      <td className="px-2 text-muted-foreground">{expedicao.destino}</td>
+
+      <td className="px-2">
+        <div className="flex flex-col leading-tight">
+          <span className="tabular-nums">{formatDate(expedicao.data_embarque)}</span>
+          {dias != null && dias >= 0 && (
+            <span
+              className={cn(
+                "text-[10px]",
+                dias < 30 ? "text-atencao-600" : "text-muted-foreground",
+              )}
+            >
+              em {dias}d
+            </span>
+          )}
+        </div>
+      </td>
+
+      <td className="px-2 tabular-nums">{formatDate(expedicao.data_retorno)}</td>
+
+      <td className="px-2">
+        <EditableSelectCell
+          value={expedicao.status}
+          options={STATUS_OPTIONS}
+          heading="Mudar status"
+          renderValue={(opt) => (
+            <Badge variant={STATUS_VARIANT[(opt?.value ?? expedicao.status) as StatusExpedicao]}>
+              {opt?.label ?? expedicao.status}
+            </Badge>
+          )}
+          onSave={async (v) => {
+            const r = await atualizarExpedicaoCampo(expedicao.id, "status", v);
+            router.refresh();
+            return r;
+          }}
+        />
+      </td>
+
+      <td className="px-2 tabular-nums">
+        <strong>{expedicao.pax_confirmados}</strong>
+        <span className="text-muted-foreground">/{expedicao.pax_planejados}</span>
+      </td>
+
+      <td className="px-2 tabular-nums">{formatBRL(expedicao.preco_venda_brl, 0)}</td>
+
+      <td className="px-2 tabular-nums">{formatBRL(expedicao.receita_prevista_brl, 0)}</td>
+
+      <td className="px-2">
+        <Badge variant={margemVariant}>{formatPercent(m)}</Badge>
+      </td>
+
+      <td className="w-16 px-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-0.5">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(expedicao)}
+              aria-label="Editar expedição"
+              title="Editar"
+              className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <ConfirmDeleteButton
+            ariaLabel="Excluir expedição"
+            title={`Excluir "${expedicao.nome}"?`}
+            description="A expedição e todos os passageiros, custos, pagamentos e checklist serão removidos. Esta ação não pode ser desfeita."
+            successMessage="Expedição excluída"
+            onConfirm={() => excluirExpedicao(expedicao.id)}
+          />
+        </div>
+      </td>
+    </tr>
+  );
 }

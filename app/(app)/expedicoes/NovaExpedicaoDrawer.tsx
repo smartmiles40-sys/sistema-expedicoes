@@ -25,8 +25,9 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { generateExpedicaoCodigo } from "@/lib/utils";
-import { criarExpedicao } from "./actions";
+import { criarExpedicao, gerarChecklistPadrao } from "./actions";
 import type { Tables } from "@/types/database";
+import { Sparkles } from "lucide-react";
 
 const schema = z.object({
   nome: z.string().min(3, "Mínimo 3 caracteres"),
@@ -61,6 +62,7 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
     defaultValues: { pax_planejados: 20, preco_venda_brl: 0 },
   });
 
+  const [gerarChecklist, setGerarChecklist] = React.useState(true);
   const destino = watch("destino");
   const dataEmbarque = watch("data_embarque");
 
@@ -77,7 +79,14 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
     const codigo = generateExpedicaoCodigo(data.destino, data.data_embarque);
     const result = await criarExpedicao({ ...data, codigo });
     if (result.ok) {
-      toast.success("Expedição criada", { description: codigo });
+      if (gerarChecklist) {
+        const ck = await gerarChecklistPadrao(result.id);
+        toast.success("Expedição criada", {
+          description: ck.ok ? `${codigo} · checklist com ${ck.total} processos` : codigo,
+        });
+      } else {
+        toast.success("Expedição criada", { description: codigo });
+      }
       reset();
       onOpenChange(false);
       router.push(`/expedicoes/${result.id}`);
@@ -176,6 +185,22 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/30 p-2.5">
+              <input
+                type="checkbox"
+                checked={gerarChecklist}
+                onChange={(e) => setGerarChecklist(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-editavel-600"
+              />
+              <span className="text-[12px] leading-tight">
+                <span className="inline-flex items-center gap-1 font-medium">
+                  <Sparkles className="h-3 w-3 text-editavel-600" /> Gerar checklist padrão
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  Cria os 31 processos das 5 fases com prazos calculados a partir do embarque.
+                </span>
+              </span>
+            </label>
           </DrawerBody>
           <DrawerFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

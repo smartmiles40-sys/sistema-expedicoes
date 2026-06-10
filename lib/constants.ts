@@ -65,13 +65,47 @@ export const STATUS_PAGAMENTO = [
 ] as const;
 export type StatusPagamento = (typeof STATUS_PAGAMENTO)[number];
 
+// Fases do checklist = SOP real da agência (ClickUp "Processos - Expedição").
+// Organizado por ANTECEDÊNCIA ao embarque, não por categoria genérica.
 export const ETAPA_CHECKLIST = [
-  "Pós-venda",
-  "Pré-viagem",
-  "Operação",
+  "Após o fechamento",
+  "12 a 6 meses",
+  "6 a 2 meses",
+  "2 meses a 15 dias",
+  "Na semana",
   "Pós-viagem",
 ] as const;
 export type EtapaChecklist = (typeof ETAPA_CHECKLIST)[number];
+
+/**
+ * Metadados de cada fase: ordem na timeline, descrição da janela e o
+ * intervalo de "dias até o embarque" que caracteriza a fase como ATUAL.
+ * `diasReferencia` é usado pelo seeding pra calcular o prazo padrão de uma
+ * tarefa (data_embarque − diasReferencia).
+ */
+export const FASES_CHECKLIST: {
+  etapa: EtapaChecklist;
+  descricao: string;
+  diasMin: number; // limite inferior de "dias até embarque" (exclusivo)
+  diasMax: number; // limite superior de "dias até embarque" (inclusivo)
+  diasReferencia: number; // offset padrão de prazo (dias antes do embarque)
+}[] = [
+  { etapa: "Após o fechamento", descricao: "Logo após fechar a venda", diasMin: 365, diasMax: Infinity, diasReferencia: 300 },
+  { etapa: "12 a 6 meses", descricao: "12 a 6 meses antes do embarque", diasMin: 180, diasMax: 365, diasReferencia: 240 },
+  { etapa: "6 a 2 meses", descricao: "6 a 2 meses antes do embarque", diasMin: 60, diasMax: 180, diasReferencia: 120 },
+  { etapa: "2 meses a 15 dias", descricao: "2 meses a 15 dias antes", diasMin: 15, diasMax: 60, diasReferencia: 35 },
+  { etapa: "Na semana", descricao: "Na semana da expedição", diasMin: 0, diasMax: 15, diasReferencia: 5 },
+  { etapa: "Pós-viagem", descricao: "Depois do retorno", diasMin: -Infinity, diasMax: 0, diasReferencia: -7 },
+];
+
+/** Fase atual da expedição com base nos dias até o embarque. */
+export function faseAtualChecklist(diasAteEmbarque: number | null): EtapaChecklist | null {
+  if (diasAteEmbarque == null) return null;
+  const fase = FASES_CHECKLIST.find(
+    (f) => diasAteEmbarque > f.diasMin && diasAteEmbarque <= f.diasMax,
+  );
+  return fase?.etapa ?? null;
+}
 
 export const STATUS_CHECKLIST = [
   "Pendente",
@@ -112,3 +146,15 @@ export type StatusFornecedor = (typeof STATUS_FORNECEDOR)[number];
 
 export const STATUS_VISTO = ["Não necessário", "A solicitar", "Em análise", "Aprovado", "Negado"] as const;
 export const STATUS_SEGURO = ["Pendente", "Solicitado", "Emitido"] as const;
+
+export const CATEGORIA_ARQUIVO = [
+  "Aéreos",
+  "Documentos pessoais",
+  "Bilhetes",
+  "Vistos",
+  "Seguros",
+  "Hospedagem",
+  "Vouchers",
+  "Outros",
+] as const;
+export type CategoriaArquivo = (typeof CATEGORIA_ARQUIVO)[number];

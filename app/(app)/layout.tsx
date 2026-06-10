@@ -6,12 +6,12 @@ import { GlobalShortcuts } from "@/components/layout/GlobalShortcuts";
 import { listExpedicoesComAgregados } from "@/lib/data/expedicoes";
 import { listFornecedores } from "@/lib/data/fornecedores";
 import { mockPassageiros } from "@/lib/mock-data";
-import { DEV_BYPASS } from "@/lib/dev-mode";
+import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import type { PassageiroRow } from "@/types/database";
 
 async function listAllPassageiros(): Promise<PassageiroRow[]> {
-  if (DEV_BYPASS) return mockPassageiros;
+  if (DEV_USE_MOCK_DATA) return mockPassageiros;
   const supabase = await getServerClient();
   const { data } = await supabase.from("passageiros").select("*").limit(200);
   return (data ?? []) as PassageiroRow[];

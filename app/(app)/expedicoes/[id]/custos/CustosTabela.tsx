@@ -1,14 +1,18 @@
 "use client";
 import * as React from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { EditableCell } from "@/components/tables/EditableCell";
-import { atualizarCustoCampo } from "@/app/(app)/expedicoes/actions";
+import { atualizarCustoCampo, excluirCusto } from "@/app/(app)/expedicoes/actions";
 import { formatBRL, formatMoney, formatDate, cn } from "@/lib/utils";
 import { CATEGORIA_CUSTO, type CategoriaCusto } from "@/lib/constants";
 import type { CustoRow, FornecedorRow, CambioRow, StatusCusto } from "@/types/database";
-import { toast } from "sonner";
+import { NovoCustoDrawer } from "./NovoCustoDrawer";
+import { EditarCustoDrawer } from "./EditarCustoDrawer";
+import { LiveBadge } from "@/components/ui/LiveBadge";
+import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 
 const STATUS_VARIANT: Record<StatusCusto, "auto" | "lista" | "vinculado" | "atencao" | "critico"> = {
   "A programar": "auto",
@@ -19,14 +23,25 @@ const STATUS_VARIANT: Record<StatusCusto, "auto" | "lista" | "vinculado" | "aten
 };
 
 interface Props {
+  expedicaoId: string;
   custos: CustoRow[];
   fornecedores: FornecedorRow[];
   cambios: CambioRow[];
 }
 
-export function CustosTabela({ custos, fornecedores }: Props) {
+export function CustosTabela({ expedicaoId, custos, fornecedores, cambios }: Props) {
   const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  const custoEditando = editandoId ? custos.find((c) => c.id === editandoId) ?? null : null;
   const fornecedoresById = new Map(fornecedores.map((f) => [f.id, f]));
+
+  const realtimeStatus = useRealtimeRefresh({
+    subscriptions: [
+      { table: "custos", filter: `expedicao_id=eq.${expedicaoId}` },
+      { table: "cambios" },
+    ],
+  });
 
   const grupos = React.useMemo(() => {
     const m = new Map<CategoriaCusto, CustoRow[]>();
@@ -53,10 +68,13 @@ export function CustosTabela({ custos, fornecedores }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Custos</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold">Custos</h2>
+            <LiveBadge status={realtimeStatus} />
+          </div>
           <p className="text-xs text-muted-foreground">{custos.length} itens lançados</p>
         </div>
-        <Button size="sm" onClick={() => toast.info("Drawer 'Novo Custo' a implementar")}>
+        <Button size="sm" onClick={() => setDrawerOpen(true)}>
           <Plus className="h-3 w-3" /> Novo Custo
         </Button>
       </div>
@@ -76,6 +94,7 @@ export function CustosTabela({ custos, fornecedores }: Props) {
                 <Th className="text-right">BRL Real.</Th>
                 <Th className="text-right">Diferença</Th>
                 <Th>Status</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -109,6 +128,7 @@ export function CustosTabela({ custos, fornecedores }: Props) {
                           </span>
                         )}
                       </td>
+                      <td />
                       <td />
                     </tr>
                     {!isCollapsed &&
@@ -164,6 +184,26 @@ export function CustosTabela({ custos, fornecedores }: Props) {
                             <td className="px-2.5">
                               <Badge variant={STATUS_VARIANT[c.status]}>{c.status}</Badge>
                             </td>
+                            <td className="w-16 px-1">
+                              <div className="flex items-center justify-end gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditandoId(c.id)}
+                                  aria-label="Editar custo"
+                                  title="Editar"
+                                  className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <ConfirmDeleteButton
+                                  ariaLabel="Excluir custo"
+                                  title={`Excluir "${c.servico}"?`}
+                                  description="Esta ação não pode ser desfeita. Se houver pagamento vinculado, a exclusão será bloqueada."
+                                  successMessage="Custo excluído"
+                                  onConfirm={() => excluirCusto(c.id, expedicaoId)}
+                                />
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -182,16 +222,33 @@ export function CustosTabela({ custos, fornecedores }: Props) {
                   )}
                 </td>
                 <td />
+                <td />
               </tr>
             </tbody>
           </table>
         </div>
       </div>
+
+      <NovoCustoDrawer
+        expedicaoId={expedicaoId}
+        fornecedores={fornecedores}
+        cambios={cambios}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
+
+      <EditarCustoDrawer
+        expedicaoId={expedicaoId}
+        custo={custoEditando}
+        fornecedores={fornecedores}
+        cambios={cambios}
+        onOpenChange={(open) => !open && setEditandoId(null)}
+      />
     </div>
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
       className={cn(

@@ -8,6 +8,7 @@ import {
 } from "@/lib/data/expedicoes";
 import { ExpedicaoHeader } from "./ExpedicaoHeader";
 import { ExpedicaoTabsNav } from "./ExpedicaoTabsNav";
+import { ExpedicaoRealtimeSync } from "./ExpedicaoRealtimeSync";
 
 export default async function ExpedicaoLayout({
   params,
@@ -40,6 +41,7 @@ export default async function ExpedicaoLayout({
 
   return (
     <div className="flex flex-col h-full">
+      <ExpedicaoRealtimeSync expedicaoId={id} />
       <ExpedicaoHeader
         expedicao={expedicao}
         kpis={{

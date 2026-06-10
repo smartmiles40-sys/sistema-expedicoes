@@ -1,8 +1,9 @@
 import { listPassageiros, listDocumentos, getExpedicao } from "@/lib/data/expedicoes";
+import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Drive } from "@/components/arquivos/Drive";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
-import { Upload } from "lucide-react";
 import { notFound } from "next/navigation";
 
 export default async function DocumentosPage({
@@ -11,12 +12,15 @@ export default async function DocumentosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pax, docs, expedicao] = await Promise.all([
+  const [pax, docs, expedicao, arquivos] = await Promise.all([
     listPassageiros(id),
     listDocumentos(id),
     getExpedicao(id),
+    listArquivosExpedicao(id),
   ]);
   if (!expedicao) notFound();
+
+  const arquivosExpedicao = arquivos.filter((a) => a.passageiro_id === null);
 
   const docsByPax = new Map(docs.map((d) => [d.passageiro_id, d]));
   const embarqueDias = daysUntil(expedicao.data_embarque) ?? 0;
@@ -32,10 +36,22 @@ export default async function DocumentosPage({
   }
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-4 space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Drive da expedição</CardTitle>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Arquivos compartilhados (não vinculados a um passageiro). Pra anexar algo de um pax específico, abre o perfil dele em Passageiros.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Drive expedicaoId={id} arquivos={arquivosExpedicao} />
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Documentos</h2>
+          <h2 className="text-base font-semibold">Status de documentos por passageiro</h2>
           <p className="text-xs text-muted-foreground">{pax.length} passageiros</p>
         </div>
       </div>
@@ -93,9 +109,12 @@ export default async function DocumentosPage({
                             Ver
                           </a>
                         ) : (
-                          <Button variant="ghost" size="sm" className="text-[11px] text-muted-foreground">
-                            <Upload className="h-3 w-3" /> Anexar
-                          </Button>
+                          <a
+                            href={`/expedicoes/${id}/passageiros/${p.id}`}
+                            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            Anexar no perfil
+                          </a>
                         )}
                       </td>
                       <td className="px-2.5 text-muted-foreground">
