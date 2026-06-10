@@ -10,6 +10,7 @@ import type { CambioRow } from "@/types/database";
 import { toast } from "sonner";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { sincronizarCambios } from "./actions";
 
 interface Props { cambios: CambioRow[]; }
 
@@ -24,10 +25,9 @@ export function CambiosTabela({ cambios }: Props) {
   async function sincronizar() {
     setLoading(true);
     try {
-      const res = await fetch("/api/cambios/sync", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        toast.error(`Falha ao buscar taxas: ${json.error ?? res.statusText}`);
+      const json = await sincronizarCambios();
+      if (!json.ok) {
+        toast.error(`Falha ao buscar taxas: ${json.error}`);
         return;
       }
       toast.success(`${json.atualizados} taxas atualizadas`);

@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
-import { mockCambios } from "@/lib/mock-data";
-import { buscarTaxasBrl } from "@/lib/cambio/fetch";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isValidCronBearer } from "@/lib/security/secrets";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { sincronizarTaxas } from "@/lib/cambio/sync";
+import type { AnyClient } from "@/lib/supabase/typed";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Sincronização de câmbios para o cron (GET com Bearer) e chamadas autenticadas.
+ * O botão "Atualizar agora" da UI NÃO usa esta rota — usa o server action
+ * `sincronizarCambios`, pois a mutação do mock precisa rodar no mesmo bundle
+ * da página. Aqui o núcleo é o mesmo (`sincronizarTaxas`).
+ */
 async function handler(req: NextRequest) {
   if (!DEV_AUTH_BYPASS) {
     if (req.method === "GET") {
@@ -22,49 +28,13 @@ async function handler(req: NextRequest) {
     }
   }
 
-  let taxas: Record<string, number>;
-  try {
-    taxas = await buscarTaxasBrl();
-  } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "fetch falhou" },
-      { status: 502 },
-    );
-  }
-
-  const agora = new Date().toISOString();
-  const linhas = Object.entries(taxas).map(([moeda, taxa_brl]) => ({
-    moeda,
-    taxa_brl,
-    atualizado_em: agora,
-  }));
-
-  if (DEV_USE_MOCK_DATA) {
-    for (const l of linhas) {
-      const existente = mockCambios.find((c) => c.moeda === l.moeda);
-      if (existente) {
-        existente.taxa_brl = l.taxa_brl;
-        existente.atualizado_em = l.atualizado_em;
-      } else {
-        mockCambios.push(l);
-      }
-    }
-    return NextResponse.json({ ok: true, atualizados: linhas.length, fonte: "open.er-api.com (mock)" });
-  }
-
-  try {
-    const supabase = createServiceRoleClient();
-    const { error } = await supabase.from("cambios").upsert(linhas, { onConflict: "moeda" });
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true, atualizados: linhas.length, fonte: "open.er-api.com" });
-  } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "upsert falhou" },
-      { status: 500 },
-    );
-  }
+  // Cron não tem sessão de usuário: usa service role pra furar a RLS no upsert.
+  // Em modo mock o client é ignorado pelo núcleo.
+  const client = DEV_USE_MOCK_DATA
+    ? undefined
+    : (createServiceRoleClient() as unknown as AnyClient);
+  const r = await sincronizarTaxas(client);
+  return NextResponse.json(r, { status: r.ok ? 200 : 502 });
 }
 
 export const GET = handler;
