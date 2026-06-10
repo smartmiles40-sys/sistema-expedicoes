@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Plane,
   TrendingUp,
@@ -75,10 +76,20 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
     .slice(0, 10);
 
   const chartData = ativas.map((e) => ({
+    id: e.id,
     nome: e.codigo,
     Receita: e.receita_prevista_brl,
     Custo: e.custo_planejado_brl,
   }));
+
+  const router = useRouter();
+  // Clicar numa barra (Receita ou Custo) abre a expedição correspondente.
+  // O recharts entrega o item original em `payload` (ou achatado direto).
+  const abrirExpedicao = (data: unknown) => {
+    const d = data as { id?: string; payload?: { id?: string } } | undefined;
+    const id = d?.id ?? d?.payload?.id;
+    if (id) router.push(`/expedicoes/${id}`);
+  };
 
   return (
     <div className="p-4 space-y-4">
@@ -126,6 +137,9 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Receita × Custo por expedição</CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Clique numa barra para abrir a expedição
+          </p>
         </CardHeader>
         <CardContent>
           <div className="h-[260px]">
@@ -148,8 +162,18 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Receita" fill="var(--vinculado-600)" />
-                  <Bar dataKey="Custo" fill="var(--editavel-600)" />
+                  <Bar
+                    dataKey="Receita"
+                    fill="var(--vinculado-600)"
+                    cursor="pointer"
+                    onClick={(d) => abrirExpedicao(d)}
+                  />
+                  <Bar
+                    dataKey="Custo"
+                    fill="var(--editavel-600)"
+                    cursor="pointer"
+                    onClick={(d) => abrirExpedicao(d)}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
