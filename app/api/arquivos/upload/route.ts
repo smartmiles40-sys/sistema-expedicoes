@@ -3,7 +3,12 @@ import { randomUUID } from "node:crypto";
 import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { CATEGORIA_ARQUIVO, type CategoriaArquivo } from "@/lib/constants";
+import {
+  CATEGORIA_ARQUIVO,
+  type CategoriaArquivo,
+  MAX_UPLOAD_BYTES,
+  MIME_ARQUIVO_PERMITIDOS,
+} from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +52,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "categoria inválida" }, { status: 400 });
   }
   const categoria = categoriaRaw as CategoriaArquivo;
+
+  // Valida tamanho ANTES de ler o corpo na memória (barra DoS de storage).
+  if (file.size > MAX_UPLOAD_BYTES) {
+    const maxMb = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024));
+    return NextResponse.json(
+      { ok: false, error: `arquivo excede o limite de ${maxMb} MB` },
+      { status: 413 },
+    );
+  }
+  if (file.size === 0) {
+    return NextResponse.json({ ok: false, error: "arquivo vazio" }, { status: 400 });
+  }
+  if (!MIME_ARQUIVO_PERMITIDOS.includes(file.type as (typeof MIME_ARQUIVO_PERMITIDOS)[number])) {
+    return NextResponse.json(
+      { ok: false, error: `tipo de arquivo não permitido: ${file.type || "desconhecido"}` },
+      { status: 415 },
+    );
+  }
 
   const supabase = createServiceRoleClient();
   const filename = safeName(file.name);

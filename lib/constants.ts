@@ -158,3 +158,25 @@ export const CATEGORIA_ARQUIVO = [
   "Outros",
 ] as const;
 export type CategoriaArquivo = (typeof CATEGORIA_ARQUIVO)[number];
+
+/** Tamanho máximo permitido por upload (15 MB) — barra DoS de storage. */
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+/**
+ * MIME types aceitos no upload de arquivos. Cobre o que o time anexa de fato:
+ * passaportes/vistos/vouchers (PDF + imagens) e planilhas/documentos do Office.
+ */
+export const MIME_ARQUIVO_PERMITIDOS = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+] as const;
