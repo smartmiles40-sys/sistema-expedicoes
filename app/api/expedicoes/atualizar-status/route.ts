@@ -3,6 +3,7 @@ import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { mockExpedicoes } from "@/lib/mock-data";
+import { isValidCronBearer } from "@/lib/security/secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,7 @@ export const dynamic = "force-dynamic";
 async function handler(req: NextRequest) {
   if (!DEV_AUTH_BYPASS) {
     if (req.method === "GET") {
-      const cronSecret = process.env.CRON_SECRET;
-      const auth = req.headers.get("authorization");
-      if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
+      if (!isValidCronBearer(req.headers.get("authorization"))) {
         return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
       }
     } else {

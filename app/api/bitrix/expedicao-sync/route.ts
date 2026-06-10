@@ -3,11 +3,10 @@ import { expedicaoSyncSchema } from "@/lib/bitrix/validators";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockExpedicoes } from "@/lib/mock-data";
+import { isValidWebhookSecret } from "@/lib/security/secrets";
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-webhook-secret");
-  const expected = process.env.WEBHOOK_SECRET;
-  if (!expected || secret !== expected) {
+  if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
