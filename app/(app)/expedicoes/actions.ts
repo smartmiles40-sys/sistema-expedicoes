@@ -15,7 +15,8 @@ import {
 } from "@/lib/mock-data";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
-import { ETAPA_CHECKLIST, STATUS_REQUISITO } from "@/lib/constants";
+import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
+import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import type { PapelUsuario, PassageiroRow } from "@/types/database";
 import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
@@ -1282,4 +1283,168 @@ export async function atualizarRequisitoCampo(
   revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
   return { ok: true };
+}
+
+// =============================================================================
+// IMPORTAÇÃO EM LOTE — passageiros via CSV
+// =============================================================================
+
+const importRowSchema = z.object({
+  nome_completo: z.string().min(2),
+  tipo: z.enum([...TIPO_PASSAGEIRO] as [TipoPassageiroEnum, ...TipoPassageiroEnum[]]),
+  status_reserva: z.enum([...STATUS_RESERVA] as [StatusReservaEnum, ...StatusReservaEnum[]]),
+  cpf: z.string().nullable().optional(),
+  passaporte: z.string().nullable().optional(),
+  validade_passaporte: z.string().nullable().optional(),
+  data_nascimento: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  telefone: z.string().nullable().optional(),
+  observacoes: z.string().nullable().optional(),
+});
+type TipoPassageiroEnum = (typeof TIPO_PASSAGEIRO)[number];
+type StatusReservaEnum = (typeof STATUS_RESERVA)[number];
+
+const importarSchema = z.object({
+  expedicao_id: z.string().min(1),
+  linhas: z.array(importRowSchema).min(1, "Nenhuma linha para importar").max(1000),
+});
+
+export type ImportarResult =
+  | { ok: true; inseridos: number; ignorados: number }
+  | { ok: false; error: string };
+
+function novoPassageiroDeImport(
+  expedicaoId: string,
+  d: z.infer<typeof importRowSchema>,
+): PassageiroRow {
+  const now = new Date().toISOString();
+  return {
+    id: genId("p"),
+    expedicao_id: expedicaoId,
+    grupo_id: null,
+    bitrix_contact_id: null,
+    bitrix_deal_id: null,
+    nome_completo: d.nome_completo,
+    tipo: d.tipo,
+    cpf: d.cpf ?? null,
+    passaporte: d.passaporte ?? null,
+    data_nascimento: d.data_nascimento ?? null,
+    validade_passaporte: d.validade_passaporte ?? null,
+    email: d.email ?? null,
+    telefone: d.telefone ?? null,
+    status_reserva: d.status_reserva,
+    voo_nacional_necessario: false,
+    companhia_aerea: null,
+    localizador: null,
+    quarto_id: null,
+    valor_contratado_brl: 0,
+    valor_pago_brl: 0,
+    saldo_brl: 0,
+    status_financeiro: "Em aberto",
+    contato_emergencia_nome: null,
+    contato_emergencia_fone: null,
+    restricoes_alimentares: null,
+    condicoes_medicas: null,
+    contrato_assinado: false,
+    checkin_online_feito: false,
+    observacoes: d.observacoes ?? null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+/**
+ * Importa passageiros em lote numa expedição. Pula linhas cujo CPF já existe na
+ * expedição (ou repetido dentro do próprio lote) e instancia os requisitos de
+ * embarque de cada novo pax. Devolve quantos entraram e quantos foram ignorados.
+ */
+export async function importarPassageiros(
+  input: z.infer<typeof importarSchema>,
+): Promise<ImportarResult> {
+  const parsed = importarSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  }
+  const { expedicao_id, linhas } = parsed.data;
+
+  if (DEV_USE_MOCK_DATA) {
+    const exp = mockExpedicoes.find((e) => e.id === expedicao_id);
+    if (!exp) return { ok: false, error: "Expedição não encontrada" };
+    const cpfsExistentes = new Set(
+      mockPassageiros
+        .filter((p) => p.expedicao_id === expedicao_id)
+        .map((p) => cpfDigitos(p.cpf))
+        .filter(Boolean),
+    );
+    let inseridos = 0;
+    let ignorados = 0;
+    for (const d of linhas) {
+      const cpf = cpfDigitos(d.cpf ?? null);
+      if (cpf && cpfsExistentes.has(cpf)) { ignorados++; continue; }
+      if (cpf) cpfsExistentes.add(cpf);
+      const novo = novoPassageiroDeImport(expedicao_id, d);
+      mockPassageiros.push(novo);
+      mockPassageiroRequisitos.push(
+        ...construirRequisitosPadrao({ passageiro: novo, destino: exp.destino }),
+      );
+      inseridos++;
+    }
+    revalidatePath(`/expedicoes/${expedicao_id}/passageiros`);
+    revalidatePath(`/expedicoes/${expedicao_id}`);
+    revalidatePath(`/expedicoes/${expedicao_id}/prontidao`);
+    revalidatePath("/passageiros");
+    return { ok: true, inseridos, ignorados };
+  }
+
+  const supabase = await getServerClient();
+  const { data: exp } = await supabase
+    .from("expedicoes")
+    .select("id")
+    .eq("id", expedicao_id)
+    .maybeSingle();
+  if (!exp) return { ok: false, error: "Expedição não encontrada" };
+
+  const { data: existentes } = await supabase
+    .from("passageiros")
+    .select("cpf")
+    .eq("expedicao_id", expedicao_id);
+  const cpfsExistentes = new Set(
+    ((existentes ?? []) as { cpf: string | null }[])
+      .map((p) => cpfDigitos(p.cpf))
+      .filter(Boolean),
+  );
+
+  let ignorados = 0;
+  const aInserir: Record<string, unknown>[] = [];
+  for (const d of linhas) {
+    const cpf = cpfDigitos(d.cpf ?? null);
+    if (cpf && cpfsExistentes.has(cpf)) { ignorados++; continue; }
+    if (cpf) cpfsExistentes.add(cpf);
+    aInserir.push({
+      expedicao_id,
+      nome_completo: d.nome_completo,
+      tipo: d.tipo,
+      status_reserva: d.status_reserva,
+      cpf: d.cpf ?? null,
+      passaporte: d.passaporte ?? null,
+      data_nascimento: d.data_nascimento ?? null,
+      validade_passaporte: d.validade_passaporte ?? null,
+      email: d.email ?? null,
+      telefone: d.telefone ?? null,
+      observacoes: d.observacoes ?? null,
+    });
+  }
+
+  if (aInserir.length) {
+    const { error } = await supabase.from("passageiros").insert(aInserir);
+    if (error) return { ok: false, error: error.message };
+    // Instancia requisitos pros novos pax (idempotente por pax).
+    await gerarRequisitosPadrao(expedicao_id);
+  }
+
+  revalidatePath(`/expedicoes/${expedicao_id}/passageiros`);
+  revalidatePath(`/expedicoes/${expedicao_id}`);
+  revalidatePath(`/expedicoes/${expedicao_id}/prontidao`);
+  revalidatePath("/passageiros");
+  return { ok: true, inseridos: aInserir.length, ignorados };
 }

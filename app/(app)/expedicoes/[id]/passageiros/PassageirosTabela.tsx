@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { Download, Pencil, Plus, RefreshCw, Search } from "lucide-react";
+import { Download, Pencil, Plus, RefreshCw, Search, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +15,8 @@ import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva } from "@/type
 import { toast } from "sonner";
 import { NovoPassageiroDrawer } from "./NovoPassageiroDrawer";
 import { EditarPassageiroDrawer } from "./EditarPassageiroDrawer";
+import { ImportarPassageirosDrawer } from "./ImportarPassageirosDrawer";
+import { cpfDigitos } from "@/lib/csv/passageiros-import";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -36,7 +38,12 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  const cpfsExistentes = React.useMemo(
+    () => passageiros.map((p) => cpfDigitos(p.cpf)).filter((c): c is string => Boolean(c)),
+    [passageiros],
+  );
   const passageiroEditando = editandoId ? passageiros.find((p) => p.id === editandoId) ?? null : null;
 
   const realtimeStatus = useRealtimeRefresh({
@@ -126,6 +133,9 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
           </Button>
           <Button variant="outline" size="sm" onClick={exportarCSV}>
             <Download className="h-3 w-3" /> Exportar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-3 w-3" /> Importar
           </Button>
           <Button size="sm" onClick={() => setDrawerOpen(true)}>
             <Plus className="h-3 w-3" /> Adicionar
@@ -256,6 +266,13 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         expedicaoId={expedicaoId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+      />
+
+      <ImportarPassageirosDrawer
+        expedicaoId={expedicaoId}
+        cpfsExistentes={cpfsExistentes}
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
 
       <EditarPassageiroDrawer
