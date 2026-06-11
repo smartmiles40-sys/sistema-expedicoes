@@ -32,6 +32,31 @@ export type StatusChecklist = "Pendente" | "Em andamento" | "Atenção" | "Concl
 export type Prioridade = "Baixa" | "Média" | "Alta" | "Crítica";
 export type TipoQuarto = "Single" | "Duplo" | "Twin" | "Triplo" | "Compartilhado" | "Líder";
 
+// Motor de Prontidão para Embarque (migration 0010)
+export type TipoRequisito =
+  | "Passaporte"
+  | "RG"
+  | "Visto"
+  | "Vacina"
+  | "Seguro"
+  | "Aéreo Internacional"
+  | "Aéreo Doméstico"
+  | "Contrato"
+  | "Autorização de Menor"
+  | "Pagamento"
+  | "Dados Pessoais";
+export type Obrigatoriedade = "Obrigatório" | "Condicional" | "Recomendado";
+export type StatusRequisito =
+  | "Pendente"
+  | "Em análise"
+  | "Enviado"
+  | "Aprovado"
+  | "Vencido"
+  | "Dispensado"
+  | "Reprovado";
+/** Semáforo consolidado de prontidão de um passageiro. */
+export type Prontidao = "Apto" | "Atenção" | "Bloqueado";
+
 // ========== Row interfaces ==========
 
 export type UsuarioRow = {
@@ -107,9 +132,70 @@ export type PassageiroRow = {
   companhia_aerea: string | null;
   localizador: string | null;
   quarto_id: string | null;
+  // Financeiro espelhado do Bitrix (migration 0010)
+  valor_contratado_brl: number;
+  valor_pago_brl: number;
+  saldo_brl: number; // gerado: valor_contratado_brl - valor_pago_brl
+  status_financeiro: string;
+  // Dados de embarque/pessoais (migration 0010)
+  contato_emergencia_nome: string | null;
+  contato_emergencia_fone: string | null;
+  restricoes_alimentares: string | null;
+  condicoes_medicas: string | null;
+  contrato_assinado: boolean;
+  checkin_online_feito: boolean;
   observacoes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type RequisitoDestinoRow = {
+  id: string;
+  destino: string;
+  tipo: TipoRequisito;
+  descricao: string;
+  obrigatoriedade: Obrigatoriedade;
+  bloqueia_embarque: boolean;
+  meses_validade_minima: number | null;
+  papel_responsavel: PapelUsuario | null;
+  ordem: number;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PassageiroRequisitoRow = {
+  id: string;
+  passageiro_id: string;
+  tipo: TipoRequisito;
+  descricao: string;
+  status: StatusRequisito;
+  obrigatoriedade: Obrigatoriedade;
+  bloqueia_embarque: boolean;
+  validade: string | null;
+  numero: string | null;
+  arquivo_id: string | null;
+  responsavel_id: string | null;
+  verificado_em: string | null;
+  verificado_por: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Linha da view vw_prontidao_passageiro (mesma lógica em lib/prontidao/regras.ts). */
+export type ProntidaoPassageiroView = {
+  passageiro_id: string;
+  expedicao_id: string;
+  nome_completo: string;
+  data_embarque: string;
+  data_retorno: string;
+  dias_ate_embarque: number;
+  bloqueios_abertos: number;
+  pendencias_leves: number;
+  passaporte_em_alerta: number;
+  tem_saldo: boolean;
+  prontidao: Prontidao;
 }
 
 export type CategoriaArquivo =
@@ -272,9 +358,13 @@ export type Database = {
       checklist_itens: { Row: ChecklistItemRow; Insert: Partial<ChecklistItemRow> & Pick<ChecklistItemRow, "expedicao_id" | "etapa" | "tarefa">; Update: Partial<ChecklistItemRow> };
       documentos: { Row: DocumentoRow; Insert: Partial<DocumentoRow> & Pick<DocumentoRow, "passageiro_id">; Update: Partial<DocumentoRow> };
       links_expedicao: { Row: LinkExpedicaoRow; Insert: Partial<LinkExpedicaoRow> & Pick<LinkExpedicaoRow, "expedicao_id" | "label" | "url">; Update: Partial<LinkExpedicaoRow> };
+      requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };
+      passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };
     };
-    Views: Record<string, never>;
+    Views: {
+      vw_prontidao_passageiro: { Row: ProntidaoPassageiroView };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

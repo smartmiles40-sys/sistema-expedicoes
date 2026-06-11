@@ -147,6 +147,57 @@ export type StatusFornecedor = (typeof STATUS_FORNECEDOR)[number];
 export const STATUS_VISTO = ["Não necessário", "A solicitar", "Em análise", "Aprovado", "Negado"] as const;
 export const STATUS_SEGURO = ["Pendente", "Solicitado", "Emitido"] as const;
 
+// =============================================================================
+// Prontidão para Embarque (migration 0010)
+// =============================================================================
+export const TIPO_REQUISITO = [
+  "Passaporte",
+  "RG",
+  "Visto",
+  "Vacina",
+  "Seguro",
+  "Aéreo Internacional",
+  "Aéreo Doméstico",
+  "Contrato",
+  "Autorização de Menor",
+  "Pagamento",
+  "Dados Pessoais",
+] as const;
+export type TipoRequisito = (typeof TIPO_REQUISITO)[number];
+
+export const OBRIGATORIEDADE = ["Obrigatório", "Condicional", "Recomendado"] as const;
+export type Obrigatoriedade = (typeof OBRIGATORIEDADE)[number];
+
+export const STATUS_REQUISITO = [
+  "Pendente",
+  "Em análise",
+  "Enviado",
+  "Aprovado",
+  "Vencido",
+  "Dispensado",
+  "Reprovado",
+] as const;
+export type StatusRequisito = (typeof STATUS_REQUISITO)[number];
+
+export const PRONTIDAO = ["Apto", "Atenção", "Bloqueado"] as const;
+export type Prontidao = (typeof PRONTIDAO)[number];
+
+/** Meses de validade do passaporte exigidos após o retorno (padrão de mercado). */
+export const MESES_VALIDADE_PASSAPORTE_PADRAO = 6;
+
+/** Antecedência (dias) em que um saldo em aberto deixa de ser alerta e vira bloqueio. */
+export const DIAS_BLOQUEIO_FINANCEIRO = 15;
+
+/**
+ * Mapa semáforo → token de cor semântica do tema (app/globals.css).
+ * Reaproveita a paleta do CLAUDE.md: verde=ok, laranja=atenção, vermelho=crítico.
+ */
+export const COR_PRONTIDAO: Record<Prontidao, "vinculado" | "atencao" | "critico"> = {
+  Apto: "vinculado",
+  Atenção: "atencao",
+  Bloqueado: "critico",
+};
+
 export const CATEGORIA_ARQUIVO = [
   "Aéreos",
   "Documentos pessoais",

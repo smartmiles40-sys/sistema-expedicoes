@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ListChecks,
+  ShieldCheck,
 } from "lucide-react";
 import {
   BarChart,
@@ -24,15 +25,16 @@ import { LiveBadge } from "@/components/ui/LiveBadge";
 import { formatBRL, formatPercent, formatDate, daysUntil } from "@/lib/utils";
 import { MARGEM_MINIMA, MARGEM_IDEAL } from "@/lib/constants";
 import type { ExpedicaoComAgregados } from "@/types/database";
-import type { ResumoProcessoExpedicao } from "@/lib/data/expedicoes";
+import type { ResumoProcessoExpedicao, ResumoProntidaoExpedicao } from "@/lib/data/expedicoes";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 
 interface Props {
   expedicoes: ExpedicaoComAgregados[];
   processos: ResumoProcessoExpedicao[];
+  prontidao: ResumoProntidaoExpedicao[];
 }
 
-export function DashboardCliente({ expedicoes, processos }: Props) {
+export function DashboardCliente({ expedicoes, processos, prontidao }: Props) {
   // Dashboard depende de várias tabelas. Debounce maior (1s) pra agrupar
   // múltiplos eventos quando alguém edita várias coisas em sequência.
   const realtimeStatus = useRealtimeRefresh({
@@ -43,6 +45,7 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
       { table: "custos" },
       { table: "pagamentos" },
       { table: "checklist_itens" },
+      { table: "passageiro_requisitos" },
     ],
   });
 
@@ -53,6 +56,19 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
   const processosOrdenados = [...comProcessos].sort(
     (a, b) => b.atrasados - a.atrasados || b.proximos7d - a.proximos7d,
   );
+
+  // Prontidão de embarque cross-expedição
+  const comProntidao = prontidao.filter((p) => p.total > 0);
+  const totalBloqueados = comProntidao.reduce((s, p) => s + p.bloqueados, 0);
+  const bloqueadosProximos = comProntidao
+    .filter((p) => p.diasAteEmbarque != null && p.diasAteEmbarque >= 0 && p.diasAteEmbarque <= 30)
+    .reduce((s, p) => s + p.bloqueados, 0);
+  const prontidaoOrdenada = [...comProntidao].sort((a, b) => {
+    // Próximas do embarque e com mais bloqueios primeiro.
+    const da = a.diasAteEmbarque ?? Infinity;
+    const db = b.diasAteEmbarque ?? Infinity;
+    return b.bloqueados - a.bloqueados || da - db;
+  });
 
   const ativas = expedicoes.filter(
     (e) => e.status === "Vendas Abertas" || e.status === "Em andamento" || e.status === "Planejamento",
@@ -229,6 +245,67 @@ export function DashboardCliente({ expedicoes, processos }: Props) {
                   <div className="flex shrink-0 items-center gap-1.5">
                     {p.atrasados > 0 && <Badge variant="critico">{p.atrasados} atrasado{p.atrasados > 1 ? "s" : ""}</Badge>}
                     {p.proximos7d > 0 && <Badge variant="atencao">{p.proximos7d} em 7d</Badge>}
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </Link>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Prontidão de embarque cross-expedição */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle className="flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-vinculado-600" /> Prontidão de embarque
+          </CardTitle>
+          <div className="flex items-center gap-1.5">
+            {bloqueadosProximos > 0 && (
+              <Badge variant="critico">{bloqueadosProximos} bloqueado{bloqueadosProximos > 1 ? "s" : ""} ≤30d</Badge>
+            )}
+            {totalBloqueados === 0 && <Badge variant="vinculado">Sem bloqueios</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {prontidaoOrdenada.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4">
+              Nenhuma expedição com requisitos gerados. Gere na aba Prontidão de cada expedição.
+            </p>
+          ) : (
+            prontidaoOrdenada.map((p) => {
+              const pct = p.total ? Math.round((p.aptos / p.total) * 100) : 0;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/expedicoes/${p.id}/prontidao`}
+                  className="flex items-center gap-3 rounded-md p-2 hover:bg-accent transition-colors group"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[13px] font-medium">{p.nome}</span>
+                      {p.diasAteEmbarque != null && p.diasAteEmbarque >= 0 && (
+                        <Badge variant={p.diasAteEmbarque <= 30 ? "atencao" : "auto"}>
+                          {p.diasAteEmbarque}d p/ embarque
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={pct === 100 ? "h-full rounded-full bg-vinculado-500" : "h-full rounded-full bg-vinculado-600"}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">{p.aptos}/{p.total} aptos</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {p.bloqueados > 0 && <Badge variant="critico">{p.bloqueados} bloqueado{p.bloqueados > 1 ? "s" : ""}</Badge>}
+                    {p.atencao > 0 && <Badge variant="atencao">{p.atencao} atenção</Badge>}
+                    {p.bloqueados > 0 && p.topBloqueador && (
+                      <span className="text-[10px] text-muted-foreground hidden xl:inline">↳ {p.topBloqueador}</span>
+                    )}
                     <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </Link>

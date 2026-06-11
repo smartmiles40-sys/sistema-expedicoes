@@ -3,7 +3,9 @@ import { passageiroSyncSchema } from "@/lib/bitrix/validators";
 import { mapBitrixStage } from "@/lib/bitrix/stage-mapping";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { mockExpedicoes, mockPassageiros } from "@/lib/mock-data";
+import { mockExpedicoes, mockPassageiros, mockPassageiroRequisitos } from "@/lib/mock-data";
+import { construirRequisitosPadrao } from "@/lib/prontidao/template";
+import { gerarRequisitosPadrao } from "@/app/(app)/expedicoes/actions";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
 
 function unauthorized() {
@@ -79,11 +81,25 @@ export async function POST(req: NextRequest) {
       companhia_aerea: null,
       localizador: null,
       quarto_id: null,
+      valor_contratado_brl: 0,
+      valor_pago_brl: 0,
+      saldo_brl: 0,
+      status_financeiro: "Em aberto",
+      contato_emergencia_nome: null,
+      contato_emergencia_fone: null,
+      restricoes_alimentares: null,
+      condicoes_medicas: null,
+      contrato_assinado: false,
+      checkin_online_feito: false,
       observacoes: data.observacoes ?? null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     mockPassageiros.push(novo);
+    // Instancia os requisitos de embarque do destino para o novo pax.
+    mockPassageiroRequisitos.push(
+      ...construirRequisitosPadrao({ passageiro: novo, destino: expedicao.destino }),
+    );
     return NextResponse.json({ ok: true, passageiro_id: novo.id, action: "created" });
   }
 
@@ -146,6 +162,9 @@ export async function POST(req: NextRequest) {
       dados_depois: upsertPayload,
       origem: "bitrix-webhook",
     });
+
+    // Garante os requisitos de embarque do destino (idempotente por pax).
+    await gerarRequisitosPadrao(exp.id);
 
     return NextResponse.json({
       ok: true,

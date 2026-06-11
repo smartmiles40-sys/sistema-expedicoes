@@ -14,8 +14,10 @@ import {
   mockUsuarios,
 } from "@/lib/mock-data";
 import { construirChecklistPadrao } from "@/lib/processos/template";
-import { ETAPA_CHECKLIST } from "@/lib/constants";
-import type { PapelUsuario } from "@/types/database";
+import { construirRequisitosPadrao } from "@/lib/prontidao/template";
+import { ETAPA_CHECKLIST, STATUS_REQUISITO } from "@/lib/constants";
+import type { PapelUsuario, PassageiroRow } from "@/types/database";
+import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
 function genId(prefix = "") {
   return `${prefix}${Math.random().toString(36).slice(2, 14).padEnd(12, "0")}`;
@@ -371,6 +373,16 @@ export async function criarPassageiro(
       companhia_aerea: null,
       localizador: null,
       quarto_id: null,
+      valor_contratado_brl: 0,
+      valor_pago_brl: 0,
+      saldo_brl: 0,
+      status_financeiro: "Em aberto",
+      contato_emergencia_nome: null,
+      contato_emergencia_fone: null,
+      restricoes_alimentares: null,
+      condicoes_medicas: null,
+      contrato_assinado: false,
+      checkin_online_feito: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -1135,5 +1147,139 @@ export async function excluirChecklistItem(
   const { error } = await supabase.from("checklist_itens").delete().eq("id", itemId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/checklist`);
+  return { ok: true };
+}
+
+// =============================================================================
+// PRONTIDÃO — instâncias de requisito por passageiro (P9)
+// =============================================================================
+
+/**
+ * Instancia os requisitos do destino para os passageiros da expedição que
+ * ainda não os têm (idempotente por pax). Disparado pelo empty-state da aba e
+ * pelo passageiro-sync do Bitrix ao confirmar um pax.
+ */
+export async function gerarRequisitosPadrao(
+  expedicaoId: string,
+): Promise<{ ok: true; total: number } | { ok: false; error: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const exp = mockExpedicoes.find((e) => e.id === expedicaoId);
+    if (!exp) return { ok: false, error: "Expedição não encontrada" };
+    const pax = mockPassageiros.filter(
+      (p) => p.expedicao_id === expedicaoId && p.status_reserva !== "Cancelado",
+    );
+    let total = 0;
+    for (const p of pax) {
+      if (mockPassageiroRequisitos.some((r) => r.passageiro_id === p.id)) continue;
+      const rows = construirRequisitosPadrao({
+        passageiro: p,
+        destino: exp.destino,
+        createdAt: new Date().toISOString(),
+      });
+      mockPassageiroRequisitos.push(...rows);
+      total += rows.length;
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+    revalidatePath(`/expedicoes/${expedicaoId}`);
+    return { ok: true, total };
+  }
+
+  const supabase = await getServerClient();
+  const { data: exp, error: expErr } = await supabase
+    .from("expedicoes")
+    .select("destino")
+    .eq("id", expedicaoId)
+    .maybeSingle();
+  if (expErr) return { ok: false, error: expErr.message };
+  if (!exp) return { ok: false, error: "Expedição não encontrada" };
+  const destino = (exp as { destino: string }).destino;
+
+  const { data: pax } = await supabase
+    .from("passageiros")
+    .select("*")
+    .eq("expedicao_id", expedicaoId)
+    .neq("status_reserva", "Cancelado");
+  const passageiros = (pax ?? []) as PassageiroRow[];
+  if (!passageiros.length) return { ok: true, total: 0 };
+
+  // Pula quem já tem requisitos.
+  const { data: existentes } = await supabase
+    .from("passageiro_requisitos")
+    .select("passageiro_id")
+    .in("passageiro_id", passageiros.map((p) => p.id));
+  const jaTem = new Set((existentes ?? []).map((r) => (r as { passageiro_id: string }).passageiro_id));
+
+  const novos = passageiros
+    .filter((p) => !jaTem.has(p.id))
+    .flatMap((p) => construirRequisitosPadrao({ passageiro: p, destino, idPrefix: "tmp" }))
+    .map((r) => ({
+      passageiro_id: r.passageiro_id,
+      tipo: r.tipo,
+      descricao: r.descricao,
+      status: r.status,
+      obrigatoriedade: r.obrigatoriedade,
+      bloqueia_embarque: r.bloqueia_embarque,
+      numero: r.numero,
+      observacoes: r.observacoes,
+    }));
+  if (!novos.length) return { ok: true, total: 0 };
+
+  const { error } = await supabase.from("passageiro_requisitos").insert(novos);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+  revalidatePath(`/expedicoes/${expedicaoId}`);
+  return { ok: true, total: novos.length };
+}
+
+const CAMPOS_REQUISITO_EDITAVEIS = new Set([
+  "status",
+  "validade",
+  "numero",
+  "obrigatoriedade",
+  "bloqueia_embarque",
+  "arquivo_id",
+  "responsavel_id",
+  "observacoes",
+]);
+
+const STATUS_VERIFICAVEIS = new Set(["Aprovado", "Reprovado", "Dispensado"]);
+
+export async function atualizarRequisitoCampo(
+  requisitoId: string,
+  expedicaoId: string,
+  campo: string,
+  valor: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!CAMPOS_REQUISITO_EDITAVEIS.has(campo)) {
+    return { ok: false, error: `Campo "${campo}" não é editável` };
+  }
+  if (campo === "status" && !STATUS_REQUISITO.includes(valor as (typeof STATUS_REQUISITO)[number])) {
+    return { ok: false, error: "Status inválido" };
+  }
+
+  // Ao mudar status para um veredito, carimba verificado_em.
+  const extra: Record<string, unknown> = {};
+  if (campo === "status" && STATUS_VERIFICAVEIS.has(valor as string)) {
+    extra.verificado_em = new Date().toISOString();
+  }
+
+  if (DEV_USE_MOCK_DATA) {
+    const idx = mockPassageiroRequisitos.findIndex((r) => r.id === requisitoId);
+    if (idx === -1) return { ok: false, error: "Requisito não encontrado" };
+    (mockPassageiroRequisitos[idx] as unknown as Record<string, unknown>)[campo] = valor;
+    Object.assign(mockPassageiroRequisitos[idx], extra, { updated_at: new Date().toISOString() });
+    revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+    revalidatePath(`/expedicoes/${expedicaoId}`);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { error } = await supabase
+    .from("passageiro_requisitos")
+    .update({ [campo]: valor, ...extra })
+    .eq("id", requisitoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+  revalidatePath(`/expedicoes/${expedicaoId}`);
   return { ok: true };
 }

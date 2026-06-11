@@ -12,13 +12,16 @@ import {
   mockQuartos,
   mockUsuarios,
   mockLinksExpedicao,
+  mockPassageiroRequisitos,
   getExpedicoesComAgregados,
 } from "@/lib/mock-data";
+import { avaliarProntidao, type ResultadoProntidao } from "@/lib/prontidao/regras";
 import type {
   Tables,
   ExpedicaoComAgregados,
   ExpedicaoRow,
   PassageiroRow,
+  PassageiroRequisitoRow,
   CustoRow,
   PagamentoRow,
   ChecklistItemRow,
@@ -27,6 +30,7 @@ import type {
   UsuarioRow,
   LinkExpedicaoRow,
   EtapaChecklist,
+  Prontidao,
 } from "@/types/database";
 
 export async function listExpedicoesComAgregados(): Promise<ExpedicaoComAgregados[]> {
@@ -173,6 +177,141 @@ export async function listLinks(expedicaoId: string): Promise<LinkExpedicaoRow[]
     return [];
   }
   return (data ?? []) as LinkExpedicaoRow[];
+}
+
+// =============================================================================
+// Prontidão para Embarque (P9)
+// =============================================================================
+
+export async function listRequisitosPassageiro(
+  passageiroId: string,
+): Promise<PassageiroRequisitoRow[]> {
+  if (DEV_USE_MOCK_DATA) {
+    return mockPassageiroRequisitos.filter((r) => r.passageiro_id === passageiroId);
+  }
+  const supabase = await getServerClient();
+  const { data } = await supabase
+    .from("passageiro_requisitos")
+    .select("*")
+    .eq("passageiro_id", passageiroId);
+  return (data ?? []) as PassageiroRequisitoRow[];
+}
+
+export type ProntidaoPassageiro = {
+  passageiro: PassageiroRow;
+  resultado: ResultadoProntidao;
+  requisitos: PassageiroRequisitoRow[];
+};
+
+/** Prontidão de todos os passageiros de uma expedição (alimenta o painel). */
+export async function getProntidaoExpedicao(
+  expedicaoId: string,
+): Promise<ProntidaoPassageiro[]> {
+  const exp = await getExpedicao(expedicaoId);
+  if (!exp) return [];
+
+  let passageiros: PassageiroRow[];
+  let requisitos: PassageiroRequisitoRow[];
+  if (DEV_USE_MOCK_DATA) {
+    passageiros = mockPassageiros.filter((p) => p.expedicao_id === expedicaoId);
+    const paxIds = new Set(passageiros.map((p) => p.id));
+    requisitos = mockPassageiroRequisitos.filter((r) => paxIds.has(r.passageiro_id));
+  } else {
+    passageiros = await listPassageiros(expedicaoId);
+    const supabase = await getServerClient();
+    const ids = passageiros.map((p) => p.id);
+    if (!ids.length) return [];
+    const { data } = await supabase
+      .from("passageiro_requisitos")
+      .select("*")
+      .in("passageiro_id", ids);
+    requisitos = (data ?? []) as PassageiroRequisitoRow[];
+  }
+
+  const porPax = new Map<string, PassageiroRequisitoRow[]>();
+  for (const r of requisitos) {
+    const arr = porPax.get(r.passageiro_id) ?? [];
+    arr.push(r);
+    porPax.set(r.passageiro_id, arr);
+  }
+
+  // Cortesias/líderes ainda contam na prontidão? Sim — o líder também embarca.
+  return passageiros
+    .filter((p) => p.status_reserva !== "Cancelado")
+    .map((passageiro) => {
+      const reqs = porPax.get(passageiro.id) ?? [];
+      return {
+        passageiro,
+        requisitos: reqs,
+        resultado: avaliarProntidao({
+          passageiro,
+          expedicao: exp,
+          destino: exp.destino,
+          requisitos: reqs,
+        }),
+      };
+    });
+}
+
+export type ResumoProntidaoExpedicao = {
+  id: string;
+  nome: string;
+  data_embarque: string;
+  status: string;
+  diasAteEmbarque: number | null;
+  total: number;
+  aptos: number;
+  atencao: number;
+  bloqueados: number;
+  /** Tipo de requisito que mais bloqueia neste grupo (top bloqueador). */
+  topBloqueador: string | null;
+};
+
+/** Resumo de prontidão por expedição — alimenta o card do dashboard. */
+export async function getResumoProntidao(): Promise<ResumoProntidaoExpedicao[]> {
+  const expedicoes = DEV_USE_MOCK_DATA
+    ? mockExpedicoes
+    : await (async () => {
+        const supabase = await getServerClient();
+        const { data } = await supabase
+          .from("expedicoes")
+          .select("*")
+          .order("data_embarque", { ascending: true });
+        return (data ?? []) as ExpedicaoRow[];
+      })();
+
+  const resumos = await Promise.all(
+    expedicoes
+      .filter((e) => e.status !== "Concluída" && e.status !== "Cancelada")
+      .map(async (e) => {
+        const linhas = await getProntidaoExpedicao(e.id);
+        const contagem: Record<Prontidao, number> = { Apto: 0, "Atenção": 0, Bloqueado: 0 };
+        const bloqueadorPorTipo = new Map<string, number>();
+        for (const { resultado } of linhas) {
+          contagem[resultado.prontidao]++;
+          for (const c of resultado.checagens) {
+            if (c.semaforo === "bloqueio") {
+              bloqueadorPorTipo.set(c.tipo, (bloqueadorPorTipo.get(c.tipo) ?? 0) + 1);
+            }
+          }
+        }
+        const topBloqueador =
+          [...bloqueadorPorTipo.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+        return {
+          id: e.id,
+          nome: e.nome,
+          data_embarque: e.data_embarque,
+          status: e.status,
+          diasAteEmbarque: daysUntil(e.data_embarque),
+          total: linhas.length,
+          aptos: contagem.Apto,
+          atencao: contagem["Atenção"],
+          bloqueados: contagem.Bloqueado,
+          topBloqueador,
+        };
+      }),
+  );
+  return resumos;
 }
 
 // =============================================================================

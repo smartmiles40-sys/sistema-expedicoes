@@ -128,7 +128,8 @@ fornecedores ──── dmc_principal ──→  expedicoes
    │                                     │
    │                                     ├──< passageiros ──< documentos
    │                                     │        │
-   │                                     │        └──→ quartos (rooming)
+   │                                     │        ├──→ quartos (rooming)
+   │                                     │        └──< passageiro_requisitos ──→ arquivos (evidência)
    │                                     │
    │                                     ├──< custos ──< pagamentos
    │                                     │
@@ -136,8 +137,10 @@ fornecedores ──── dmc_principal ──→  expedicoes
    │
    └────────── (FK em custos, pagamentos)
 
+requisitos_destino (destino) — catálogo do que cada destino exige
 cambios (moeda PK) — tabela de taxas BRL
 audit_log — INSERT/UPDATE/DELETE em tabelas críticas
+vw_prontidao_passageiro — VIEW: semáforo Apto/Atenção/Bloqueado por pax
 ```
 
 Detalhes em `db/migrations/0001_initial_schema.sql`. Triggers: `set_updated_at`, `audit_*`.
@@ -167,6 +170,7 @@ Detalhes: `docs/N8N_INTEGRATION.md`.
 | P6 | Command palette + atalhos + dark mode + realtime | ✅ |
 | P7 | Webhooks Bitrix | ✅ |
 | P8 | Motor de Processos (checklist = SOP real do ClickUp) | ✅ |
+| P9 | Motor de Prontidão para Embarque (requisitos + semáforo + painel) | ✅ (mock; Supabase pendente) |
 
 ## ✅ Checklist = Motor de Processos (P8)
 
@@ -194,6 +198,30 @@ opcional). Não é mais uma lista genérica por categoria.
 
 ⚠️ Ao mexer no checklist: as 4 etapas antigas (`Pós-venda/Pré-viagem/Operação/Pós-viagem`)
 **não existem mais** — use os valores de `ETAPA_CHECKLIST`.
+
+## 🚦 Prontidão para Embarque (P9)
+
+Responde "este passageiro pode embarcar?" de forma **calculada**, espelhando o motor
+de processos do P8 (catálogo + instâncias + status):
+
+- **Catálogo:** `requisitos_destino` define o QUE cada destino exige (passaporte,
+  visto, vacina, seguro, financeiro…). Fonte em `lib/prontidao/requisitos-destino.ts`.
+- **Instâncias:** `passageiro_requisitos` = status de cada exigência por pax
+  (status, validade, nº, evidência via `arquivo_id`, responsável). Unique `(passageiro_id, tipo)`.
+- **Financeiro:** `passageiros` ganhou `valor_contratado_brl`, `valor_pago_brl`,
+  `saldo_brl` (gerado) e `status_financeiro` — espelhados do Bitrix via n8n.
+  Mais campos de embarque: contato de emergência, restrições, contrato, check-in.
+- **Semáforo:** `vw_prontidao_passageiro` (SQL) e `lib/prontidao/regras.ts` (TS, usado
+  no mock) implementam a MESMA lógica → `Apto` / `Atenção` / `Bloqueado`.
+  Regras: passaporte válido ≥ 6m após retorno (`MESES_VALIDADE_PASSAPORTE_PADRAO`),
+  requisito obrigatório-bloqueante resolvido, saldo zerado (vira bloqueio a ≤ 15 dias
+  do embarque — `DIAS_BLOQUEIO_FINANCEIRO`).
+- **Seeding:** `gerarRequisitosPadrao(passageiroId)` instancia os requisitos do
+  destino. Disparado ao confirmar o pax e no `passageiro-sync` do Bitrix.
+- **UI:** aba `/expedicoes/[id]/prontidao` (tabela-semáforo + drawer por requisito) +
+  card no dashboard (`getResumoProntidao()`).
+- **Enums:** `TIPO_REQUISITO`, `OBRIGATORIEDADE`, `STATUS_REQUISITO`, `PRONTIDAO`,
+  `COR_PRONTIDAO` em `lib/constants.ts`.
 
 ## 🧪 Como rodar
 

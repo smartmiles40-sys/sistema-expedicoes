@@ -8,6 +8,8 @@ import type {
   EtapaChecklist,
 } from "@/types/database";
 import { construirChecklistPadrao } from "@/lib/processos/template";
+import { construirRequisitosDestino } from "@/lib/prontidao/requisitos-destino";
+import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 
 const today = new Date();
 const iso = (d: Date) => d.toISOString();
@@ -232,9 +234,47 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     created_at: pastDate(40),
     updated_at: pastDate(7),
   },
+  {
+    id: "e0000000-0000-0000-0000-000000000005",
+    codigo: "JAPAO-OUT2026",
+    nome: "Japão – Out 2026",
+    destino: "Japão",
+    data_embarque: "2026-10-26T12:00:00.000Z",
+    data_retorno: "2026-11-12T12:00:00.000Z",
+    responsavel_operacional_id: "00000000-0000-0000-0000-000000000002",
+    responsavel_comercial_id: "00000000-0000-0000-0000-000000000003",
+    dmc_principal_id: null,
+    status: "Planejamento",
+    pax_planejados: 18,
+    pax_cortesia: 1,
+    preco_venda_brl: 38900,
+    bitrix_pipeline_id: "PIPE-005",
+    ordem: 5,
+    observacoes: null,
+    created_at: iso(today),
+    updated_at: iso(today),
+  },
 ];
 
-export const mockPassageiros: Tables<"passageiros">[] = [
+/**
+ * Campos do passageiro anteriores à migration 0010 (financeiro + dados de
+ * embarque entram via normalização logo abaixo, pra não repetir em 12 literais).
+ */
+type PassageiroBase = Omit<
+  Tables<"passageiros">,
+  | "valor_contratado_brl"
+  | "valor_pago_brl"
+  | "saldo_brl"
+  | "status_financeiro"
+  | "contato_emergencia_nome"
+  | "contato_emergencia_fone"
+  | "restricoes_alimentares"
+  | "condicoes_medicas"
+  | "contrato_assinado"
+  | "checkin_online_feito"
+>;
+
+const passageirosBase: PassageiroBase[] = [
   // Peru
   { id: "p0000001", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1001", bitrix_deal_id: "BX-D-1001", nome_completo: "Mariana Silva", tipo: "Pagante", cpf: "111.222.333-44", passaporte: "FA123456", data_nascimento: "1988-03-12", validade_passaporte: futureDate(800), email: "mari@gmail.com", telefone: "+55 11 99999-1111", status_reserva: "Confirmado", voo_nacional_necessario: true, companhia_aerea: "LATAM", localizador: "ABC123", quarto_id: null, observacoes: null, created_at: pastDate(50), updated_at: pastDate(2) },
   { id: "p0000002", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000001", bitrix_contact_id: "BX-1002", bitrix_deal_id: "BX-D-1002", nome_completo: "João Pereira", tipo: "Pagante", cpf: "222.333.444-55", passaporte: "FB234567", data_nascimento: "1990-07-22", validade_passaporte: futureDate(120), email: "jp@gmail.com", telefone: "+55 11 98888-2222", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: "Vegetariano", created_at: pastDate(48), updated_at: pastDate(2) },
@@ -252,6 +292,66 @@ export const mockPassageiros: Tables<"passageiros">[] = [
   { id: "p0000011", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4001", bitrix_deal_id: "BX-D-4001", nome_completo: "Roberto Carvalho", tipo: "Pagante", cpf: "111.000.222-44", passaporte: "FH890123", data_nascimento: "1978-01-19", validade_passaporte: futureDate(300), email: "ro@gmail.com", telefone: "+55 11 98765-1234", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4001", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(7) },
   { id: "p0000012", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4002", bitrix_deal_id: "BX-D-4002", nome_completo: "Helena Castro", tipo: "Pagante", cpf: "222.111.333-55", passaporte: "FI901234", data_nascimento: "1986-10-05", validade_passaporte: futureDate(400), email: "he@gmail.com", telefone: "+55 11 91234-5678", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4002", quarto_id: null, observacoes: null, created_at: pastDate(33), updated_at: pastDate(7) },
 ];
+
+/**
+ * Dados financeiros/pessoais (0010) de demo por passageiro. O que não estiver
+ * aqui herda os defaults — saldo zerado, sem contrato/check-in. A variedade
+ * abaixo cobre os três estados do semáforo de prontidão.
+ */
+type PassageiroExtra = Pick<
+  Tables<"passageiros">,
+  | "valor_contratado_brl"
+  | "valor_pago_brl"
+  | "status_financeiro"
+  | "contato_emergencia_nome"
+  | "contato_emergencia_fone"
+  | "restricoes_alimentares"
+  | "condicoes_medicas"
+  | "contrato_assinado"
+  | "checkin_online_feito"
+>;
+
+const extrasPorPassageiro: Record<string, Partial<PassageiroExtra>> = {
+  // Peru — Mariana: tudo quitado e assinado (candidata a Apto)
+  p0000001: { valor_contratado_brl: 18900, valor_pago_brl: 18900, status_financeiro: "Quitado", contrato_assinado: true, checkin_online_feito: true, contato_emergencia_nome: "Paulo Silva", contato_emergencia_fone: "+55 11 99999-0001" },
+  // João: saldo em aberto + restrição alimentar (Atenção)
+  p0000002: { valor_contratado_brl: 18900, valor_pago_brl: 9450, status_financeiro: "Em aberto", contrato_assinado: true, restricoes_alimentares: "Vegetariano" },
+  // Letícia: sem passaporte e parcela em aberto (Bloqueado via requisito)
+  p0000003: { valor_contratado_brl: 18900, valor_pago_brl: 6300, status_financeiro: "Em aberto" },
+  // Rafael: passaporte vence ANTES do retorno (Bloqueado), mas pago
+  p0000004: { valor_contratado_brl: 18900, valor_pago_brl: 18900, status_financeiro: "Quitado", contrato_assinado: true },
+  // Ana (líder): cortesia, sem cobrança
+  p0000005: { valor_contratado_brl: 0, valor_pago_brl: 0, status_financeiro: "Cortesia", contrato_assinado: true, checkin_online_feito: true },
+  // Patagônia
+  p0000006: { valor_contratado_brl: 22500, valor_pago_brl: 22500, status_financeiro: "Quitado", contrato_assinado: true },
+  p0000007: { valor_contratado_brl: 22500, valor_pago_brl: 0, status_financeiro: "Em aberto" },
+  p0000008: { valor_contratado_brl: 22500, valor_pago_brl: 11250, status_financeiro: "Em aberto" },
+  // Egito — Roberto: condição médica relevante pro embarque
+  p0000011: { valor_contratado_brl: 27800, valor_pago_brl: 27800, status_financeiro: "Quitado", contrato_assinado: true, condicoes_medicas: "Hipertensão — leva medicação" },
+  p0000012: { valor_contratado_brl: 27800, valor_pago_brl: 13900, status_financeiro: "Em aberto" },
+};
+
+function normalizarPassageiro(p: PassageiroBase): Tables<"passageiros"> {
+  const extra = extrasPorPassageiro[p.id] ?? {};
+  const valor_contratado_brl = extra.valor_contratado_brl ?? 0;
+  const valor_pago_brl = extra.valor_pago_brl ?? 0;
+  return {
+    ...p,
+    valor_contratado_brl,
+    valor_pago_brl,
+    saldo_brl: valor_contratado_brl - valor_pago_brl, // espelha a coluna gerada
+    status_financeiro: extra.status_financeiro ?? "Em aberto",
+    contato_emergencia_nome: extra.contato_emergencia_nome ?? null,
+    contato_emergencia_fone: extra.contato_emergencia_fone ?? null,
+    restricoes_alimentares: extra.restricoes_alimentares ?? null,
+    condicoes_medicas: extra.condicoes_medicas ?? null,
+    contrato_assinado: extra.contrato_assinado ?? false,
+    checkin_online_feito: extra.checkin_online_feito ?? false,
+  };
+}
+
+export const mockPassageiros: Tables<"passageiros">[] =
+  passageirosBase.map(normalizarPassageiro);
 
 export const mockQuartos: Tables<"quartos">[] = [
   { id: "q001", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "101", tipo: "Duplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
@@ -338,6 +438,70 @@ export const mockDocumentos: Tables<"documentos">[] = [
 ];
 
 export const mockLinksExpedicao: Tables<"links_expedicao">[] = [];
+
+// Catálogo de requisitos (0010) para os destinos das expedições de demo.
+export const mockRequisitosDestino: Tables<"requisitos_destino">[] = (() => {
+  const destinos = [...new Set(mockExpedicoes.map((e) => e.destino))];
+  return destinos.flatMap((destino) =>
+    construirRequisitosDestino({
+      destino,
+      idPrefix: `rd-${destino.toLowerCase().replace(/[^a-z]/g, "")}`,
+      createdAt: pastDate(200),
+    }),
+  );
+})();
+
+/**
+ * Instâncias de requisito por passageiro (0010). Geradas do catálogo do destino
+ * e ajustadas por `reqOverrides` para cobrir os três estados do semáforo.
+ * Chave do override: `"<passageiroId>:<tipo>"`.
+ */
+const reqOverrides: Record<
+  string,
+  Partial<Pick<Tables<"passageiro_requisitos">, "status" | "validade" | "numero" | "observacoes">>
+> = {
+  // Peru — Mariana (Apto): tudo resolvido
+  "p0000001:Seguro": { status: "Aprovado", numero: "TA-99001", validade: futureDate(110) },
+  "p0000001:Vacina": { status: "Dispensado", observacoes: "Não vai à selva" },
+  "p0000001:Aéreo Doméstico": { status: "Aprovado", numero: "LA2040" },
+  // João (Atenção): seguro ok e vacina dispensada; sobra saldo + passaporte na janela
+  "p0000002:Seguro": { status: "Aprovado", numero: "TA-99002", validade: futureDate(110) },
+  "p0000002:Vacina": { status: "Dispensado" },
+  // Rafael (Bloqueado pelo passaporte) — seguro até resolvido
+  "p0000004:Seguro": { status: "Aprovado", numero: "TA-99004", validade: futureDate(110) },
+  "p0000004:Vacina": { status: "Dispensado" },
+  // Ana líder (Apto)
+  "p0000005:Seguro": { status: "Aprovado", numero: "TA-99005", validade: futureDate(110) },
+  "p0000005:Vacina": { status: "Dispensado" },
+  "p0000005:Aéreo Doméstico": { status: "Aprovado", numero: "LA2041" },
+  // Patagônia — Camila (Apto)
+  "p0000006:Seguro": { status: "Aprovado", numero: "TA-88006", validade: futureDate(195) },
+  "p0000006:RG": { status: "Dispensado" },
+  // Egito — Roberto (Atenção): visto e seguro ok; passaporte vence dentro de 6 meses
+  "p0000011:Visto": { status: "Aprovado", numero: "EG-2026-114" },
+  "p0000011:Seguro": { status: "Aprovado", numero: "TA-77011", validade: futureDate(165) },
+  "p0000011:Vacina": { status: "Dispensado" },
+  "p0000011:Aéreo Doméstico": { status: "Dispensado" },
+  // Helena (Bloqueado pelo visto pendente) — seguro adiantado
+  "p0000012:Seguro": { status: "Aprovado", numero: "TA-77012", validade: futureDate(165) },
+};
+
+export const mockPassageiroRequisitos: Tables<"passageiro_requisitos">[] =
+  mockPassageiros.flatMap((pax) => {
+    const exp = mockExpedicoes.find((e) => e.id === pax.expedicao_id);
+    if (!exp) return [];
+    const rows = construirRequisitosPadrao({
+      passageiro: pax,
+      destino: exp.destino,
+      idPrefix: `pr-${pax.id}`,
+      createdAt: pastDate(30),
+    });
+    for (const r of rows) {
+      const ov = reqOverrides[`${pax.id}:${r.tipo}`];
+      if (ov) Object.assign(r, ov);
+    }
+    return rows;
+  });
 
 export function getExpedicoesComAgregados(): ExpedicaoComAgregados[] {
   const usuariosById = new Map(mockUsuarios.map((u) => [u.id, u]));
