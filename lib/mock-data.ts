@@ -291,6 +291,9 @@ const passageirosBase: PassageiroBase[] = [
   // Egito
   { id: "p0000011", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4001", bitrix_deal_id: "BX-D-4001", nome_completo: "Roberto Carvalho", tipo: "Pagante", cpf: "111.000.222-44", passaporte: "FH890123", data_nascimento: "1978-01-19", validade_passaporte: futureDate(300), email: "ro@gmail.com", telefone: "+55 11 98765-1234", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4001", quarto_id: null, observacoes: null, created_at: pastDate(35), updated_at: pastDate(7) },
   { id: "p0000012", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000004", bitrix_contact_id: "BX-4002", bitrix_deal_id: "BX-D-4002", nome_completo: "Helena Castro", tipo: "Pagante", cpf: "222.111.333-55", passaporte: "FI901234", data_nascimento: "1986-10-05", validade_passaporte: futureDate(400), email: "he@gmail.com", telefone: "+55 11 91234-5678", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: "Emirates", localizador: "EM4002", quarto_id: null, observacoes: null, created_at: pastDate(33), updated_at: pastDate(7) },
+  // Mariana Silva (mesmo CPF de p0000001) também na Patagônia — demonstra a
+  // consolidação por pessoa: ela aparece como 1 pessoa com 2 expedições.
+  { id: "p0000013", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-1001", bitrix_deal_id: "BX-D-2099", nome_completo: "Mariana Silva", tipo: "Pagante", cpf: "111.222.333-44", passaporte: "FA123456", data_nascimento: "1988-03-12", validade_passaporte: futureDate(800), email: "mari@gmail.com", telefone: "+55 11 99999-1111", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: "Expedicionária recorrente", created_at: pastDate(25), updated_at: pastDate(3) },
 ];
 
 /**
@@ -324,6 +327,7 @@ const extrasPorPassageiro: Record<string, Partial<PassageiroExtra>> = {
   p0000005: { valor_contratado_brl: 0, valor_pago_brl: 0, status_financeiro: "Cortesia", contrato_assinado: true, checkin_online_feito: true },
   // Patagônia
   p0000006: { valor_contratado_brl: 22500, valor_pago_brl: 22500, status_financeiro: "Quitado", contrato_assinado: true },
+  p0000013: { valor_contratado_brl: 22500, valor_pago_brl: 22500, status_financeiro: "Quitado", contrato_assinado: true },
   p0000007: { valor_contratado_brl: 22500, valor_pago_brl: 0, status_financeiro: "Em aberto" },
   p0000008: { valor_contratado_brl: 22500, valor_pago_brl: 11250, status_financeiro: "Em aberto" },
   // Egito — Roberto: condição médica relevante pro embarque

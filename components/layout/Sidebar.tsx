@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Users,
   Map,
   Building2,
   Coins,
@@ -15,6 +16,7 @@ import { UserMenu } from "./UserMenu";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/passageiros", label: "Passageiros", icon: Users },
   { href: "/expedicoes", label: "Expedições", icon: Map },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
   { href: "/cambios", label: "Câmbios", icon: Coins },
