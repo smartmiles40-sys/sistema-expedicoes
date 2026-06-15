@@ -3,6 +3,7 @@ import {
   parseCSV,
   detectarDelimitador,
   normalizarData,
+  parseNumeroBR,
   parsePassageirosCSV,
   cpfDigitos,
 } from "./passageiros-import";
@@ -65,6 +66,23 @@ describe("cpfDigitos", () => {
   });
 });
 
+describe("parseNumeroBR", () => {
+  it("formato BR com milhar e decimal", () => {
+    expect(parseNumeroBR("18.900,50").num).toBe(18900.5);
+  });
+  it("só decimal com vírgula", () => {
+    expect(parseNumeroBR("1234,56").num).toBe(1234.56);
+  });
+  it("formato simples e com R$", () => {
+    expect(parseNumeroBR("18900").num).toBe(18900);
+    expect(parseNumeroBR("R$ 18900").num).toBe(18900);
+  });
+  it("vazio vira null; texto vira erro", () => {
+    expect(parseNumeroBR("")).toEqual({ num: null });
+    expect(parseNumeroBR("abc").erro).toBeTruthy();
+  });
+});
+
 describe("parsePassageirosCSV", () => {
   it("mapeia cabeçalhos com acento/caixa e normaliza dados", () => {
     const csv = [
@@ -104,5 +122,16 @@ describe("parsePassageirosCSV", () => {
     const d = parsePassageirosCSV(csv).linhas[0].dados;
     expect(d.tipo).toBe("Pagante");
     expect(d.status_reserva).toBe("Lead");
+  });
+
+  it("lê financeiro e código de expedição", () => {
+    const csv = [
+      "expedicao;nome;valor contratado;valor pago",
+      "PERU-AGO2026;Ana;18.900,00;9.450,00",
+    ].join("\n");
+    const d = parsePassageirosCSV(csv).linhas[0].dados;
+    expect(d.expedicao_codigo).toBe("PERU-AGO2026");
+    expect(d.valor_contratado_brl).toBe(18900);
+    expect(d.valor_pago_brl).toBe(9450);
   });
 });

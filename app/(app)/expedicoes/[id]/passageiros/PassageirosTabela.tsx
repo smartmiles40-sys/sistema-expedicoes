@@ -269,6 +269,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
       />
 
       <ImportarPassageirosDrawer
+        modo="expedicao"
         expedicaoId={expedicaoId}
         cpfsExistentes={cpfsExistentes}
         open={importOpen}

@@ -1,9 +1,11 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Search, User, Plane, ArrowRight } from "lucide-react";
+import { Search, User, Plane, ArrowRight, Upload } from "lucide-react";
 import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ImportarPassageirosDrawer } from "@/app/(app)/expedicoes/[id]/passageiros/ImportarPassageirosDrawer";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody,
 } from "@/components/ui/Drawer";
@@ -26,9 +28,16 @@ function idade(nascimentoIso: string | null): number | null {
   return Math.floor(-dias / 365.25);
 }
 
-export function PassageirosGlobalTabela({ pessoas }: { pessoas: PessoaAgregada[] }) {
+export function PassageirosGlobalTabela({
+  pessoas,
+  expedicoes,
+}: {
+  pessoas: PessoaAgregada[];
+  expedicoes: { codigo: string; nome: string }[];
+}) {
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
+  const [importOpen, setImportOpen] = React.useState(false);
 
   const termo = busca.trim().toLowerCase();
   const filtradas = termo
@@ -55,9 +64,14 @@ export function PassageirosGlobalTabela({ pessoas }: { pessoas: PessoaAgregada[]
             className="pl-7"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {pessoas.length} pessoa{pessoas.length === 1 ? "" : "s"} · {totalParticipacoes} participaç{totalParticipacoes === 1 ? "ão" : "ões"} em expedições
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-muted-foreground">
+            {pessoas.length} pessoa{pessoas.length === 1 ? "" : "s"} · {totalParticipacoes} participaç{totalParticipacoes === 1 ? "ão" : "ões"} em expedições
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-3 w-3" /> Importar CSV
+          </Button>
+        </div>
       </div>
 
       {/* Tabela */}
@@ -124,6 +138,13 @@ export function PassageirosGlobalTabela({ pessoas }: { pessoas: PessoaAgregada[]
       {aberta && (
         <PessoaDrawer pessoa={aberta} onClose={() => setAberta(null)} />
       )}
+
+      <ImportarPassageirosDrawer
+        modo="global"
+        expedicoes={expedicoes}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+      />
     </div>
   );
 }

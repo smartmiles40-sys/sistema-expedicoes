@@ -1300,9 +1300,18 @@ const importRowSchema = z.object({
   email: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
   observacoes: z.string().nullable().optional(),
+  valor_contratado_brl: z.number().nonnegative().nullable().optional(),
+  valor_pago_brl: z.number().nonnegative().nullable().optional(),
 });
 type TipoPassageiroEnum = (typeof TIPO_PASSAGEIRO)[number];
 type StatusReservaEnum = (typeof STATUS_RESERVA)[number];
+
+/** Deriva o status financeiro a partir dos valores e do tipo de pax. */
+function statusFinanceiroDe(contratado: number, pago: number, tipo: TipoPassageiroEnum): string {
+  if (tipo !== "Pagante" && contratado === 0) return "Cortesia";
+  if (contratado > 0 && pago >= contratado) return "Quitado";
+  return "Em aberto";
+}
 
 const importarSchema = z.object({
   expedicao_id: z.string().min(1),
@@ -1318,6 +1327,8 @@ function novoPassageiroDeImport(
   d: z.infer<typeof importRowSchema>,
 ): PassageiroRow {
   const now = new Date().toISOString();
+  const contratado = d.valor_contratado_brl ?? 0;
+  const pago = d.valor_pago_brl ?? 0;
   return {
     id: genId("p"),
     expedicao_id: expedicaoId,
@@ -1337,10 +1348,10 @@ function novoPassageiroDeImport(
     companhia_aerea: null,
     localizador: null,
     quarto_id: null,
-    valor_contratado_brl: 0,
-    valor_pago_brl: 0,
-    saldo_brl: 0,
-    status_financeiro: "Em aberto",
+    valor_contratado_brl: contratado,
+    valor_pago_brl: pago,
+    saldo_brl: contratado - pago,
+    status_financeiro: statusFinanceiroDe(contratado, pago, d.tipo),
     contato_emergencia_nome: null,
     contato_emergencia_fone: null,
     restricoes_alimentares: null,
@@ -1420,6 +1431,8 @@ export async function importarPassageiros(
     const cpf = cpfDigitos(d.cpf ?? null);
     if (cpf && cpfsExistentes.has(cpf)) { ignorados++; continue; }
     if (cpf) cpfsExistentes.add(cpf);
+    const contratado = d.valor_contratado_brl ?? 0;
+    const pago = d.valor_pago_brl ?? 0;
     aInserir.push({
       expedicao_id,
       nome_completo: d.nome_completo,
@@ -1432,6 +1445,9 @@ export async function importarPassageiros(
       email: d.email ?? null,
       telefone: d.telefone ?? null,
       observacoes: d.observacoes ?? null,
+      valor_contratado_brl: contratado,
+      valor_pago_brl: pago,
+      status_financeiro: statusFinanceiroDe(contratado, pago, d.tipo),
     });
   }
 
@@ -1447,4 +1463,131 @@ export async function importarPassageiros(
   revalidatePath(`/expedicoes/${expedicao_id}/prontidao`);
   revalidatePath("/passageiros");
   return { ok: true, inseridos: aInserir.length, ignorados };
+}
+
+// --- Importação GLOBAL: cada linha indica a expedição pelo código ------------
+
+const globalRowSchema = importRowSchema.extend({
+  expedicao_codigo: z.string().min(1, "Código de expedição ausente"),
+});
+const importarGlobalSchema = z.object({
+  linhas: z.array(globalRowSchema).min(1, "Nenhuma linha para importar").max(2000),
+});
+
+export type ImportarGlobalResult =
+  | { ok: true; inseridos: number; ignorados: number; semExpedicao: number }
+  | { ok: false; error: string };
+
+export async function importarPassageirosGlobal(
+  input: z.infer<typeof importarGlobalSchema>,
+): Promise<ImportarGlobalResult> {
+  const parsed = importarGlobalSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  }
+  const { linhas } = parsed.data;
+
+  if (DEV_USE_MOCK_DATA) {
+    const porCodigo = new Map(mockExpedicoes.map((e) => [e.codigo, e]));
+    const cpfsPorExp = new Map<string, Set<string>>();
+    const cpfSet = (expId: string) => {
+      let s = cpfsPorExp.get(expId);
+      if (!s) {
+        s = new Set(
+          mockPassageiros
+            .filter((p) => p.expedicao_id === expId)
+            .map((p) => cpfDigitos(p.cpf))
+            .filter((c): c is string => Boolean(c)),
+        );
+        cpfsPorExp.set(expId, s);
+      }
+      return s;
+    };
+    let inseridos = 0, ignorados = 0, semExpedicao = 0;
+    for (const d of linhas) {
+      const exp = porCodigo.get(d.expedicao_codigo);
+      if (!exp) { semExpedicao++; continue; }
+      const cpf = cpfDigitos(d.cpf ?? null);
+      const set = cpfSet(exp.id);
+      if (cpf && set.has(cpf)) { ignorados++; continue; }
+      if (cpf) set.add(cpf);
+      const novo = novoPassageiroDeImport(exp.id, d);
+      mockPassageiros.push(novo);
+      mockPassageiroRequisitos.push(
+        ...construirRequisitosPadrao({ passageiro: novo, destino: exp.destino }),
+      );
+      inseridos++;
+    }
+    revalidatePath("/passageiros");
+    revalidatePath("/dashboard");
+    return { ok: true, inseridos, ignorados, semExpedicao };
+  }
+
+  const supabase = await getServerClient();
+  const codigos = [...new Set(linhas.map((l) => l.expedicao_codigo))];
+  const { data: exps } = await supabase
+    .from("expedicoes")
+    .select("id, codigo, destino")
+    .in("codigo", codigos);
+  const porCodigo = new Map(
+    ((exps ?? []) as { id: string; codigo: string }[]).map((e) => [e.codigo, e.id]),
+  );
+
+  const idsEnvolvidos = [...porCodigo.values()];
+  const cpfsPorExp = new Map<string, Set<string>>();
+  if (idsEnvolvidos.length) {
+    const { data: existentes } = await supabase
+      .from("passageiros")
+      .select("expedicao_id, cpf")
+      .in("expedicao_id", idsEnvolvidos);
+    for (const p of (existentes ?? []) as { expedicao_id: string; cpf: string | null }[]) {
+      const cpf = cpfDigitos(p.cpf);
+      if (!cpf) continue;
+      const s = cpfsPorExp.get(p.expedicao_id) ?? new Set<string>();
+      s.add(cpf);
+      cpfsPorExp.set(p.expedicao_id, s);
+    }
+  }
+
+  let ignorados = 0, semExpedicao = 0;
+  const aInserir: Record<string, unknown>[] = [];
+  const expedicoesComInsercao = new Set<string>();
+  for (const d of linhas) {
+    const expId = porCodigo.get(d.expedicao_codigo);
+    if (!expId) { semExpedicao++; continue; }
+    const cpf = cpfDigitos(d.cpf ?? null);
+    const set = cpfsPorExp.get(expId) ?? new Set<string>();
+    cpfsPorExp.set(expId, set);
+    if (cpf && set.has(cpf)) { ignorados++; continue; }
+    if (cpf) set.add(cpf);
+    const contratado = d.valor_contratado_brl ?? 0;
+    const pago = d.valor_pago_brl ?? 0;
+    expedicoesComInsercao.add(expId);
+    aInserir.push({
+      expedicao_id: expId,
+      nome_completo: d.nome_completo,
+      tipo: d.tipo,
+      status_reserva: d.status_reserva,
+      cpf: d.cpf ?? null,
+      passaporte: d.passaporte ?? null,
+      data_nascimento: d.data_nascimento ?? null,
+      validade_passaporte: d.validade_passaporte ?? null,
+      email: d.email ?? null,
+      telefone: d.telefone ?? null,
+      observacoes: d.observacoes ?? null,
+      valor_contratado_brl: contratado,
+      valor_pago_brl: pago,
+      status_financeiro: statusFinanceiroDe(contratado, pago, d.tipo),
+    });
+  }
+
+  if (aInserir.length) {
+    const { error } = await supabase.from("passageiros").insert(aInserir);
+    if (error) return { ok: false, error: error.message };
+    for (const expId of expedicoesComInsercao) await gerarRequisitosPadrao(expId);
+  }
+
+  revalidatePath("/passageiros");
+  revalidatePath("/dashboard");
+  return { ok: true, inseridos: aInserir.length, ignorados, semExpedicao };
 }

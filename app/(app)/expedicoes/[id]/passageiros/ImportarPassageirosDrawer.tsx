@@ -14,29 +14,41 @@ import {
   cpfDigitos,
   type LinhaImport,
 } from "@/lib/csv/passageiros-import";
-import { importarPassageiros } from "@/app/(app)/expedicoes/actions";
+import { importarPassageiros, importarPassageirosGlobal } from "@/app/(app)/expedicoes/actions";
 
 type StatusLinha = "ok" | "duplicado" | "erro";
 
-interface Props {
-  expedicaoId: string;
-  cpfsExistentes: string[];
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}
+type BaseProps = { open: boolean; onOpenChange: (v: boolean) => void };
+type ModoExpedicao = BaseProps & { modo: "expedicao"; expedicaoId: string; cpfsExistentes: string[] };
+type ModoGlobal = BaseProps & { modo: "global"; expedicoes: { codigo: string; nome: string }[] };
+type Props = ModoExpedicao | ModoGlobal;
 
-const MODELO_CSV =
-  "nome_completo;data_nascimento;cpf;passaporte;validade_passaporte;email;telefone;tipo;status_reserva\n" +
-  "Maria Souza;12/05/1990;111.222.333-44;FA123456;01/01/2032;maria@email.com;11999990000;Pagante;Confirmado\n" +
-  "João Lima;03/11/1988;555.666.777-88;;;joao@email.com;11988887777;Pagante;Pré-reserva";
+const COLS_BASE = "nome_completo;data_nascimento;cpf;passaporte;validade_passaporte;email;telefone;tipo;status_reserva;valor_contratado;valor_pago";
+const MODELO_EXPEDICAO =
+  COLS_BASE + "\n" +
+  "Maria Souza;12/05/1990;111.222.333-44;FA123456;01/01/2032;maria@email.com;11999990000;Pagante;Confirmado;18900;9450\n" +
+  "João Lima;03/11/1988;555.666.777-88;;;joao@email.com;11988887777;Pagante;Pré-reserva;18900;0";
+const MODELO_GLOBAL =
+  "expedicao_codigo;" + COLS_BASE + "\n" +
+  "PERU-AGO2026;Maria Souza;12/05/1990;111.222.333-44;FA123456;01/01/2032;maria@email.com;11999990000;Pagante;Confirmado;18900;9450\n" +
+  "PATAG-NOV2026;João Lima;03/11/1988;555.666.777-88;;;joao@email.com;11988887777;Pagante;Pré-reserva;22500;0";
 
-export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, onOpenChange }: Props) {
+export function ImportarPassageirosDrawer(props: Props) {
+  const { open, onOpenChange } = props;
+  const global = props.modo === "global";
   const router = useRouter();
   const [parse, setParse] = React.useState<ReturnType<typeof parsePassageirosCSV> | null>(null);
   const [nomeArquivo, setNomeArquivo] = React.useState<string | null>(null);
   const [importando, setImportando] = React.useState(false);
 
-  const existentes = React.useMemo(() => new Set(cpfsExistentes), [cpfsExistentes]);
+  const existentes = React.useMemo(
+    () => new Set(props.modo === "expedicao" ? props.cpfsExistentes : []),
+    [props],
+  );
+  const codigosValidos = React.useMemo(
+    () => new Set(props.modo === "global" ? props.expedicoes.map((e) => e.codigo) : []),
+    [props],
+  );
 
   function handleOpenChange(v: boolean) {
     if (!v) { setParse(null); setNomeArquivo(null); }
@@ -54,31 +66,38 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
     carregarTexto(await file.text());
   }
 
-  // Classifica cada linha (erro > duplicado > ok), marcando duplicados dentro do lote.
+  // Classifica cada linha (erro > duplicado > ok), marcando duplicados no lote.
   const classificadas = React.useMemo(() => {
     if (!parse) return [];
     const vistos = new Set<string>();
     return parse.linhas.map((l): { linha: LinhaImport; status: StatusLinha; motivo: string } => {
       if (l.erros.length > 0) return { linha: l, status: "erro", motivo: l.erros.join("; ") };
+      if (global) {
+        const cod = l.dados.expedicao_codigo;
+        if (!cod) return { linha: l, status: "erro", motivo: "código da expedição ausente" };
+        if (!codigosValidos.has(cod)) return { linha: l, status: "erro", motivo: `expedição "${cod}" não encontrada` };
+      }
       const cpf = cpfDigitos(l.dados.cpf);
-      if (cpf && (existentes.has(cpf) || vistos.has(cpf))) {
+      // Chave de dedup: por expedição no modo global; global na expedição única.
+      const chave = global ? `${l.dados.expedicao_codigo}|${cpf}` : cpf;
+      if (cpf && (existentes.has(cpf) || vistos.has(chave ?? ""))) {
         return { linha: l, status: "duplicado", motivo: "CPF já existe nesta expedição" };
       }
-      if (cpf) vistos.add(cpf);
+      if (cpf && chave) vistos.add(chave);
       return { linha: l, status: "ok", motivo: "" };
     });
-  }, [parse, existentes]);
+  }, [parse, existentes, codigosValidos, global]);
 
   const validos = classificadas.filter((c) => c.status === "ok");
   const duplicados = classificadas.filter((c) => c.status === "duplicado").length;
   const comErro = classificadas.filter((c) => c.status === "erro").length;
 
   function baixarModelo() {
-    const blob = new Blob(["﻿" + MODELO_CSV], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿" + (global ? MODELO_GLOBAL : MODELO_EXPEDICAO)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "modelo-passageiros.csv";
+    a.download = global ? "modelo-passageiros-global.csv" : "modelo-passageiros.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -86,16 +105,19 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
   async function importar() {
     if (validos.length === 0) return;
     setImportando(true);
-    const r = await importarPassageiros({
-      expedicao_id: expedicaoId,
-      linhas: validos.map((c) => c.linha.dados),
-    });
+    const dados = validos.map((c) => c.linha.dados);
+    const r = props.modo === "global"
+      ? await importarPassageirosGlobal({
+          linhas: dados.map((d) => ({ ...d, expedicao_codigo: d.expedicao_codigo ?? "" })),
+        })
+      : await importarPassageiros({ expedicao_id: props.expedicaoId, linhas: dados });
     setImportando(false);
     if (r.ok) {
-      toast.success(
-        `${r.inseridos} passageiro(s) importado(s)` +
-          (r.ignorados ? ` · ${r.ignorados} ignorado(s)` : ""),
-      );
+      const extras = [
+        r.ignorados ? `${r.ignorados} ignorado(s)` : null,
+        "semExpedicao" in r && r.semExpedicao ? `${r.semExpedicao} sem expedição` : null,
+      ].filter(Boolean).join(" · ");
+      toast.success(`${r.inseridos} passageiro(s) importado(s)${extras ? ` · ${extras}` : ""}`);
       handleOpenChange(false);
       router.refresh();
     } else {
@@ -105,12 +127,17 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
-      <DrawerContent width="w-[640px]">
+      <DrawerContent width="w-[680px]">
         <DrawerHeader>
           <DrawerTitle>Importar passageiros (CSV)</DrawerTitle>
           <DrawerDescription>
-            Colunas reconhecidas: nome completo, data de nascimento, CPF, passaporte,
-            validade, e-mail, telefone, tipo, status. Só o nome é obrigatório.
+            {global
+              ? "Cada linha indica a expedição pelo código (coluna expedicao_codigo). "
+              : ""}
+            Colunas: nome completo, data de nascimento, CPF, passaporte, validade, e-mail,
+            telefone, tipo, status, valor contratado, valor pago. Só o nome
+            {global ? " e o código da expedição são" : " é"} obrigatório
+            {global ? "s" : ""}.
           </DrawerDescription>
         </DrawerHeader>
         <DrawerBody>
@@ -135,7 +162,7 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
             <p className="text-[11px] text-muted-foreground mb-1">Ou cole o conteúdo do CSV:</p>
             <textarea
               rows={4}
-              placeholder="nome_completo;cpf;passaporte;..."
+              placeholder={global ? "expedicao_codigo;nome_completo;cpf;..." : "nome_completo;cpf;passaporte;..."}
               onChange={(e) => carregarTexto(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[12px] font-mono outline-none focus:ring-2 focus:ring-editavel-600"
             />
@@ -160,21 +187,29 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
                   <table className="w-full table-dense">
                     <thead className="bg-muted/40 border-b border-border sticky top-0">
                       <tr>
-                        <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2">#</th>
-                        <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2">Nome</th>
-                        <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2">CPF</th>
-                        <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2">Nasc.</th>
-                        <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2">Situação</th>
+                        <ThMini>#</ThMini>
+                        {global && <ThMini>Expedição</ThMini>}
+                        <ThMini>Nome</ThMini>
+                        <ThMini>CPF</ThMini>
+                        <ThMini>Nasc.</ThMini>
+                        <ThMini>Contratado</ThMini>
+                        <ThMini>Situação</ThMini>
                       </tr>
                     </thead>
                     <tbody>
                       {classificadas.map((c) => (
                         <tr key={c.linha.linha} className={cn("border-b border-border", c.status === "erro" && "bg-critico-100/40", c.status === "duplicado" && "bg-atencao-100/40")}>
                           <td className="px-2 text-[11px] tabular-nums text-muted-foreground">{c.linha.linha}</td>
+                          {global && (
+                            <td className="px-2 text-[11px] font-mono text-muted-foreground">{c.linha.dados.expedicao_codigo ?? "—"}</td>
+                          )}
                           <td className="px-2 text-[12px] font-medium">{c.linha.dados.nome_completo || <span className="text-critico-600">—</span>}</td>
                           <td className="px-2 text-[11px] font-mono text-muted-foreground">{c.linha.dados.cpf ?? "—"}</td>
                           <td className="px-2 text-[11px] tabular-nums text-muted-foreground">
                             {c.linha.dados.data_nascimento ? formatDate(c.linha.dados.data_nascimento) : "—"}
+                          </td>
+                          <td className="px-2 text-[11px] tabular-nums text-muted-foreground">
+                            {c.linha.dados.valor_contratado_brl != null ? c.linha.dados.valor_contratado_brl.toLocaleString("pt-BR") : "—"}
                           </td>
                           <td className="px-2">
                             <span title={c.motivo} className="inline-flex">
@@ -205,5 +240,13 @@ export function ImportarPassageirosDrawer({ expedicaoId, cpfsExistentes, open, o
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function ThMini({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-2 whitespace-nowrap">
+      {children}
+    </th>
   );
 }

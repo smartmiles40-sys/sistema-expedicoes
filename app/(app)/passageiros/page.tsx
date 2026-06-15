@@ -1,8 +1,13 @@
 import { listPessoas } from "@/lib/data/pessoas";
+import { listExpedicoesComAgregados } from "@/lib/data/expedicoes";
 import { PassageirosGlobalTabela } from "./PassageirosGlobalTabela";
 
 export default async function PassageirosGlobalPage() {
-  const pessoas = await listPessoas();
+  const [pessoas, expedicoes] = await Promise.all([
+    listPessoas(),
+    listExpedicoesComAgregados(),
+  ]);
+  const expedicoesResumo = expedicoes.map((e) => ({ codigo: e.codigo, nome: e.nome }));
 
   return (
     <div className="p-4">
@@ -12,7 +17,7 @@ export default async function PassageirosGlobalPage() {
           Base consolidada de todos os passageiros — dados pessoais e histórico de expedições.
         </p>
       </div>
-      <PassageirosGlobalTabela pessoas={pessoas} />
+      <PassageirosGlobalTabela pessoas={pessoas} expedicoes={expedicoesResumo} />
     </div>
   );
 }

@@ -18,7 +18,10 @@ export type CampoPassageiro =
   | "telefone"
   | "tipo"
   | "status_reserva"
-  | "observacoes";
+  | "observacoes"
+  | "valor_contratado_brl"
+  | "valor_pago_brl"
+  | "expedicao_codigo";
 
 export type DadosImport = {
   nome_completo: string;
@@ -31,6 +34,10 @@ export type DadosImport = {
   tipo: TipoPassageiro;
   status_reserva: StatusReserva;
   observacoes: string | null;
+  valor_contratado_brl: number | null;
+  valor_pago_brl: number | null;
+  /** Código da expedição — usado só na importação global. */
+  expedicao_codigo: string | null;
 };
 
 export type LinhaImport = {
@@ -70,6 +77,9 @@ const ALIASES: Record<CampoPassageiro, string[]> = {
   tipo: ["tipo", "tipo passageiro"],
   status_reserva: ["status reserva", "status", "situacao", "reserva"],
   observacoes: ["observacoes", "obs", "observacao", "notas"],
+  valor_contratado_brl: ["valor contratado", "contratado", "valor total", "total", "valor"],
+  valor_pago_brl: ["valor pago", "pago", "entrada", "valor pago brl"],
+  expedicao_codigo: ["expedicao codigo", "expedicao", "expedicao cod", "cod expedicao", "codigo expedicao", "codigo da expedicao", "codigo"],
 };
 
 /** Detecta o delimitador olhando a primeira linha (`;` vs `,`). */
@@ -151,6 +161,18 @@ export function normalizarData(valor: string): { iso: string | null; erro?: stri
   return { iso: null, erro: `data não reconhecida "${valor}"` };
 }
 
+/** Converte valor monetário em número. Aceita "1.234,56" (BR) e "1234.56" (US). */
+export function parseNumeroBR(valor: string): { num: number | null; erro?: string } {
+  let s = valor.trim().replace(/r\$\s?/i, "").replace(/\s/g, "");
+  if (!s) return { num: null };
+  if (s.includes(".") && s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (s.includes(",")) s = s.replace(",", ".");
+  const n = Number(s);
+  if (Number.isNaN(n)) return { num: null, erro: `valor numérico inválido "${valor}"` };
+  if (n < 0) return { num: null, erro: "valor negativo" };
+  return { num: n };
+}
+
 function coerceTipo(valor: string): TipoPassageiro {
   const n = normalizar(valor);
   const achado = TIPO_PASSAGEIRO.find((t) => normalizar(t) === n);
@@ -206,6 +228,11 @@ export function parsePassageirosCSV(texto: string): ResultadoParse {
     const emailRaw = get("email");
     if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) erros.push("e-mail inválido");
 
+    const contratado = parseNumeroBR(get("valor_contratado_brl"));
+    if (contratado.erro) erros.push(`valor contratado: ${contratado.erro}`);
+    const pago = parseNumeroBR(get("valor_pago_brl"));
+    if (pago.erro) erros.push(`valor pago: ${pago.erro}`);
+
     const dados: DadosImport = {
       nome_completo,
       data_nascimento: nasc.iso,
@@ -217,6 +244,9 @@ export function parsePassageirosCSV(texto: string): ResultadoParse {
       tipo: coerceTipo(get("tipo")),
       status_reserva: coerceStatus(get("status_reserva")),
       observacoes: get("observacoes") || null,
+      valor_contratado_brl: contratado.num,
+      valor_pago_brl: pago.num,
+      expedicao_codigo: get("expedicao_codigo") || null,
     };
 
     return { linha: idx + 1, dados, erros };
