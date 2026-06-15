@@ -1,0 +1,4 @@
+expedicao_codigo;nome_completo;data_nascimento;cpf;passaporte;validade_passaporte;email;telefone;tipo;status_reserva;valor_contratado;valor_pago
+PERU-AGO2023;Maria Souza;12/05/1990;111.222.333-44;FA123456;01/01/2032;maria@email.com;11999990000;Pagante;Confirmado;18900;18900
+PERU-AGO2023;João Lima;03/11/1988;555.666.777-88;;;joao@email.com;11988887777;Pagante;Confirmado;18900;18900
+JAPAO-MAR2024;Maria Souza;12/05/1990;111.222.333-44;FA123456;01/01/2032;maria@email.com;11999990000;Pagante;Confirmado;38900;38900

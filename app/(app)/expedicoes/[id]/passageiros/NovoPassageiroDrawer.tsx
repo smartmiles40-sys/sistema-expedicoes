@@ -24,13 +24,15 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
+import { cpfValido } from "@/lib/cpf";
 import { criarPassageiro } from "@/app/(app)/expedicoes/actions";
 
 const schema = z.object({
-  nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
+  nome_completo: z.string().min(2, "Nome completo obrigatório"),
   tipo: z.enum(["Pagante", "Cortesia", "Líder"]),
   status_reserva: z.enum(["Lead", "Pré-reserva", "Confirmado", "Cancelado"]),
-  cpf: z.string().optional(),
+  cpf: z.string().refine(cpfValido, "CPF inválido ou ausente"),
+  data_nascimento: z.string().min(1, "Data de nascimento obrigatória"),
   passaporte: z.string().optional(),
   validade_passaporte: z.string().optional(),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
@@ -77,7 +79,7 @@ export function NovoPassageiroDrawer({ expedicaoId, open, onOpenChange }: Props)
           </DrawerHeader>
           <DrawerBody>
             <div className="space-y-1">
-              <Label htmlFor="np-nome">Nome completo</Label>
+              <Label htmlFor="np-nome">Nome completo *</Label>
               <Input id="np-nome" {...register("nome_completo")} autoFocus />
               {errors.nome_completo && <p className="text-[11px] text-critico-600">{errors.nome_completo.message}</p>}
             </div>
@@ -105,24 +107,31 @@ export function NovoPassageiroDrawer({ expedicaoId, open, onOpenChange }: Props)
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label htmlFor="np-cpf">CPF</Label>
+                <Label htmlFor="np-cpf">CPF *</Label>
                 <Input id="np-cpf" {...register("cpf")} placeholder="000.000.000-00" />
+                {errors.cpf && <p className="text-[11px] text-critico-600">{errors.cpf.message}</p>}
               </div>
               <div className="space-y-1">
-                <Label htmlFor="np-tel">Telefone</Label>
-                <Input id="np-tel" {...register("telefone")} />
+                <Label htmlFor="np-nasc">Data de nascimento *</Label>
+                <Input id="np-nasc" type="date" {...register("data_nascimento")} />
+                {errors.data_nascimento && <p className="text-[11px] text-critico-600">{errors.data_nascimento.message}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
+                <Label htmlFor="np-tel">Telefone</Label>
+                <Input id="np-tel" {...register("telefone")} />
+              </div>
+              <div className="space-y-1">
                 <Label htmlFor="np-pass">Passaporte</Label>
                 <Input id="np-pass" {...register("passaporte")} />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="np-val">Validade</Label>
-                <Input id="np-val" type="date" {...register("validade_passaporte")} />
-              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="np-val">Validade do passaporte</Label>
+              <Input id="np-val" type="date" {...register("validade_passaporte")} />
             </div>
 
             <div className="space-y-1">

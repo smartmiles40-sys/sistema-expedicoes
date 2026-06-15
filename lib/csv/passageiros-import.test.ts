@@ -124,6 +124,26 @@ describe("parsePassageirosCSV", () => {
     expect(d.status_reserva).toBe("Lead");
   });
 
+  it("modo estrito exige CPF válido e nascimento", () => {
+    const csv = [
+      "nome;data_nascimento;cpf",
+      "Ana Sem Cpf;12/05/1990;",
+      "Bea Cpf Invalido;12/05/1990;111.222.333-44",
+      "Cris Sem Nasc;;111.444.777-35",
+      "Davi Completo;12/05/1990;111.444.777-35",
+    ].join("\n");
+    const r = parsePassageirosCSV(csv, { exigirObrigatorios: true });
+    expect(r.linhas[0].erros.join()).toMatch(/CPF obrigatório/);
+    expect(r.linhas[1].erros.join()).toMatch(/CPF inválido/);
+    expect(r.linhas[2].erros.join()).toMatch(/nascimento obrigatória/);
+    expect(r.linhas[3].erros).toHaveLength(0);
+  });
+
+  it("modo padrão (tolerante) não exige CPF nem nascimento", () => {
+    const r = parsePassageirosCSV("nome\nAna Souza");
+    expect(r.linhas[0].erros).toHaveLength(0);
+  });
+
   it("lê financeiro e código de expedição", () => {
     const csv = [
       "expedicao;nome;valor contratado;valor pago",

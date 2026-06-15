@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Bell,
   Users,
   Map,
   Building2,
@@ -16,6 +17,7 @@ import { UserMenu } from "./UserMenu";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
   { href: "/expedicoes", label: "Expedições", icon: Map },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
@@ -23,7 +25,13 @@ const NAV = [
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
-export function Sidebar({ user }: { user: CurrentUser | null }) {
+export function Sidebar({
+  user,
+  alertCount = 0,
+}: {
+  user: CurrentUser | null;
+  alertCount?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -60,7 +68,12 @@ export function Sidebar({ user }: { user: CurrentUser | null }) {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {item.href === "/avisos" && alertCount > 0 && (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-critico-600 px-1.5 text-[10px] font-semibold leading-none text-white">
+                      {alertCount > 99 ? "99+" : alertCount}
+                    </span>
+                  )}
                 </Link>
               </li>
             );

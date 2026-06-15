@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { GlobalShortcuts } from "@/components/layout/GlobalShortcuts";
-import { listExpedicoesComAgregados } from "@/lib/data/expedicoes";
+import { listExpedicoesComAgregados, getContagemAlertas } from "@/lib/data/expedicoes";
 import { listFornecedores } from "@/lib/data/fornecedores";
 import { mockPassageiros } from "@/lib/mock-data";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
@@ -21,14 +21,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [expedicoes, fornecedores, passageiros] = await Promise.all([
+  const [expedicoes, fornecedores, passageiros, alertas] = await Promise.all([
     listExpedicoesComAgregados(),
     listFornecedores(),
     listAllPassageiros(),
+    getContagemAlertas(),
   ]);
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} alertCount={alertas.total}>
       {children}
       <CommandPalette
         expedicoes={expedicoes}

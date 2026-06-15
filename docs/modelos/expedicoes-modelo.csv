@@ -1,0 +1,4 @@
+codigo;nome;destino;data_embarque;data_retorno;status;pax;preco_venda_brl
+NORUEGA-JUL2024;Noruega - Fiordes Jul 2024;Noruega;15/07/2024;26/07/2024;Concluída;18;42000
+JAPAO-MAR2024;Japão - Cerejeiras Mar 2024;Japão;20/03/2024;03/04/2024;Concluída;22;38900
+PERU-AGO2023;Peru - Machu Picchu Ago 2023;Peru;10/08/2023;19/08/2023;Concluída;24;18900

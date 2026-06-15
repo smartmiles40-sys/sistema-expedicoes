@@ -17,6 +17,7 @@ import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
+import { cpfValido } from "@/lib/cpf";
 import type { PapelUsuario, PassageiroRow } from "@/types/database";
 import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
@@ -330,13 +331,13 @@ export async function atualizarChecklistCampo(
 
 const novoPassageiroSchema = z.object({
   expedicao_id: z.string().min(1),
-  nome_completo: z.string().min(2, "Nome obrigatório"),
+  nome_completo: z.string().min(2, "Nome completo obrigatório"),
   tipo: z.enum(["Pagante", "Cortesia", "Líder"]),
   status_reserva: z.enum(["Lead", "Pré-reserva", "Confirmado", "Cancelado"]).default("Lead"),
-  cpf: z.string().optional().nullable(),
+  cpf: z.string().refine(cpfValido, "CPF inválido ou ausente"),
+  data_nascimento: z.string().min(1, "Data de nascimento obrigatória"),
   passaporte: z.string().optional().nullable(),
   validade_passaporte: z.string().optional().nullable(),
-  data_nascimento: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
   telefone: z.string().optional().nullable(),
   observacoes: z.string().optional().nullable(),
@@ -1293,10 +1294,12 @@ const importRowSchema = z.object({
   nome_completo: z.string().min(2),
   tipo: z.enum([...TIPO_PASSAGEIRO] as [TipoPassageiroEnum, ...TipoPassageiroEnum[]]),
   status_reserva: z.enum([...STATUS_RESERVA] as [StatusReservaEnum, ...StatusReservaEnum[]]),
-  cpf: z.string().nullable().optional(),
+  cpf: z.string().nullable().refine((v) => cpfValido(v), { message: "CPF inválido ou ausente" }),
   passaporte: z.string().nullable().optional(),
   validade_passaporte: z.string().nullable().optional(),
-  data_nascimento: z.string().nullable().optional(),
+  data_nascimento: z.string().nullable().refine((v) => !!v && v.trim().length > 0, {
+    message: "Data de nascimento obrigatória",
+  }),
   email: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
   observacoes: z.string().nullable().optional(),

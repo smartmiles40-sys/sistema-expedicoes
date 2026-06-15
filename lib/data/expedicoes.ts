@@ -16,6 +16,8 @@ import {
   getExpedicoesComAgregados,
 } from "@/lib/mock-data";
 import { avaliarProntidao, type ResultadoProntidao } from "@/lib/prontidao/regras";
+import { avaliarAlerta, regraDoTipo, type SeveridadeAlerta } from "@/lib/alertas/regras";
+import type { TipoRequisito } from "@/types/database";
 import type {
   Tables,
   ExpedicaoComAgregados,
@@ -312,6 +314,80 @@ export async function getResumoProntidao(): Promise<ResumoProntidaoExpedicao[]> 
       }),
   );
   return resumos;
+}
+
+// =============================================================================
+// Avisos operacionais (alertas por passageiro) — usado em /avisos e no menu
+// =============================================================================
+
+export type AlertaOperacional = {
+  expedicao_id: string;
+  expedicao_nome: string;
+  data_embarque: string;
+  dias_ate_embarque: number;
+  passageiro_id: string;
+  passageiro_nome: string;
+  tipo: TipoRequisito;
+  severidade: SeveridadeAlerta;
+  rotulo: string;
+  detalhe: string;
+};
+
+/** Lista de avisos: exigências pendentes dentro da janela, por passageiro. */
+export async function getAlertasOperacionais(): Promise<AlertaOperacional[]> {
+  const expedicoes = DEV_USE_MOCK_DATA
+    ? mockExpedicoes
+    : await (async () => {
+        const supabase = await getServerClient();
+        const { data } = await supabase.from("expedicoes").select("*");
+        return (data ?? []) as ExpedicaoRow[];
+      })();
+
+  const ativas = expedicoes.filter(
+    (e) => e.status !== "Concluída" && e.status !== "Cancelada",
+  );
+
+  const alertas: AlertaOperacional[] = [];
+  for (const e of ativas) {
+    const dias = daysUntil(e.data_embarque);
+    if (dias == null || dias < 0) continue;
+    const linhas = await getProntidaoExpedicao(e.id);
+    for (const { passageiro, resultado } of linhas) {
+      for (const c of resultado.checagens) {
+        const severidade = avaliarAlerta(c.tipo, c.semaforo, dias);
+        if (!severidade) continue;
+        alertas.push({
+          expedicao_id: e.id,
+          expedicao_nome: e.nome,
+          data_embarque: e.data_embarque,
+          dias_ate_embarque: dias,
+          passageiro_id: passageiro.id,
+          passageiro_nome: passageiro.nome_completo,
+          tipo: c.tipo,
+          severidade,
+          rotulo: regraDoTipo(c.tipo)?.rotulo ?? c.tipo,
+          detalhe: c.detalhe,
+        });
+      }
+    }
+  }
+
+  // Mais urgente primeiro: menos dias até embarque, e críticos antes de atenção.
+  alertas.sort(
+    (a, b) =>
+      a.dias_ate_embarque - b.dias_ate_embarque ||
+      (a.severidade === b.severidade ? 0 : a.severidade === "critico" ? -1 : 1),
+  );
+  return alertas;
+}
+
+/** Contagem de avisos (para o badge no menu). */
+export async function getContagemAlertas(): Promise<{ total: number; criticos: number }> {
+  const alertas = await getAlertasOperacionais();
+  return {
+    total: alertas.length,
+    criticos: alertas.filter((a) => a.severidade === "critico").length,
+  };
 }
 
 // =============================================================================

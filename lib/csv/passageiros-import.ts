@@ -6,6 +6,7 @@
  * com acento/caixa variável, e datas em ISO ou DD/MM/AAAA.
  */
 import { TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
+import { cpfValido } from "@/lib/cpf";
 import type { TipoPassageiro, StatusReserva } from "@/types/database";
 
 export type CampoPassageiro =
@@ -189,7 +190,11 @@ function coerceStatus(valor: string): StatusReserva {
  * Lê o CSV inteiro e devolve uma linha estruturada por registro, com os erros
  * de validação de cada uma (nome é o único campo obrigatório).
  */
-export function parsePassageirosCSV(texto: string): ResultadoParse {
+export function parsePassageirosCSV(
+  texto: string,
+  opcoes?: { exigirObrigatorios?: boolean },
+): ResultadoParse {
+  const exigir = opcoes?.exigirObrigatorios ?? false;
   const grade = parseCSV(texto);
   if (grade.length === 0) {
     return { linhas: [], erroGeral: "Arquivo vazio.", colunasReconhecidas: [] };
@@ -218,12 +223,17 @@ export function parsePassageirosCSV(texto: string): ResultadoParse {
 
     const nasc = normalizarData(get("data_nascimento"));
     if (nasc.erro) erros.push(`nascimento: ${nasc.erro}`);
+    else if (exigir && !nasc.iso) erros.push("data de nascimento obrigatória");
     const val = normalizarData(get("validade_passaporte"));
     if (val.erro) erros.push(`validade passaporte: ${val.erro}`);
 
     const cpfRaw = get("cpf");
-    const cpfDigitos = cpfRaw.replace(/\D/g, "");
-    if (cpfRaw && cpfDigitos.length !== 11) erros.push("CPF não tem 11 dígitos");
+    if (exigir) {
+      if (!cpfRaw) erros.push("CPF obrigatório");
+      else if (!cpfValido(cpfRaw)) erros.push("CPF inválido");
+    } else if (cpfRaw && cpfRaw.replace(/\D/g, "").length !== 11) {
+      erros.push("CPF não tem 11 dígitos");
+    }
 
     const emailRaw = get("email");
     if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) erros.push("e-mail inválido");

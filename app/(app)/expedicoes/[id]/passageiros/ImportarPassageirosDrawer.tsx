@@ -56,7 +56,8 @@ export function ImportarPassageirosDrawer(props: Props) {
   }
 
   function carregarTexto(texto: string) {
-    setParse(parsePassageirosCSV(texto));
+    // Cadastro exige CPF válido + data de nascimento (modo estrito).
+    setParse(parsePassageirosCSV(texto, { exigirObrigatorios: true }));
   }
 
   async function onArquivo(e: React.ChangeEvent<HTMLInputElement>) {

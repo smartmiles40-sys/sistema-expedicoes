@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dados locais reais (PII) — NUNCA versionar. Carregados só no localhost.
+/data-local/

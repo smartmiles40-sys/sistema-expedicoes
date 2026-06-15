@@ -7,9 +7,18 @@ import type {
   ExpedicaoComAgregados,
   EtapaChecklist,
 } from "@/types/database";
+import fs from "node:fs";
+import path from "node:path";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosDestino } from "@/lib/prontidao/requisitos-destino";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
+import {
+  parseCSV,
+  parsePassageirosCSV,
+  normalizarData,
+  parseNumeroBR,
+  type DadosImport,
+} from "@/lib/csv/passageiros-import";
 
 const today = new Date();
 const iso = (d: Date) => d.toISOString();
@@ -540,3 +549,140 @@ export function getExpedicoesComAgregados(): ExpedicaoComAgregados[] {
     };
   });
 }
+
+// =============================================================================
+// Seed LOCAL (gitignored) — carrega expedições/passageiros reais de data-local/
+// só no servidor e só em modo mock. Nunca vai pro GitHub (ver .gitignore).
+// Os CSVs usam o mesmo formato dos modelos em docs/modelos/.
+// =============================================================================
+function passageiroDeSeed(
+  d: DadosImport,
+  expedicaoId: string,
+  id: string,
+): Tables<"passageiros"> {
+  const contratado = d.valor_contratado_brl ?? 0;
+  const pago = d.valor_pago_brl ?? 0;
+  const status_financeiro =
+    d.tipo !== "Pagante" && contratado === 0
+      ? "Cortesia"
+      : contratado > 0 && pago >= contratado
+        ? "Quitado"
+        : "Em aberto";
+  return {
+    id,
+    expedicao_id: expedicaoId,
+    grupo_id: null,
+    bitrix_contact_id: null,
+    bitrix_deal_id: null,
+    nome_completo: d.nome_completo,
+    tipo: d.tipo,
+    cpf: d.cpf,
+    passaporte: d.passaporte,
+    data_nascimento: d.data_nascimento,
+    validade_passaporte: d.validade_passaporte,
+    email: d.email,
+    telefone: d.telefone,
+    status_reserva: d.status_reserva,
+    voo_nacional_necessario: false,
+    companhia_aerea: null,
+    localizador: null,
+    quarto_id: null,
+    valor_contratado_brl: contratado,
+    valor_pago_brl: pago,
+    saldo_brl: contratado - pago,
+    status_financeiro,
+    contato_emergencia_nome: null,
+    contato_emergencia_fone: null,
+    restricoes_alimentares: null,
+    condicoes_medicas: null,
+    contrato_assinado: false,
+    checkin_online_feito: false,
+    observacoes: d.observacoes,
+    created_at: pastDate(1),
+    updated_at: pastDate(1),
+  };
+}
+
+function carregarSeedLocal(): void {
+  if (typeof window !== "undefined") return; // só no servidor
+  try {
+    const dir = path.join(process.cwd(), "data-local");
+    const paxPath = path.join(dir, "passageiros.csv");
+    if (!fs.existsSync(paxPath)) return;
+
+    const codigoToId = new Map<string, string>();
+    const destinoById = new Map<string, string>();
+
+    // Permite anexar passageiros a expedições JÁ existentes (pelo código),
+    // além das definidas em data-local/expedicoes.csv.
+    for (const e of mockExpedicoes) {
+      codigoToId.set(e.codigo, e.id);
+      destinoById.set(e.id, e.destino);
+    }
+
+    const expPath = path.join(dir, "expedicoes.csv");
+    if (fs.existsSync(expPath)) {
+      const grade = parseCSV(fs.readFileSync(expPath, "utf8"));
+      const [hdr, ...linhas] = grade;
+      const col = (nome: string) =>
+        hdr.findIndex((h) => h.trim().toLowerCase() === nome);
+      const cCod = col("codigo"), cNome = col("nome"), cDest = col("destino"),
+        cEmb = col("data_embarque"), cRet = col("data_retorno"),
+        cStatus = col("status"), cPax = col("pax"), cPreco = col("preco_venda_brl");
+      for (const r of linhas) {
+        const codigo = (cCod >= 0 ? r[cCod] : "")?.trim();
+        if (!codigo) continue;
+        const id = `seed-${codigo.toLowerCase()}`;
+        const destino = (cDest >= 0 ? r[cDest] : "")?.trim() ?? "";
+        const emb = normalizarData(cEmb >= 0 ? r[cEmb] ?? "" : "").iso ?? iso(today);
+        const ret = normalizarData(cRet >= 0 ? r[cRet] ?? "" : "").iso ?? emb;
+        mockExpedicoes.push({
+          id,
+          codigo,
+          nome: (cNome >= 0 ? r[cNome] : "")?.trim() || codigo,
+          destino,
+          data_embarque: emb,
+          data_retorno: ret,
+          responsavel_operacional_id: null,
+          responsavel_comercial_id: null,
+          dmc_principal_id: null,
+          status: ((cStatus >= 0 ? r[cStatus] : "")?.trim() ||
+            "Concluída") as Tables<"expedicoes">["status"],
+          pax_planejados: Number((cPax >= 0 ? r[cPax] : "0")?.trim() || 0) || 0,
+          pax_cortesia: 0,
+          preco_venda_brl: parseNumeroBR(cPreco >= 0 ? r[cPreco] ?? "" : "").num ?? 0,
+          bitrix_pipeline_id: null,
+          observacoes: null,
+          ordem: null,
+          created_at: pastDate(1),
+          updated_at: pastDate(1),
+        });
+        codigoToId.set(codigo, id);
+        destinoById.set(id, destino);
+      }
+    }
+
+    const parsed = parsePassageirosCSV(fs.readFileSync(paxPath, "utf8"));
+    let i = 0;
+    for (const linha of parsed.linhas) {
+      if (linha.erros.length > 0) continue;
+      const codigo = linha.dados.expedicao_codigo;
+      const expId = codigo ? codigoToId.get(codigo) : undefined;
+      if (!expId) continue;
+      i++;
+      const pax = passageiroDeSeed(linha.dados, expId, `seed-pax-${i}`);
+      mockPassageiros.push(pax);
+      mockPassageiroRequisitos.push(
+        ...construirRequisitosPadrao({
+          passageiro: pax,
+          destino: destinoById.get(expId) ?? "",
+          idPrefix: `prseed-${i}`,
+        }),
+      );
+    }
+  } catch (e) {
+    console.error("[seed-local] falha ao carregar data-local/:", e);
+  }
+}
+
+carregarSeedLocal();
