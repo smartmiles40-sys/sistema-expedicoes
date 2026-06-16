@@ -13,11 +13,7 @@
  *    onde o time registra status, validade e evidência.
  */
 import { parseISO } from "date-fns";
-import { daysUntil } from "@/lib/utils";
-import {
-  MESES_VALIDADE_PASSAPORTE_PADRAO,
-  DIAS_BLOQUEIO_FINANCEIRO,
-} from "@/lib/constants";
+import { MESES_VALIDADE_PASSAPORTE_PADRAO } from "@/lib/constants";
 import { requisitosDoDestino } from "@/lib/prontidao/requisitos-destino";
 import type {
   PassageiroRow,
@@ -30,7 +26,6 @@ import type {
 /** Tipos cuja prontidão é derivada de colunas do passageiro (não viram instância). */
 export const REQUISITOS_DE_COLUNA: ReadonlySet<TipoRequisito> = new Set([
   "Passaporte",
-  "Pagamento",
   "Contrato",
   "Dados Pessoais",
 ]);
@@ -98,14 +93,6 @@ function checarPassaporte(
   return "ok";
 }
 
-function checarFinanceiro(p: PassageiroRow, exp: ExpedicaoLite): Semaforo {
-  if (p.saldo_brl <= 0) return "ok";
-  const dias = daysUntil(exp.data_embarque);
-  // Saldo em aberto vira bloqueio na reta final.
-  if (dias != null && dias <= DIAS_BLOQUEIO_FINANCEIRO) return "bloqueio";
-  return "atencao";
-}
-
 function checarContrato(p: PassageiroRow, bloqueia: boolean): Semaforo {
   if (p.contrato_assinado) return "ok";
   return bloqueia ? "bloqueio" : "atencao";
@@ -126,10 +113,6 @@ function detalheColuna(tipo: TipoRequisito, p: PassageiroRow, sem: Semaforo): st
         : sem === "atencao"
           ? `Vence em ${p.validade_passaporte.slice(0, 10)} — dentro de 6 meses do retorno`
           : `Válido até ${p.validade_passaporte.slice(0, 10)}`;
-    case "Pagamento":
-      return p.saldo_brl <= 0
-        ? "Quitado"
-        : `Saldo em aberto: R$ ${p.saldo_brl.toLocaleString("pt-BR")}`;
     case "Contrato":
       return p.contrato_assinado ? "Assinado" : "Contrato não assinado";
     case "Dados Pessoais":
@@ -183,9 +166,6 @@ export function avaliarProntidao(params: {
       switch (t.tipo) {
         case "Passaporte":
           semaforo = checarPassaporte(passageiro, expedicao, t.bloqueia_embarque);
-          break;
-        case "Pagamento":
-          semaforo = checarFinanceiro(passageiro, expedicao);
           break;
         case "Contrato":
           semaforo = checarContrato(passageiro, t.bloqueia_embarque);

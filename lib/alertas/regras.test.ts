@@ -27,9 +27,9 @@ describe("avaliarAlerta", () => {
     expect(avaliarAlerta("Passaporte", "bloqueio", null)).toBeNull();
   });
 
-  it("pagamento só entra na janela mais curta (30 dias)", () => {
-    expect(avaliarAlerta("Pagamento", "bloqueio", 45)).toBeNull();
-    expect(avaliarAlerta("Pagamento", "bloqueio", 20)).toBe("critico");
+  it("pagamento de passageiro não gera mais aviso (regra removida)", () => {
+    expect(avaliarAlerta("Pagamento", "bloqueio", 20)).toBeNull();
+    expect(regraDoTipo("Pagamento")).toBeUndefined();
   });
 
   it("mapeia severidade: bloqueio->critico, atencao->atencao", () => {
@@ -39,6 +39,6 @@ describe("avaliarAlerta", () => {
 
   it("regraDoTipo devolve a janela configurada", () => {
     expect(regraDoTipo("Passaporte")?.janelaDias).toBe(Infinity);
-    expect(regraDoTipo("Pagamento")?.janelaDias).toBe(30);
+    expect(regraDoTipo("Visto")?.janelaDias).toBe(60);
   });
 });

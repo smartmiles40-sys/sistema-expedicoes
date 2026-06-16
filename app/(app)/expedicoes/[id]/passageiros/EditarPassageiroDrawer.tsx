@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/Select";
 import { TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
 import { Drive } from "@/components/arquivos/Drive";
-import { atualizarPassageiroLote } from "@/app/(app)/expedicoes/actions";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
 import type { ArquivoRow, PassageiroRow } from "@/types/database";
 
 const schema = z.object({
@@ -44,6 +45,8 @@ const schema = z.object({
   companhia_aerea: z.string().optional(),
   localizador: z.string().optional(),
   voo_nacional_necessario: z.boolean().optional(),
+  contrato_assinado: z.boolean().optional(),
+  checkin_online_feito: z.boolean().optional(),
   observacoes: z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
@@ -77,6 +80,8 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOp
       companhia_aerea: passageiro.companhia_aerea ?? "",
       localizador: passageiro.localizador ?? "",
       voo_nacional_necessario: passageiro.voo_nacional_necessario ?? false,
+      contrato_assinado: passageiro.contrato_assinado ?? false,
+      checkin_online_feito: passageiro.checkin_online_feito ?? false,
       observacoes: passageiro.observacoes ?? "",
     });
   }, [passageiro, reset]);
@@ -206,14 +211,33 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOp
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-[12px]">
-              <input
-                type="checkbox"
-                {...register("voo_nacional_necessario")}
-                className="h-3.5 w-3.5"
-              />
-              Voo nacional necessário
-            </label>
+            <div className="flex flex-col gap-1.5 rounded-md border border-border p-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Embarque</span>
+              <label className="flex items-center gap-2 text-[12px]">
+                <input
+                  type="checkbox"
+                  {...register("contrato_assinado")}
+                  className="h-3.5 w-3.5"
+                />
+                Contrato assinado
+              </label>
+              <label className="flex items-center gap-2 text-[12px]">
+                <input
+                  type="checkbox"
+                  {...register("checkin_online_feito")}
+                  className="h-3.5 w-3.5"
+                />
+                Check-in online feito
+              </label>
+              <label className="flex items-center gap-2 text-[12px]">
+                <input
+                  type="checkbox"
+                  {...register("voo_nacional_necessario")}
+                  className="h-3.5 w-3.5"
+                />
+                Voo nacional necessário
+              </label>
+            </div>
 
             <div className="space-y-1">
               <Label htmlFor="ep-obs">Observações</Label>
@@ -245,6 +269,21 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOp
         </DrawerBody>
 
         <DrawerFooter>
+          {passageiro && (
+            <ConfirmDeleteButton
+              triggerLabel="Excluir passageiro"
+              triggerClassName="mr-auto"
+              ariaLabel="Excluir passageiro"
+              title={`Excluir "${passageiro.nome_completo}"?`}
+              description="Esta ação não pode ser desfeita. Arquivos vinculados continuarão no storage."
+              successMessage="Passageiro excluído"
+              onConfirm={() => excluirPassageiro(passageiro.id, expedicaoId)}
+              onDeleted={() => {
+                onOpenChange(false);
+                router.refresh();
+              }}
+            />
+          )}
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>

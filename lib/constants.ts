@@ -185,9 +185,6 @@ export type Prontidao = (typeof PRONTIDAO)[number];
 /** Meses de validade do passaporte exigidos após o retorno (padrão de mercado). */
 export const MESES_VALIDADE_PASSAPORTE_PADRAO = 6;
 
-/** Antecedência (dias) em que um saldo em aberto deixa de ser alerta e vira bloqueio. */
-export const DIAS_BLOQUEIO_FINANCEIRO = 15;
-
 /**
  * Mapa semáforo → token de cor semântica do tema (app/globals.css).
  * Reaproveita a paleta do CLAUDE.md: verde=ok, laranja=atenção, vermelho=crítico.

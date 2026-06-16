@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
+import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { getArquivoMock } from "@/lib/data/arquivos-mock";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const BUCKET = "arquivos-expedicoes";
 
@@ -16,6 +18,18 @@ export async function GET(
     if (!u) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await ctx.params;
+
+  // Modo mock: serve o arquivo direto do disco (inline pra pré-visualizar imagens).
+  if (DEV_USE_MOCK_DATA) {
+    const found = await getArquivoMock(id);
+    if (!found) return NextResponse.json({ ok: false, error: "não encontrado" }, { status: 404 });
+    return new NextResponse(new Uint8Array(found.bytes), {
+      headers: {
+        "Content-Type": found.row.mime ?? "application/octet-stream",
+        "Content-Disposition": `inline; filename="${encodeURIComponent(found.row.nome)}"`,
+      },
+    });
+  }
 
   const supabase = createServiceRoleClient();
   const { data: row } = await supabase

@@ -12,7 +12,6 @@ const ATALHOS: { keys: string; descricao: string }[] = [
   { keys: "Esc", descricao: "Cancelar edição" },
   { keys: "Tab", descricao: "Próxima célula" },
   { keys: "⌘ K", descricao: "Command palette" },
-  { keys: "g d", descricao: "Ir para Dashboard" },
   { keys: "g e", descricao: "Ir para Expedições" },
   { keys: "g f", descricao: "Ir para Fornecedores" },
   { keys: "?", descricao: "Mostrar atalhos" },
@@ -34,12 +33,6 @@ export function GlobalShortcuts() {
       // Sequência g+letra
       const now = Date.now();
       if (lastKeyRef.current === "g" && now - lastTimeRef.current < 1500) {
-        if (e.key === "d") {
-          e.preventDefault();
-          router.push("/dashboard");
-          lastKeyRef.current = "";
-          return;
-        }
         if (e.key === "e") {
           e.preventDefault();
           router.push("/expedicoes");

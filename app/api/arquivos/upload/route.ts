@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
+import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { addArquivoMock } from "@/lib/data/arquivos-mock";
 import {
   CATEGORIA_ARQUIVO,
   type CategoriaArquivo,
@@ -69,6 +70,24 @@ export async function POST(req: NextRequest) {
       { ok: false, error: `tipo de arquivo não permitido: ${file.type || "desconhecido"}` },
       { status: 415 },
     );
+  }
+
+  // Modo mock (sem Supabase): persiste em disco sob .dev-uploads/.
+  if (DEV_USE_MOCK_DATA) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const row = await addArquivoMock(
+      {
+        expedicao_id,
+        passageiro_id,
+        categoria,
+        nome: file.name,
+        descricao,
+        mime: file.type || null,
+        tamanho_bytes: file.size,
+      },
+      buffer,
+    );
+    return NextResponse.json({ ok: true, id: row.id });
   }
 
   const supabase = createServiceRoleClient();

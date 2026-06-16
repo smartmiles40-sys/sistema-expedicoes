@@ -5,7 +5,7 @@ import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage() {
   if (DEV_AUTH_BYPASS) {
-    redirect("/dashboard");
+    redirect("/expedicoes");
   }
 
   return (

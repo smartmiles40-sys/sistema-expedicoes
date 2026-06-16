@@ -263,6 +263,26 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     created_at: iso(today),
     updated_at: iso(today),
   },
+  {
+    id: "e0000000-0000-0000-0000-000000000006",
+    codigo: "PERU-AGO26",
+    nome: "Peru – Ago 2026",
+    destino: "Peru",
+    data_embarque: "2026-08-22T12:00:00.000Z",
+    data_retorno: "2026-08-30T12:00:00.000Z",
+    responsavel_operacional_id: "00000000-0000-0000-0000-000000000002",
+    responsavel_comercial_id: "00000000-0000-0000-0000-000000000003",
+    dmc_principal_id: null,
+    status: "Em andamento",
+    pax_planejados: 9,
+    pax_cortesia: 0,
+    preco_venda_brl: 0,
+    bitrix_pipeline_id: null,
+    ordem: 6,
+    observacoes: "Machu Picchu, cultura inca e gastronomia premiada. 9 dias · edição encerrada (vendas fechadas).",
+    created_at: iso(today),
+    updated_at: iso(today),
+  },
 ];
 
 /**
@@ -303,6 +323,16 @@ const passageirosBase: PassageiroBase[] = [
   // Mariana Silva (mesmo CPF de p0000001) também na Patagônia — demonstra a
   // consolidação por pessoa: ela aparece como 1 pessoa com 2 expedições.
   { id: "p0000013", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000002", bitrix_contact_id: "BX-1001", bitrix_deal_id: "BX-D-2099", nome_completo: "Mariana Silva", tipo: "Pagante", cpf: "111.222.333-44", passaporte: "FA123456", data_nascimento: "1988-03-12", validade_passaporte: futureDate(800), email: "mari@gmail.com", telefone: "+55 11 99999-1111", status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: "Expedicionária recorrente", created_at: pastDate(25), updated_at: pastDate(3) },
+  // Peru – Grupo (e...006). "Total" da planilha = tamanho da reserva; titular cadastrado aqui.
+  { id: "p0000101", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Alynne Moura Maglioni Monti", tipo: "Pagante", cpf: "103.640.356-41", passaporte: "FW614529", data_nascimento: "1992-07-21", validade_passaporte: "2028-07-31", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000103", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Cristina Martini", tipo: "Pagante", cpf: "070.600.879-07", passaporte: "GM358823", data_nascimento: "1989-11-14", validade_passaporte: "2035-08-31", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000104", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Eduardo Regis Coroa Vasconcelos", tipo: "Pagante", cpf: "022.060.842-36", passaporte: "GG280125", data_nascimento: "1992-05-29", validade_passaporte: "2033-02-23", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000105", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Georgia Freitas Café", tipo: "Pagante", cpf: "058.459.213-25", passaporte: "FX579723", data_nascimento: "1998-02-20", validade_passaporte: "2028-11-29", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000107", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Jéssica de Andrade Freitas", tipo: "Pagante", cpf: "117.627.436-80", passaporte: "GN029292", data_nascimento: "1995-05-27", validade_passaporte: "2035-11-25", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000108", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Maria Aparecida Queirós de Sousa", tipo: "Pagante", cpf: "035.777.863-45", passaporte: null, data_nascimento: "1989-01-20", validade_passaporte: null, email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000109", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Maria Tais Claudino de Almeida", tipo: "Pagante", cpf: "031.689.813-97", passaporte: "GF958696", data_nascimento: "1992-05-29", validade_passaporte: "2033-01-15", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000110", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Matthäus Gondim Muniz", tipo: "Pagante", cpf: "008.937.093-79", passaporte: "FX579722", data_nascimento: "1991-08-13", validade_passaporte: "2028-11-29", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
+  { id: "p0000111", grupo_id: null, expedicao_id:"e0000000-0000-0000-0000-000000000006", bitrix_contact_id: null, bitrix_deal_id: null, nome_completo: "Paula Viana Egypto", tipo: "Pagante", cpf: "016.016.133-93", passaporte: "GJ716623", data_nascimento: "1985-11-03", validade_passaporte: "2034-07-09", email: null, telefone: null, status_reserva: "Confirmado", voo_nacional_necessario: false, companhia_aerea: null, localizador: null, quarto_id: null, observacoes: null, created_at: iso(today), updated_at: iso(today) },
 ];
 
 /**

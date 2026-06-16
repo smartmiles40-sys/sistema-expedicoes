@@ -10,7 +10,6 @@ const TABS = [
   { slug: "custos", label: "Custos" },
   { slug: "pagamentos", label: "Pagamentos" },
   { slug: "checklist", label: "Checklist" },
-  { slug: "prontidao", label: "Prontidão" },
   { slug: "documentos", label: "Documentos" },
   { slug: "links", label: "Links" },
 ];

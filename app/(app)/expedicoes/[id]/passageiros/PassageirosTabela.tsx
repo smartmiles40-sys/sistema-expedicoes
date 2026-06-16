@@ -1,21 +1,23 @@
 "use client";
 import * as React from "react";
-import { Download, Pencil, Plus, RefreshCw, Search, Upload } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Download, Plus, RefreshCw, Search, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EditableCell } from "@/components/tables/EditableCell";
-import { atualizarPassageiroCampo, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
-import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
-import { STATUS_RESERVA, TIPO_PASSAGEIRO } from "@/lib/constants";
-import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva } from "@/types/database";
+import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO } from "@/lib/constants";
+import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
+import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { toast } from "sonner";
 import { NovoPassageiroDrawer } from "./NovoPassageiroDrawer";
 import { EditarPassageiroDrawer } from "./EditarPassageiroDrawer";
 import { ImportarPassageirosDrawer } from "./ImportarPassageirosDrawer";
+import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
@@ -31,15 +33,38 @@ interface Props {
   quartos: QuartoRow[];
   arquivos: ArquivoRow[];
   dataEmbarque: string;
+  destino: string;
+  prontidao: ProntidaoPassageiro[];
+  usuarios: UsuarioRow[];
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios }: Props) {
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  const [prontidaoPaxId, setProntidaoPaxId] = React.useState<string | null>(null);
+
+  // Abre o perfil automaticamente quando chega de outra tela com ?editar=<id>
+  // (ex.: clicar no nome do passageiro em /avisos). Limpa o param em seguida
+  // pra não reabrir o drawer toda vez que o usuário fechá-lo.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const editarParam = searchParams.get("editar");
+  React.useEffect(() => {
+    if (editarParam && passageiros.some((p) => p.id === editarParam)) {
+      setEditandoId(editarParam);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [editarParam, passageiros, router, pathname]);
+  const prontidaoByPax = React.useMemo(
+    () => new Map(prontidao.map((p) => [p.passageiro.id, p])),
+    [prontidao],
+  );
+  const prontidaoSelecionada = prontidaoPaxId ? prontidaoByPax.get(prontidaoPaxId) ?? null : null;
   const cpfsExistentes = React.useMemo(
     () => passageiros.map((p) => cpfDigitos(p.cpf)).filter((c): c is string => Boolean(c)),
     [passageiros],
@@ -157,8 +182,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                 <Th>Quarto</Th>
                 <Th>Voo</Th>
                 <Th>Status</Th>
+                <Th>Prontidão</Th>
                 <Th>Observações</Th>
-                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -185,7 +210,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                         <button
                           type="button"
                           onClick={() => setEditandoId(p.id)}
-                          className="text-left hover:underline"
+                          title="Abrir perfil do passageiro"
+                          className="text-left text-editavel-700 hover:underline"
                         >
                           {p.nome_completo}
                         </button>
@@ -222,32 +248,30 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                       <td className="px-2.5">
                         <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
                       </td>
+                      <td className="px-2.5">
+                        {(() => {
+                          const pr = prontidaoByPax.get(p.id);
+                          if (!pr) return <span className="text-muted-foreground">—</span>;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setProntidaoPaxId(p.id)}
+                              title="Ver requisitos de embarque"
+                              className="rounded-sm focus:outline-none focus:ring-2 focus:ring-editavel-600"
+                            >
+                              <Badge variant={COR_PRONTIDAO[pr.resultado.prontidao]}>
+                                {pr.resultado.prontidao}
+                              </Badge>
+                            </button>
+                          );
+                        })()}
+                      </td>
                       <td>
                         <EditableCell
                           value={p.observacoes}
                           onSave={(v) => atualizarPassageiroCampo(p.id, "observacoes", v)}
                           placeholder="—"
                         />
-                      </td>
-                      <td className="w-16 px-1">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setEditandoId(p.id)}
-                            aria-label="Editar passageiro"
-                            title="Editar / Arquivos"
-                            className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <ConfirmDeleteButton
-                            ariaLabel="Excluir passageiro"
-                            title={`Excluir "${p.nome_completo}"?`}
-                            description="Esta ação não pode ser desfeita. Arquivos vinculados continuarão no storage."
-                            successMessage="Passageiro excluído"
-                            onConfirm={() => excluirPassageiro(p.id, expedicaoId)}
-                          />
-                        </div>
                       </td>
                     </tr>
                   );
@@ -281,6 +305,14 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         passageiro={passageiroEditando}
         arquivos={arquivos}
         onOpenChange={(open) => !open && setEditandoId(null)}
+      />
+
+      <ProntidaoPaxDrawer
+        expedicaoId={expedicaoId}
+        destino={destino}
+        item={prontidaoSelecionada}
+        usuarios={usuarios}
+        onClose={() => setProntidaoPaxId(null)}
       />
     </div>
   );

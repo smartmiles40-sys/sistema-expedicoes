@@ -42,3 +42,6 @@ next-env.d.ts
 
 # dados locais reais (PII) — NUNCA versionar. Carregados só no localhost.
 /data-local/
+
+# uploads do modo mock (arquivos de teste local) — NUNCA versionar.
+/.dev-uploads/

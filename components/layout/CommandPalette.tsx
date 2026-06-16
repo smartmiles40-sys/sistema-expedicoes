@@ -3,7 +3,6 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
-  LayoutDashboard,
   Map,
   Building2,
   Coins,
@@ -73,9 +72,6 @@ export function CommandPalette({ expedicoes, passageiros, fornecedores }: Props)
               </Command.Empty>
 
               <Command.Group heading="Navegação" className="text-[11px] uppercase tracking-wide text-muted-foreground p-1">
-                <Item onSelect={() => go("/dashboard")} icon={<LayoutDashboard className="h-3.5 w-3.5" />}>
-                  Dashboard <Hint>g d</Hint>
-                </Item>
                 <Item onSelect={() => go("/expedicoes")} icon={<Map className="h-3.5 w-3.5" />}>
                   Expedições <Hint>g e</Hint>
                 </Item>

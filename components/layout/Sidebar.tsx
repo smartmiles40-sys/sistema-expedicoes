@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Bell,
   Users,
   Map,
@@ -16,7 +15,6 @@ import type { CurrentUser } from "@/lib/supabase/auth";
 import { UserMenu } from "./UserMenu";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
   { href: "/expedicoes", label: "Expedições", icon: Map },
@@ -51,10 +49,7 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto p-2">
         <ul className="space-y-0.5">
           {NAV.map((item) => {
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
+            const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
               <li key={item.href}>

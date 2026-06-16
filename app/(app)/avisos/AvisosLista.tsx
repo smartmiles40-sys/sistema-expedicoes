@@ -80,7 +80,7 @@ export function AvisosLista({ alertas }: { alertas: AlertaOperacional[] }) {
           <div key={g.expedicao_id} className="rounded-md border border-border bg-background overflow-hidden">
             <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
               <div className="min-w-0">
-                <Link href={`/expedicoes/${g.expedicao_id}/prontidao`} className="text-[13px] font-semibold hover:underline truncate">
+                <Link href={`/expedicoes/${g.expedicao_id}/passageiros`} className="text-[13px] font-semibold hover:underline truncate">
                   {g.expedicao_nome}
                 </Link>
                 <span className="ml-2 text-[11px] text-muted-foreground">
@@ -93,7 +93,7 @@ export function AvisosLista({ alertas }: { alertas: AlertaOperacional[] }) {
               {g.itens.map((a, i) => (
                 <li key={`${a.passageiro_id}-${a.tipo}-${i}`}>
                   <Link
-                    href={`/expedicoes/${a.expedicao_id}/prontidao`}
+                    href={`/expedicoes/${a.expedicao_id}/passageiros?editar=${a.passageiro_id}`}
                     className="flex items-center gap-3 px-3 py-2 border-b border-border last:border-0 hover:bg-accent/30 transition-colors group"
                   >
                     <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", DOT[a.severidade])} />

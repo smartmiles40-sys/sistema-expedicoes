@@ -14,9 +14,11 @@ import {
   Building,
   Receipt,
   Folder,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
+import { Dialog, DialogContent, DialogTitle, DialogFooter } from "@/components/ui/Dialog";
 import { CATEGORIA_ARQUIVO, type CategoriaArquivo } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { ArquivoRow } from "@/types/database";
@@ -46,6 +48,7 @@ export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGO
   const [pastaAtiva, setPastaAtiva] = React.useState<CategoriaArquivo | "Todos">("Todos");
   const [uploading, setUploading] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
+  const [preview, setPreview] = React.useState<ArquivoRow | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   useRealtimeRefresh({
@@ -185,19 +188,41 @@ export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGO
         <ul className="divide-y divide-border rounded-md border border-border overflow-hidden bg-background">
           {filtrados.map((a) => {
             const Icon = ICONES[a.categoria as CategoriaArquivo] ?? FileText;
+            const ehImagem = a.mime?.startsWith("image/") ?? false;
             return (
               <li key={a.id} className="flex items-center gap-3 px-3 py-2 hover:bg-accent/30 transition-colors">
                 <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium truncate">{a.nome}</div>
+                  {ehImagem ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreview(a)}
+                      title="Visualizar imagem"
+                      className="block max-w-full truncate text-left text-[13px] font-medium text-editavel-700 hover:underline"
+                    >
+                      {a.nome}
+                    </button>
+                  ) : (
+                    <div className="text-[13px] font-medium truncate">{a.nome}</div>
+                  )}
                   <div className="text-[10px] text-muted-foreground flex items-center gap-2">
                     <span>{a.categoria}</span>
                     {a.tamanho_bytes != null && <span>· {formatSize(a.tamanho_bytes)}</span>}
                     <span>· {new Date(a.created_at).toLocaleDateString("pt-BR")}</span>
                   </div>
                 </div>
+                {ehImagem && (
+                  <button
+                    onClick={() => setPreview(a)}
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                    title="Visualizar"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <a
                   href={`/api/arquivos/${a.id}/download`}
+                  download={a.nome}
                   className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                   title="Baixar"
                 >
@@ -215,6 +240,32 @@ export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGO
           })}
         </ul>
       )}
+
+      {/* Lightbox — pré-visualização de imagem. Fecha no X, no Esc ou clicando fora. */}
+      <Dialog open={preview !== null} onOpenChange={(v) => !v && setPreview(null)}>
+        {preview && (
+          <DialogContent className="max-w-3xl">
+            <DialogTitle className="pr-8 truncate">{preview.nome}</DialogTitle>
+            <div className="flex items-center justify-center rounded-md bg-muted/30 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/arquivos/${preview.id}/download`}
+                alt={preview.nome}
+                className="max-h-[70vh] w-auto object-contain"
+              />
+            </div>
+            <DialogFooter>
+              <a
+                href={`/api/arquivos/${preview.id}/download`}
+                download={preview.nome}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" /> Baixar
+              </a>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

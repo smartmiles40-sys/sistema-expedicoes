@@ -32,7 +32,6 @@ export const ALERTA_REGRAS: RegraAlerta[] = [
   { tipo: "Aéreo Internacional", janelaDias: 60, rotulo: "Bilhete internacional não emitido" },
   { tipo: "Vacina", janelaDias: 45, rotulo: "Vacina / certificado pendente" },
   { tipo: "Seguro", janelaDias: 45, rotulo: "Seguro viagem pendente" },
-  { tipo: "Pagamento", janelaDias: 30, rotulo: "Pagamento em aberto" },
   { tipo: "Aéreo Doméstico", janelaDias: 30, rotulo: "Trecho doméstico pendente" },
   { tipo: "RG", janelaDias: 30, rotulo: "RG pendente" },
   { tipo: "Contrato", janelaDias: 90, rotulo: "Contrato não assinado" },

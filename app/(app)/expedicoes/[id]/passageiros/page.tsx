@@ -1,4 +1,4 @@
-import { listPassageiros, listQuartos } from "@/lib/data/expedicoes";
+import { listPassageiros, listQuartos, getProntidaoExpedicao, listUsuarios } from "@/lib/data/expedicoes";
 import { getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { PassageirosTabela } from "./PassageirosTabela";
@@ -10,11 +10,13 @@ export default async function PassageirosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pax, quartos, expedicao, arquivos] = await Promise.all([
+  const [pax, quartos, expedicao, arquivos, prontidao, usuarios] = await Promise.all([
     listPassageiros(id),
     listQuartos(id),
     getExpedicao(id),
     listArquivosExpedicao(id),
+    getProntidaoExpedicao(id),
+    listUsuarios(),
   ]);
   if (!expedicao) notFound();
 
@@ -26,6 +28,9 @@ export default async function PassageirosPage({
         quartos={quartos}
         arquivos={arquivos}
         dataEmbarque={expedicao.data_embarque}
+        destino={expedicao.destino}
+        prontidao={prontidao}
+        usuarios={usuarios}
       />
     </div>
   );

@@ -67,8 +67,7 @@ Web app interno para uma agência de turismo focada em **expedições** (viagens
 /app
   /(auth)
     /login           — magic link
-  /(app)             — rotas autenticadas
-    /dashboard       — KPIs cross-expedição
+  /(app)             — rotas autenticadas (entrada padrão: /expedicoes)
     /expedicoes      — lista
       /[id]          — detalhe (7 tabs)
         /passageiros
@@ -218,10 +217,41 @@ de processos do P8 (catálogo + instâncias + status):
   do embarque — `DIAS_BLOQUEIO_FINANCEIRO`).
 - **Seeding:** `gerarRequisitosPadrao(passageiroId)` instancia os requisitos do
   destino. Disparado ao confirmar o pax e no `passageiro-sync` do Bitrix.
-- **UI:** aba `/expedicoes/[id]/prontidao` (tabela-semáforo + drawer por requisito) +
-  card no dashboard (`getResumoProntidao()`).
+- **UI:** **fundida na aba Passageiros** (não há mais aba "Prontidão" separada).
+  A tabela de passageiros ganhou uma coluna **Prontidão** (badge Apto/Atenção/Bloqueado);
+  clicar abre o `ProntidaoPaxDrawer` (`app/(app)/expedicoes/[id]/passageiros/`) com o
+  semáforo por exigência + drawer de edição do requisito (status/validade/responsável)
+  e o botão "Gerar requisitos de {destino}". `passageiros/page.tsx` carrega
+  `getProntidaoExpedicao()` + `listUsuarios()`. Card no dashboard
+  (`getResumoProntidao()`) e avisos linkam pra `/expedicoes/[id]/passageiros`.
 - **Enums:** `TIPO_REQUISITO`, `OBRIGATORIEDADE`, `STATUS_REQUISITO`, `PRONTIDAO`,
   `COR_PRONTIDAO` em `lib/constants.ts`.
+
+## 👤 Perfil global do passageiro + retroalimentação
+
+Não existe tabela `pessoas`: uma "pessoa" é a **agregação** de várias linhas
+`passageiros` (uma por expedição), agrupadas por identidade em
+`chaveIdentidade()` (CPF → Bitrix → e-mail → nome) — `lib/data/pessoas.ts`,
+`PessoaAgregada`. A aba global `/passageiros` lista essas pessoas.
+
+- **Dados PESSOAIS** (`CAMPOS_PESSOAIS` em `actions.ts`: nome, cpf, passaporte,
+  validade, nascimento, e-mail, telefone, contato de emergência, restrições,
+  condições médicas) pertencem à PESSOA. **Dados da RESERVA** (tipo, status,
+  quarto, voo, financeiro, observações) ficam na linha da expedição.
+- **Retroalimentação:** editar um campo pessoal — seja no perfil global
+  (`atualizarDadosPessoais`) ou no drawer dentro da expedição
+  (`atualizarPassageiroLote`) — propaga para TODAS as linhas da mesma identidade
+  via `propagarDadosPessoais()`, e revalida `/passageiros` + cada expedição
+  afetada. Editar dado de reserva NÃO propaga.
+- **Documentos:** o perfil global mostra os arquivos de todas as linhas da pessoa
+  (`listArquivosDePassageiros` + filtro por `idsPassageiros`); novos uploads
+  ancoram na expedição mais recente (`expedicaoIdAncora`/`passageiroIdAncora`).
+- **Arquivos no modo mock:** as rotas `/api/arquivos/{upload,[id],[id]/download}`
+  têm branch `DEV_USE_MOCK_DATA` que persiste em disco sob `.dev-uploads/`
+  (`lib/data/arquivos-mock.ts`: `index.json` + um `.blob` por id). As funções de
+  leitura (`lib/data/arquivos.ts`) também leem desse store. Assim upload/preview/
+  delete de documentos funcionam localmente sem Supabase; com Supabase conectado,
+  o branch real assume e o store fica inerte. `.dev-uploads/` é gitignorado.
 
 ## 🧪 Como rodar
 
@@ -232,7 +262,24 @@ cp .env.local.example .env.local   # se ainda não tiver
 npm run dev
 ```
 
-Abrir http://localhost:3000 → redireciona pra `/dashboard` (login pulado em dev).
+Abrir http://localhost:3000 → redireciona pra `/expedicoes` (login pulado em dev).
+
+## 💸 Pagamento: só fornecedor (passageiro removido)
+
+O sistema controla **apenas o pagamento de fornecedores** — a aba **Pagamentos**
+dentro da expedição (`custos ──< pagamentos`, ligados a `fornecedores`). O
+controle de **pagamento de passageiro foi removido** (funcional):
+
+- Sem seção "Financeiro" no perfil global; `PessoaAgregada` não soma contratado/pago.
+- Sem requisito **"Pagamento"** na prontidão: removido de `BASE_INTERNACIONAL`
+  (`requisitos-destino.ts`), de `REQUISITOS_DE_COLUNA`/`checarFinanceiro`
+  (`prontidao/regras.ts`) e das regras de aviso (`alertas/regras.ts`). Saldo em
+  aberto **não bloqueia mais embarque**.
+- As colunas `valor_contratado_brl`/`valor_pago_brl`/`saldo_brl`/`status_financeiro`
+  continuam no schema/tipos como **dormentes** (não exibidas/usadas). A seed
+  `0011` ainda traz a linha `Pagamento` em `requisitos_destino`, mas o builder
+  (`construirRequisitosPadrao`) usa o template TS, então nada instancia "Pagamento".
+- **Não há Dashboard.** A entrada padrão é `/expedicoes`.
 
 ## ⚠️ Convenções obrigatórias
 

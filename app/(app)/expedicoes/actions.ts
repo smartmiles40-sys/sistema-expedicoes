@@ -18,6 +18,7 @@ import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
+import { chaveIdentidade } from "@/lib/data/pessoas";
 import type { PapelUsuario, PassageiroRow } from "@/types/database";
 import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
@@ -226,8 +227,88 @@ const editarPassageiroLoteSchema = z.object({
   companhia_aerea: z.string().nullable().optional(),
   localizador: z.string().nullable().optional(),
   voo_nacional_necessario: z.boolean().optional(),
+  contrato_assinado: z.boolean().optional(),
+  checkin_online_feito: z.boolean().optional(),
   observacoes: z.string().nullable().optional(),
 });
+
+// =============================================================================
+// Dados PESSOAIS x dados da RESERVA — "retroalimentação" do perfil
+// -----------------------------------------------------------------------------
+// Uma pessoa pode estar em várias expedições (uma linha `passageiros` por
+// expedição). Os campos abaixo pertencem à PESSOA, não à reserva: ao editar um,
+// propagamos pra todas as linhas da mesma identidade (CPF→Bitrix→e-mail→nome).
+// =============================================================================
+const CAMPOS_PESSOAIS = [
+  "nome_completo",
+  "cpf",
+  "passaporte",
+  "validade_passaporte",
+  "data_nascimento",
+  "email",
+  "telefone",
+  "contato_emergencia_nome",
+  "contato_emergencia_fone",
+  "restricoes_alimentares",
+  "condicoes_medicas",
+] as const;
+
+function soPessoais(dados: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const c of CAMPOS_PESSOAIS) if (c in dados) out[c] = dados[c];
+  return out;
+}
+
+/**
+ * Propaga os campos pessoais de `dados` para TODAS as linhas que compartilham
+ * identidade com `refId` (inclusive ela mesma). Retorna os `expedicao_id`
+ * afetados, pra revalidar as páginas certas.
+ */
+async function propagarDadosPessoais(
+  refId: string,
+  dados: Record<string, unknown>,
+): Promise<string[]> {
+  const patch = soPessoais(dados);
+  if (Object.keys(patch).length === 0) return [];
+
+  if (DEV_USE_MOCK_DATA) {
+    const ref = mockPassageiros.find((p) => p.id === refId);
+    if (!ref) return [];
+    const chave = chaveIdentidade(ref);
+    const afetados = new Set<string>();
+    for (const p of mockPassageiros) {
+      if (chaveIdentidade(p) !== chave) continue;
+      Object.assign(p, patch, { updated_at: new Date().toISOString() });
+      afetados.add(p.expedicao_id);
+    }
+    return [...afetados];
+  }
+
+  const supabase = await getServerClient();
+  const { data } = await supabase.from("passageiros").select("*");
+  const rows = (data ?? []) as PassageiroRow[];
+  const ref = rows.find((p) => p.id === refId);
+  if (!ref) return [];
+  const chave = chaveIdentidade(ref);
+  const irmaos = rows.filter((p) => chaveIdentidade(p) === chave);
+  const { error } = await supabase
+    .from("passageiros")
+    .update(patch)
+    .in("id", irmaos.map((p) => p.id));
+  if (error) throw new Error(error.message);
+  return [...new Set(irmaos.map((p) => p.expedicao_id))];
+}
+
+function revalidarPessoa(expedicaoIds: string[]) {
+  for (const eid of expedicaoIds) {
+    revalidatePath(`/expedicoes/${eid}/passageiros`);
+    revalidatePath(`/expedicoes/${eid}`);
+  }
+  revalidatePath("/passageiros");
+  // Avisos/prontidão derivam dos dados do passageiro (ex.: validade do
+  // passaporte) — revalidar pra o aviso sumir/atualizar na hora.
+  revalidatePath("/avisos");
+}
 
 export async function atualizarPassageiroLote(
   passageiroId: string,
@@ -243,17 +324,61 @@ export async function atualizarPassageiroLote(
   if (DEV_USE_MOCK_DATA) {
     const idx = mockPassageiros.findIndex((p) => p.id === passageiroId);
     if (idx === -1) return { ok: false, error: "Passageiro não encontrado" };
+    // Reserva (esta linha) recebe tudo; pessoais propagam pras demais expedições.
     Object.assign(mockPassageiros[idx], dados, { updated_at: new Date().toISOString() });
-    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+    const afetados = await propagarDadosPessoais(passageiroId, dados);
+    revalidarPessoa(afetados.length ? afetados : [expedicaoId]);
     return { ok: true };
   }
 
   const supabase = await getServerClient();
   const { error } = await supabase.from("passageiros").update(dados).eq("id", passageiroId);
   if (error) return { ok: false, error: error.message };
-  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  let afetados: string[];
+  try {
+    afetados = await propagarDadosPessoais(passageiroId, dados);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro ao propagar dados pessoais" };
+  }
+  revalidarPessoa(afetados.length ? afetados : [expedicaoId]);
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros/${passageiroId}`);
   return { ok: true };
+}
+
+const dadosPessoaisSchema = z.object({
+  nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
+  cpf: z.string().nullable().optional(),
+  passaporte: z.string().nullable().optional(),
+  validade_passaporte: z.string().nullable().optional(),
+  data_nascimento: z.string().nullable().optional(),
+  email: z.string().email("E-mail inválido").or(z.literal("")).nullable().optional(),
+  telefone: z.string().nullable().optional(),
+  contato_emergencia_nome: z.string().nullable().optional(),
+  contato_emergencia_fone: z.string().nullable().optional(),
+  restricoes_alimentares: z.string().nullable().optional(),
+  condicoes_medicas: z.string().nullable().optional(),
+});
+
+/**
+ * Edita os dados pessoais de uma pessoa a partir do perfil GLOBAL e propaga pra
+ * todas as expedições dela. `refId` é qualquer linha `passageiros` da pessoa.
+ */
+export async function atualizarDadosPessoais(
+  refId: string,
+  input: z.infer<typeof dadosPessoaisSchema>,
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = dadosPessoaisSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  }
+  try {
+    const afetados = await propagarDadosPessoais(refId, parsed.data);
+    if (afetados.length === 0) return { ok: false, error: "Passageiro não encontrado" };
+    revalidarPessoa(afetados);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro ao salvar" };
+  }
 }
 
 export async function atualizarPassageiroCampo(
@@ -268,6 +393,8 @@ export async function atualizarPassageiroCampo(
     (mockPassageiros[idx] as unknown as Record<string, unknown>)[campo] = valor;
     mockPassageiros[idx].updated_at = new Date().toISOString();
     revalidatePath("/expedicoes");
+    revalidatePath("/passageiros");
+    revalidatePath("/avisos");
     return { ok: true };
   }
   const supabase = await getServerClient();
@@ -276,6 +403,9 @@ export async function atualizarPassageiroCampo(
     .update({ [campo]: valor })
     .eq("id", passageiroId);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/expedicoes");
+  revalidatePath("/passageiros");
+  revalidatePath("/avisos");
   return { ok: true };
 }
 
@@ -930,6 +1060,7 @@ export async function excluirPassageiro(
     mockPassageiros.splice(idx, 1);
     revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
     revalidatePath(`/expedicoes/${expedicaoId}`);
+    revalidatePath("/avisos");
     return { ok: true };
   }
 
@@ -938,6 +1069,7 @@ export async function excluirPassageiro(
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/avisos");
   return { ok: true };
 }
 
@@ -1181,8 +1313,9 @@ export async function gerarRequisitosPadrao(
       mockPassageiroRequisitos.push(...rows);
       total += rows.length;
     }
-    revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
     revalidatePath(`/expedicoes/${expedicaoId}`);
+    revalidatePath("/avisos");
     return { ok: true, total };
   }
 
@@ -1228,8 +1361,9 @@ export async function gerarRequisitosPadrao(
 
   const { error } = await supabase.from("passageiro_requisitos").insert(novos);
   if (error) return { ok: false, error: error.message };
-  revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/avisos");
   return { ok: true, total: novos.length };
 }
 
@@ -1270,8 +1404,9 @@ export async function atualizarRequisitoCampo(
     if (idx === -1) return { ok: false, error: "Requisito não encontrado" };
     (mockPassageiroRequisitos[idx] as unknown as Record<string, unknown>)[campo] = valor;
     Object.assign(mockPassageiroRequisitos[idx], extra, { updated_at: new Date().toISOString() });
-    revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
     revalidatePath(`/expedicoes/${expedicaoId}`);
+    revalidatePath("/avisos");
     return { ok: true };
   }
 
@@ -1281,8 +1416,9 @@ export async function atualizarRequisitoCampo(
     .update({ [campo]: valor, ...extra })
     .eq("id", requisitoId);
   if (error) return { ok: false, error: error.message };
-  revalidatePath(`/expedicoes/${expedicaoId}/prontidao`);
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/avisos");
   return { ok: true };
 }
 
@@ -1405,7 +1541,6 @@ export async function importarPassageiros(
     }
     revalidatePath(`/expedicoes/${expedicao_id}/passageiros`);
     revalidatePath(`/expedicoes/${expedicao_id}`);
-    revalidatePath(`/expedicoes/${expedicao_id}/prontidao`);
     revalidatePath("/passageiros");
     return { ok: true, inseridos, ignorados };
   }
@@ -1463,7 +1598,6 @@ export async function importarPassageiros(
 
   revalidatePath(`/expedicoes/${expedicao_id}/passageiros`);
   revalidatePath(`/expedicoes/${expedicao_id}`);
-  revalidatePath(`/expedicoes/${expedicao_id}/prontidao`);
   revalidatePath("/passageiros");
   return { ok: true, inseridos: aInserir.length, ignorados };
 }

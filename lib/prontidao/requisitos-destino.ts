@@ -36,7 +36,6 @@ const BASE_INTERNACIONAL: RequisitoDestinoTemplate[] = [
   { tipo: "Passaporte", descricao: `Passaporte válido por ao menos ${P} meses após o retorno`, obrigatoriedade: "Obrigatório", bloqueia_embarque: true, meses_validade_minima: P, papel_responsavel: "operacional" },
   { tipo: "Dados Pessoais", descricao: "Cadastro completo (CPF, nascimento, contato)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
   { tipo: "Contrato", descricao: "Contrato assinado", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
-  { tipo: "Pagamento", descricao: "Saldo quitado antes do embarque", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "financeiro" },
   { tipo: "Seguro", descricao: "Seguro viagem emitido cobrindo todo o período", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
   { tipo: "Aéreo Internacional", descricao: "Bilhete internacional emitido (localizador)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
 ];
