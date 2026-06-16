@@ -27,7 +27,8 @@ declare
   tabelas text[] := array[
     'expedicoes', 'passageiros', 'quartos', 'custos', 'pagamentos',
     'checklist_itens', 'fornecedores', 'cambios', 'documentos',
-    'arquivos', 'usuarios', 'grupos_expedicao', 'links_expedicao'
+    'arquivos', 'usuarios', 'grupos_expedicao', 'links_expedicao',
+    'requisitos_destino', 'passageiro_requisitos'
   ];
 begin
   foreach t in array tabelas loop
@@ -56,7 +57,8 @@ declare
   tabelas text[] := array[
     'expedicoes', 'passageiros', 'quartos', 'custos', 'pagamentos',
     'checklist_itens', 'fornecedores', 'cambios', 'documentos',
-    'arquivos', 'usuarios', 'grupos_expedicao', 'links_expedicao'
+    'arquivos', 'usuarios', 'grupos_expedicao', 'links_expedicao',
+    'requisitos_destino', 'passageiro_requisitos'
   ];
 begin
   foreach t in array tabelas loop
