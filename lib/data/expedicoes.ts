@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import { daysUntil } from "@/lib/utils";
@@ -45,19 +46,76 @@ export async function listExpedicoesComAgregados(): Promise<ExpedicaoComAgregado
     .order("ordem", { ascending: true, nullsFirst: false })
     .order("data_embarque", { ascending: true });
   if (error) throw error;
-  const rows = (data ?? []) as ExpedicaoRow[];
-  // TODO: agregar via view/RPC quando Supabase estiver conectado
-  return rows.map((e) => ({
-    ...e,
-    pax_confirmados: 0,
-    receita_prevista_brl: e.preco_venda_brl * (e.pax_planejados - e.pax_cortesia),
-    custo_planejado_brl: 0,
-    margem_prevista: 0,
-    pagamentos_vencidos: 0,
-    docs_pendentes: 0,
-    responsavel_op_nome: null,
-    responsavel_com_nome: null,
-  }));
+  return agregarExpedicoes(supabase, (data ?? []) as ExpedicaoRow[]);
+}
+
+/**
+ * Calcula os agregados (pax confirmados, custo, margem, pagamentos vencidos,
+ * docs pendentes, responsáveis) de um conjunto de expedições com poucas queries
+ * em lote. Usado no modo Supabase por listExpedicoesComAgregados e
+ * getExpedicaoComAgregados (no mock isso vem de lib/mock-data.ts).
+ */
+async function agregarExpedicoes(
+  supabase: Awaited<ReturnType<typeof getServerClient>>,
+  rows: ExpedicaoRow[],
+): Promise<ExpedicaoComAgregados[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((e) => e.id);
+
+  const [paxRes, custosRes, usuariosRes] = await Promise.all([
+    supabase.from("passageiros").select("id, expedicao_id, status_reserva, passaporte").in("expedicao_id", ids),
+    supabase.from("custos").select("id, expedicao_id, valor_planejado_brl").in("expedicao_id", ids),
+    supabase.from("usuarios").select("id, nome"),
+  ]);
+  const pax = (paxRes.data ?? []) as {
+    id: string; expedicao_id: string; status_reserva: string; passaporte: string | null;
+  }[];
+  const custos = (custosRes.data ?? []) as {
+    id: string; expedicao_id: string; valor_planejado_brl: number | null;
+  }[];
+  const usuariosById = new Map(
+    ((usuariosRes.data ?? []) as { id: string; nome: string }[]).map((u) => [u.id, u.nome]),
+  );
+
+  const custoExp = new Map(custos.map((c) => [c.id, c.expedicao_id]));
+  let pagamentos: { custo_id: string; status: string }[] = [];
+  if (custos.length) {
+    const { data } = await supabase
+      .from("pagamentos")
+      .select("custo_id, status")
+      .in("custo_id", custos.map((c) => c.id));
+    pagamentos = (data ?? []) as { custo_id: string; status: string }[];
+  }
+
+  return rows.map((e) => {
+    const paxDaExp = pax.filter((p) => p.expedicao_id === e.id);
+    const pax_confirmados = paxDaExp.filter((p) => p.status_reserva === "Confirmado").length;
+    const receita_prevista_brl = e.preco_venda_brl * (e.pax_planejados - e.pax_cortesia);
+    const custo_planejado_brl = custos
+      .filter((c) => c.expedicao_id === e.id)
+      .reduce((acc, c) => acc + (c.valor_planejado_brl ?? 0), 0);
+    const margem_prevista =
+      receita_prevista_brl > 0 ? (receita_prevista_brl - custo_planejado_brl) / receita_prevista_brl : 0;
+    const pagamentos_vencidos = pagamentos.filter(
+      (p) => p.status === "Vencido" && custoExp.get(p.custo_id) === e.id,
+    ).length;
+    const docs_pendentes = paxDaExp.filter(
+      (p) => p.status_reserva !== "Cancelado" && !p.passaporte,
+    ).length;
+    return {
+      ...e,
+      pax_confirmados,
+      receita_prevista_brl,
+      custo_planejado_brl,
+      margem_prevista,
+      pagamentos_vencidos,
+      docs_pendentes,
+      responsavel_op_nome: e.responsavel_operacional_id
+        ? usuariosById.get(e.responsavel_operacional_id) ?? null : null,
+      responsavel_com_nome: e.responsavel_comercial_id
+        ? usuariosById.get(e.responsavel_comercial_id) ?? null : null,
+    };
+  });
 }
 
 export async function getExpedicao(id: string): Promise<ExpedicaoRow | null> {
@@ -75,17 +133,8 @@ export async function getExpedicaoComAgregados(id: string): Promise<ExpedicaoCom
   }
   const e = await getExpedicao(id);
   if (!e) return null;
-  return {
-    ...e,
-    pax_confirmados: 0,
-    receita_prevista_brl: e.preco_venda_brl * (e.pax_planejados - e.pax_cortesia),
-    custo_planejado_brl: 0,
-    margem_prevista: 0,
-    pagamentos_vencidos: 0,
-    docs_pendentes: 0,
-    responsavel_op_nome: null,
-    responsavel_com_nome: null,
-  };
+  const supabase = await getServerClient();
+  return (await agregarExpedicoes(supabase, [e]))[0] ?? null;
 }
 
 export async function listPassageiros(expedicaoId: string): Promise<PassageiroRow[]> {
@@ -333,16 +382,69 @@ export type AlertaOperacional = {
   detalhe: string;
 };
 
-/** Lista de avisos: exigências pendentes dentro da janela, por passageiro. */
-export async function getAlertasOperacionais(): Promise<AlertaOperacional[]> {
-  const expedicoes = DEV_USE_MOCK_DATA
-    ? mockExpedicoes
-    : await (async () => {
-        const supabase = await getServerClient();
-        const { data } = await supabase.from("expedicoes").select("*");
-        return (data ?? []) as ExpedicaoRow[];
-      })();
+/**
+ * Carrega a prontidão de TODOS os passageiros em apenas 3 queries em lote
+ * (expedições + passageiros + requisitos) e agrupa por expedição. Substitui o
+ * N+1 de chamar getProntidaoExpedicao por expedição — é o que deixava o badge
+ * de avisos (no layout, em toda página) e a /avisos lentos.
+ */
+async function getProntidaoTodas(): Promise<{
+  expedicoes: ExpedicaoRow[];
+  porExpedicao: Map<string, ProntidaoPassageiro[]>;
+}> {
+  let expedicoes: ExpedicaoRow[];
+  let passageiros: PassageiroRow[];
+  let requisitos: PassageiroRequisitoRow[];
 
+  if (DEV_USE_MOCK_DATA) {
+    expedicoes = mockExpedicoes;
+    passageiros = mockPassageiros;
+    requisitos = mockPassageiroRequisitos;
+  } else {
+    const supabase = await getServerClient();
+    const [expRes, paxRes, reqRes] = await Promise.all([
+      supabase.from("expedicoes").select("*"),
+      supabase.from("passageiros").select("*"),
+      supabase.from("passageiro_requisitos").select("*"),
+    ]);
+    expedicoes = (expRes.data ?? []) as ExpedicaoRow[];
+    passageiros = (paxRes.data ?? []) as PassageiroRow[];
+    requisitos = (reqRes.data ?? []) as PassageiroRequisitoRow[];
+  }
+
+  const expById = new Map(expedicoes.map((e) => [e.id, e]));
+  const reqPorPax = new Map<string, PassageiroRequisitoRow[]>();
+  for (const r of requisitos) {
+    const arr = reqPorPax.get(r.passageiro_id) ?? [];
+    arr.push(r);
+    reqPorPax.set(r.passageiro_id, arr);
+  }
+
+  const porExpedicao = new Map<string, ProntidaoPassageiro[]>();
+  for (const passageiro of passageiros) {
+    if (passageiro.status_reserva === "Cancelado") continue;
+    const exp = expById.get(passageiro.expedicao_id);
+    if (!exp) continue;
+    const reqs = reqPorPax.get(passageiro.id) ?? [];
+    const arr = porExpedicao.get(passageiro.expedicao_id) ?? [];
+    arr.push({
+      passageiro,
+      requisitos: reqs,
+      resultado: avaliarProntidao({ passageiro, expedicao: exp, destino: exp.destino, requisitos: reqs }),
+    });
+    porExpedicao.set(passageiro.expedicao_id, arr);
+  }
+
+  return { expedicoes, porExpedicao };
+}
+
+/**
+ * Lista de avisos: exigências pendentes dentro da janela, por passageiro.
+ * Envolvido em `cache()` pra rodar uma vez só por request (o layout e a /avisos
+ * chamam na mesma renderização).
+ */
+export const getAlertasOperacionais = cache(async (): Promise<AlertaOperacional[]> => {
+  const { expedicoes, porExpedicao } = await getProntidaoTodas();
   const ativas = expedicoes.filter(
     (e) => e.status !== "Concluída" && e.status !== "Cancelada",
   );
@@ -351,7 +453,7 @@ export async function getAlertasOperacionais(): Promise<AlertaOperacional[]> {
   for (const e of ativas) {
     const dias = daysUntil(e.data_embarque);
     if (dias == null || dias < 0) continue;
-    const linhas = await getProntidaoExpedicao(e.id);
+    const linhas = porExpedicao.get(e.id) ?? [];
     for (const { passageiro, resultado } of linhas) {
       for (const c of resultado.checagens) {
         const severidade = avaliarAlerta(c.tipo, c.semaforo, dias);
@@ -379,7 +481,7 @@ export async function getAlertasOperacionais(): Promise<AlertaOperacional[]> {
       (a.severidade === b.severidade ? 0 : a.severidade === "critico" ? -1 : 1),
   );
   return alertas;
-}
+});
 
 /** Contagem de avisos (para o badge no menu). */
 export async function getContagemAlertas(): Promise<{ total: number; criticos: number }> {
