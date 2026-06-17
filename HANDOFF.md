@@ -8,7 +8,7 @@ o que falta é essencialmente **segurança (login + RLS)**, **build de produçã
 
 - **Stack:** Next.js 16 (App Router, TypeScript) + Supabase (Postgres + Auth + Realtime + Storage).
 - **Projeto Supabase:** `bnbpsuenlokhljrkvlke` — já tem schema, dados reais (21 expedições) e realtime habilitado.
-- **Código:** commits locais no branch `master`. **Ainda não há remoto** (precisa criar, ex.: GitHub, e dar `git push`).
+- **Código:** branch `master`, com remoto já configurado: `origin` → `https://github.com/smartmiles40-sys/sistema-expedicoes.git`. Os commits da sessão estão **locais** — o `master` está vários commits à frente do remoto; falta só **autenticar no GitHub e dar `git push`**.
 - **Hoje roda em modo dev** com **login DESLIGADO** (`DEV_AUTH_BYPASS=true`) e policies `anon_read_dev` que **expõem todos os dados a qualquer um** — por isso só deve rodar em `localhost`/rede confiável até a segurança ser fechada.
 
 ---
@@ -32,7 +32,8 @@ o que falta é essencialmente **segurança (login + RLS)**, **build de produçã
 ## 🟡 NECESSÁRIO — deploy
 
 4. **Repositório**
-   - Criar um remoto (ex.: GitHub) e `git push` do branch `master`.
+   - Remoto já configurado: `origin` → `https://github.com/smartmiles40-sys/sistema-expedicoes.git`.
+   - Fazer **`git push origin master`** autenticado (login do GitHub ou Personal Access Token). O `master` local está vários commits à frente do remoto.
 
 5. **Variáveis de ambiente** (configurar **no host de produção**, NÃO commitar):
    ```
