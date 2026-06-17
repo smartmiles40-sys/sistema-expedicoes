@@ -535,6 +535,85 @@ export async function criarPassageiro(
   return { ok: true, id: (r.data as { id: string }).id };
 }
 
+/**
+ * Adiciona uma pessoa JÁ EXISTENTE (de outra expedição) à expedição alvo,
+ * copiando os dados pessoais (CAMPOS_PESSOAIS) de uma linha de referência. A
+ * reserva começa do zero (tipo Pagante, status Lead, sem quarto/financeiro).
+ * `refPassageiroId` é qualquer linha `passageiros` da pessoa.
+ */
+export async function adicionarPassageiroExistente(
+  expedicaoId: string,
+  refPassageiroId: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const camposPessoais = (origem: Record<string, unknown>) => {
+    const out: Record<string, unknown> = {};
+    for (const c of CAMPOS_PESSOAIS) out[c] = origem[c] ?? null;
+    return out;
+  };
+
+  if (DEV_USE_MOCK_DATA) {
+    const ref = mockPassageiros.find((p) => p.id === refPassageiroId);
+    if (!ref) return { ok: false, error: "Passageiro de origem não encontrado" };
+    const chave = chaveIdentidade(ref);
+    if (mockPassageiros.some((p) => p.expedicao_id === expedicaoId && chaveIdentidade(p) === chave)) {
+      return { ok: false, error: "Essa pessoa já está nesta expedição" };
+    }
+    const id = genId("p");
+    mockPassageiros.push({
+      ...ref,
+      ...(camposPessoais(ref as unknown as Record<string, unknown>) as Partial<PassageiroRow>),
+      id,
+      expedicao_id: expedicaoId,
+      grupo_id: null,
+      quarto_id: null,
+      tipo: "Pagante",
+      status_reserva: "Lead",
+      voo_nacional_necessario: false,
+      companhia_aerea: null,
+      localizador: null,
+      valor_contratado_brl: 0,
+      valor_pago_brl: 0,
+      saldo_brl: 0,
+      status_financeiro: "Em aberto",
+      contrato_assinado: false,
+      checkin_online_feito: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as PassageiroRow);
+    await gerarRequisitosPadrao(expedicaoId);
+    revalidatePath(`/expedicoes/${expedicaoId}`);
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+    revalidatePath("/passageiros");
+    return { ok: true, id };
+  }
+
+  const supabase = await getServerClient();
+  const { data: refData } = await supabase.from("passageiros").select("*").eq("id", refPassageiroId).maybeSingle();
+  if (!refData) return { ok: false, error: "Passageiro de origem não encontrado" };
+  const ref = refData as PassageiroRow;
+  const chave = chaveIdentidade(ref);
+
+  const { data: naExp } = await supabase.from("passageiros").select("*").eq("expedicao_id", expedicaoId);
+  if (((naExp ?? []) as PassageiroRow[]).some((p) => chaveIdentidade(p) === chave)) {
+    return { ok: false, error: "Essa pessoa já está nesta expedição" };
+  }
+
+  const payload = {
+    ...camposPessoais(ref as unknown as Record<string, unknown>),
+    expedicao_id: expedicaoId,
+    tipo: "Pagante",
+    status_reserva: "Lead",
+  };
+  const ins = await supabase.from("passageiros").insert(payload).select("id").single();
+  if (ins.error) return { ok: false, error: ins.error.message };
+  await gerarRequisitosPadrao(expedicaoId);
+  revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  revalidatePath("/passageiros");
+  return { ok: true, id: (ins.data as { id: string }).id };
+}
+
 const novoQuartoSchema = z.object({
   expedicao_id: z.string().min(1),
   numero: z.string().min(1, "Número obrigatório"),

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,10 +13,12 @@ import { formatDate, daysUntil, cn } from "@/lib/utils";
 import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO } from "@/lib/constants";
 import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
+import type { PessoaAgregada } from "@/lib/data/pessoas";
 import { toast } from "sonner";
 import { NovoPassageiroDrawer } from "./NovoPassageiroDrawer";
 import { EditarPassageiroDrawer } from "./EditarPassageiroDrawer";
 import { ImportarPassageirosDrawer } from "./ImportarPassageirosDrawer";
+import { AdicionarExistenteDrawer } from "./AdicionarExistenteDrawer";
 import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 
@@ -36,14 +38,16 @@ interface Props {
   destino: string;
   prontidao: ProntidaoPassageiro[];
   usuarios: UsuarioRow[];
+  pessoas: PessoaAgregada[];
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios, pessoas }: Props) {
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
+  const [existenteOpen, setExistenteOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
   const [prontidaoPaxId, setProntidaoPaxId] = React.useState<string | null>(null);
 
@@ -161,6 +165,9 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
           </Button>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="h-3 w-3" /> Importar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setExistenteOpen(true)}>
+            <UserPlus className="h-3 w-3" /> Adicionar existente
           </Button>
           <Button size="sm" onClick={() => setDrawerOpen(true)}>
             <Plus className="h-3 w-3" /> Adicionar
@@ -298,6 +305,14 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         cpfsExistentes={cpfsExistentes}
         open={importOpen}
         onOpenChange={setImportOpen}
+      />
+
+      <AdicionarExistenteDrawer
+        expedicaoId={expedicaoId}
+        pessoas={pessoas}
+        cpfsExistentes={cpfsExistentes}
+        open={existenteOpen}
+        onOpenChange={setExistenteOpen}
       />
 
       <EditarPassageiroDrawer
