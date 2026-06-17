@@ -312,6 +312,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         destino={destino}
         item={prontidaoSelecionada}
         usuarios={usuarios}
+        arquivos={arquivos}
         onClose={() => setProntidaoPaxId(null)}
       />
     </div>

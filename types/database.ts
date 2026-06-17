@@ -201,6 +201,7 @@ export type ProntidaoPassageiroView = {
 export type CategoriaArquivo =
   | "Aéreos"
   | "Documentos pessoais"
+  | "Contrato"
   | "Bilhetes"
   | "Vistos"
   | "Seguros"

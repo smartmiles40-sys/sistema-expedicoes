@@ -198,6 +198,7 @@ export const COR_PRONTIDAO: Record<Prontidao, "vinculado" | "atencao" | "critico
 export const CATEGORIA_ARQUIVO = [
   "Aéreos",
   "Documentos pessoais",
+  "Contrato",
   "Bilhetes",
   "Vistos",
   "Seguros",

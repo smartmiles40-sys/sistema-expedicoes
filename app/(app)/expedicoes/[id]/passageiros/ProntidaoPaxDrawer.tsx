@@ -11,12 +11,13 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
+import { Drive } from "@/components/arquivos/Drive";
 import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { gerarRequisitosPadrao, atualizarRequisitoCampo } from "@/app/(app)/expedicoes/actions";
+import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
 import type { Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
-import type { PassageiroRequisitoRow, Tables } from "@/types/database";
+import type { PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables } from "@/types/database";
 
 const DOT: Record<Semaforo, string> = {
   ok: "bg-vinculado-600",
@@ -30,6 +31,7 @@ interface Props {
   destino: string;
   item: ProntidaoPassageiro | null;
   usuarios: Tables<"usuarios">[];
+  arquivos: ArquivoRow[];
   onClose: () => void;
 }
 
@@ -38,9 +40,10 @@ interface Props {
  * editar os requisitos de instância (visto, seguro, vacina…). Substitui a antiga
  * aba "Prontidão" — agora acessível pela coluna da tabela de Passageiros.
  */
-export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, onClose }: Props) {
+export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, arquivos, onClose }: Props) {
   const router = useRouter();
   const [editando, setEditando] = React.useState<PassageiroRequisitoRow | null>(null);
+  const [contratoOpen, setContratoOpen] = React.useState(false);
   const [gerando, startGerar] = React.useTransition();
 
   const usuariosById = React.useMemo(
@@ -83,13 +86,17 @@ export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, onClo
             <ul className="divide-y divide-border rounded-md border border-border overflow-hidden">
               {resultado.checagens.map((c) => {
                 const req = c.requisito_id ? reqById.get(c.requisito_id) : null;
-                const clicavel = Boolean(req);
+                const ehContrato = c.tipo === "Contrato";
+                const clicavel = Boolean(req) || ehContrato;
                 return (
                   <li key={c.tipo}>
                     <button
                       type="button"
                       disabled={!clicavel}
-                      onClick={() => req && setEditando(req)}
+                      onClick={() => {
+                        if (req) setEditando(req);
+                        else if (ehContrato) setContratoOpen(true);
+                      }}
                       className={cn(
                         "w-full flex items-center gap-2.5 px-3 py-2 text-left",
                         clicavel ? "hover:bg-accent/40 cursor-pointer" : "cursor-default",
@@ -134,7 +141,88 @@ export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, onClo
           onClose={() => setEditando(null)}
         />
       )}
+
+      {contratoOpen && (
+        <ContratoDrawer
+          expedicaoId={expedicaoId}
+          passageiro={passageiro}
+          arquivos={arquivos}
+          onClose={() => setContratoOpen(false)}
+        />
+      )}
     </>
+  );
+}
+
+// =============================================================================
+// Drawer do Contrato — marcar assinado + anexar o arquivo do contrato
+// =============================================================================
+function ContratoDrawer({
+  expedicaoId, passageiro, arquivos, onClose,
+}: {
+  expedicaoId: string;
+  passageiro: PassageiroRow;
+  arquivos: ArquivoRow[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [assinado, setAssinado] = React.useState(passageiro.contrato_assinado ?? false);
+  const [salvando, setSalvando] = React.useState(false);
+
+  async function toggle(valor: boolean) {
+    setAssinado(valor);
+    setSalvando(true);
+    const r = await atualizarPassageiroCampo(passageiro.id, "contrato_assinado", valor);
+    setSalvando(false);
+    if (r.ok) {
+      toast.success(valor ? "Contrato marcado como assinado" : "Marcação de contrato removida");
+      router.refresh();
+    } else {
+      setAssinado(!valor);
+      toast.error("Erro ao salvar", { description: r.error });
+    }
+  }
+
+  const arquivosDoPax = arquivos.filter((a) => a.passageiro_id === passageiro.id);
+
+  return (
+    <Drawer open onOpenChange={(v) => !v && onClose()}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Contrato — {passageiro.nome_completo}</DrawerTitle>
+          <DrawerDescription>Marque a assinatura e anexe o contrato do passageiro.</DrawerDescription>
+        </DrawerHeader>
+        <DrawerBody>
+          <label className="flex items-center gap-2.5 rounded-md border border-border p-3 text-[13px] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={assinado}
+              disabled={salvando}
+              onChange={(e) => toggle(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="font-medium">Contrato assinado</span>
+          </label>
+
+          <div className="mt-4 space-y-2">
+            <h3 className="text-sm font-semibold">Arquivo do contrato</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Anexe o PDF/imagem do contrato assinado. Fica na pasta &quot;Contrato&quot; do passageiro.
+            </p>
+            <Drive
+              expedicaoId={expedicaoId}
+              passageiroId={passageiro.id}
+              arquivos={arquivosDoPax}
+              categorias={["Contrato"]}
+              pastaInicial="Contrato"
+            />
+          </div>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

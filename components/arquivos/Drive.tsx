@@ -15,6 +15,7 @@ import {
   Receipt,
   Folder,
   Eye,
+  FileSignature,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +28,7 @@ import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 const ICONES: Record<CategoriaArquivo, React.ComponentType<{ className?: string }>> = {
   Aéreos: Plane,
   "Documentos pessoais": IdCard,
+  Contrato: FileSignature,
   Bilhetes: Ticket,
   Vistos: Stamp,
   Seguros: ShieldCheck,
@@ -41,11 +43,13 @@ interface Props {
   arquivos: ArquivoRow[];
   /** Categorias que aparecem como pastas. Default = todas. */
   categorias?: readonly CategoriaArquivo[];
+  /** Pasta já aberta ao montar (e destino padrão do upload). Default = "Todos". */
+  pastaInicial?: CategoriaArquivo;
 }
 
-export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGORIA_ARQUIVO }: Props) {
+export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGORIA_ARQUIVO, pastaInicial }: Props) {
   const router = useRouter();
-  const [pastaAtiva, setPastaAtiva] = React.useState<CategoriaArquivo | "Todos">("Todos");
+  const [pastaAtiva, setPastaAtiva] = React.useState<CategoriaArquivo | "Todos">(pastaInicial ?? "Todos");
   const [uploading, setUploading] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const [preview, setPreview] = React.useState<ArquivoRow | null>(null);
