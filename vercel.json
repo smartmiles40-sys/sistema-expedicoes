@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cambios/sync",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/expedicoes/atualizar-status",
