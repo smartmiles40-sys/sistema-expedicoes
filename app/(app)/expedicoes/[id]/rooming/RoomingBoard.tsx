@@ -62,6 +62,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+  const dndId = React.useId();
 
   const semQuarto = localPax.filter((p) => !p.quarto_id && p.status_reserva !== "Cancelado");
   const paxByQuarto = new Map<string, PassageiroRow[]>();
@@ -110,7 +111,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos }: Props) {
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
       <div className="space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>

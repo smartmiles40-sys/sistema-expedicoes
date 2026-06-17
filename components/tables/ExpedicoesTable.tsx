@@ -81,6 +81,9 @@ export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder }: P
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+  // id estável (igual no servidor e no cliente) — evita o mismatch de hidratação
+  // do @dnd-kit nos ids de acessibilidade (DndDescribedBy-N).
+  const dndId = React.useId();
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -104,7 +107,7 @@ export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder }: P
   return (
     <div className="rounded-md border border-border overflow-hidden bg-background">
       <div className="overflow-x-auto">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <table className="w-full table-dense border-collapse">
             <thead className="bg-muted/40">
               <tr className="border-b border-border">
