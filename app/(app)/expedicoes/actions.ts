@@ -518,6 +518,8 @@ export async function criarPassageiro(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+    // Prontidão: já instancia os requisitos do destino pro novo passageiro.
+    await gerarRequisitosPadrao(d.expedicao_id);
     revalidatePath(`/expedicoes/${d.expedicao_id}`);
     revalidatePath(`/expedicoes/${d.expedicao_id}/passageiros`);
     return { ok: true, id };
@@ -526,6 +528,8 @@ export async function criarPassageiro(
   const supabase = await getServerClient();
   const r = await supabase.from("passageiros").insert(payload).select("id").single();
   if (r.error) return { ok: false, error: r.error.message };
+  // Prontidão: já instancia os requisitos do destino pro novo passageiro.
+  await gerarRequisitosPadrao(d.expedicao_id);
   revalidatePath(`/expedicoes/${d.expedicao_id}`);
   revalidatePath(`/expedicoes/${d.expedicao_id}/passageiros`);
   return { ok: true, id: (r.data as { id: string }).id };

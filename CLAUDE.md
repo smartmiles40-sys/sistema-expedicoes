@@ -215,8 +215,9 @@ de processos do P8 (catálogo + instâncias + status):
   Regras: passaporte válido ≥ 6m após retorno (`MESES_VALIDADE_PASSAPORTE_PADRAO`),
   requisito obrigatório-bloqueante resolvido, saldo zerado (vira bloqueio a ≤ 15 dias
   do embarque — `DIAS_BLOQUEIO_FINANCEIRO`).
-- **Seeding:** `gerarRequisitosPadrao(passageiroId)` instancia os requisitos do
-  destino. Disparado ao confirmar o pax e no `passageiro-sync` do Bitrix.
+- **Seeding:** `gerarRequisitosPadrao(expedicaoId)` instancia os requisitos do
+  destino (idempotente por pax). Disparado **automaticamente ao incluir um
+  passageiro** (`criarPassageiro`), no import CSV e no `passageiro-sync` do Bitrix.
 - **UI:** **fundida na aba Passageiros** (não há mais aba "Prontidão" separada).
   A tabela de passageiros ganhou uma coluna **Prontidão** (badge Apto/Atenção/Bloqueado);
   clicar abre o `ProntidaoPaxDrawer` (`app/(app)/expedicoes/[id]/passageiros/`) com o

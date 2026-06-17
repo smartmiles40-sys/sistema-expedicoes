@@ -7,6 +7,14 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 
 export type RealtimeStatus = "idle" | "connecting" | "live" | "error" | "offline";
 
+/**
+ * Contador global pra dar nome ÚNICO a cada canal criado. Sem isso, o nome era
+ * determinístico e — no Strict Mode / Fast Refresh — o efeito re-rodava antes do
+ * `removeChannel` (async) terminar, fazendo `supabase.channel(nome)` devolver um
+ * canal já inscrito → erro "cannot add postgres_changes after subscribe".
+ */
+let realtimeChannelSeq = 0;
+
 export interface RealtimeSubscription {
   /** Nome da tabela no schema `public`. */
   table: string;
@@ -119,7 +127,7 @@ export function useRealtimeRefresh({
       const id = `${sub.table}-${idx}`;
       statuses.set(id, "connecting");
 
-      const channelName = `rt:${sub.table}:${sub.filter ?? "all"}:${idx}`;
+      const channelName = `rt:${sub.table}:${sub.filter ?? "all"}:${idx}:${++realtimeChannelSeq}`;
       const channel = supabase.channel(channelName);
       const eventsToListen = sub.events ?? ["INSERT", "UPDATE", "DELETE"];
 
