@@ -205,7 +205,7 @@ function ChecklistVazio({
       </div>
       <h3 className="text-sm font-semibold">Nenhum processo cadastrado</h3>
       <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-        Gere o checklist padrão com os <strong>31 processos</strong> da expedição, organizados nas 5 fases
+        Gere o checklist padrão com os <strong>23 processos operacionais</strong> da expedição, organizados nas 5 fases
         de antecedência. Os prazos são calculados automaticamente a partir da data de embarque.
       </p>
       <div className="mt-4 flex items-center justify-center gap-2">

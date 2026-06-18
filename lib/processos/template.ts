@@ -2,8 +2,10 @@
  * Catálogo canônico de processos de uma expedição.
  *
  * Fonte: ClickUp "Processos - Expedição" do Grupo Inovvatur / Se Tu For, Eu Vou
- * (app.clickup.com/31174175/v/li/901305605968). Os títulos das 31 tarefas são
- * VERBATIM da lista; as subtarefas marcadas são um ponto de partida operacional
+ * (app.clickup.com/31174175/v/li/901305605968). Os títulos das 23 tarefas são
+ * VERBATIM da lista (apenas as OPERACIONAIS — processos de comercial e
+ * financeiro foram removidos do checklist a pedido); as subtarefas marcadas
+ * são um ponto de partida operacional
  * (refinar contra o ClickUp). Cada processo carrega a fase de antecedência, o
  * papel responsável padrão e a prioridade — o builder calcula o prazo a partir
  * da data de embarque da expedição.
@@ -22,13 +24,7 @@ export type ProcessoTemplate = {
 };
 
 export const PROCESSOS_EXPEDICAO: ProcessoTemplate[] = [
-  // ─── Após o fechamento (pós-venda / comercial / financeiro) ───────────────
-  { etapa: "Após o fechamento", tarefa: "Entrar em contato com o cliente", papel: "comercial", prioridade: "Alta" },
-  { etapa: "Após o fechamento", tarefa: "Preencher o contrato, enviar para o cliente e anexar", papel: "comercial", prioridade: "Alta",
-    subtarefas: ["Preencher contrato com dados do cliente", "Enviar para assinatura", "Anexar contrato assinado"] },
-  { etapa: "Após o fechamento", tarefa: "Solicitar link de pagamento para Milena", papel: "financeiro", prioridade: "Alta" },
-  { etapa: "Após o fechamento", tarefa: "Anexar contrato no sistema", papel: "comercial", prioridade: "Média" },
-  { etapa: "Após o fechamento", tarefa: "Se cliente pagar no pix, fazer controle mensal", papel: "financeiro", prioridade: "Média" },
+  // ─── Após o fechamento (operacional) ──────────────────────────────────────
   { etapa: "Após o fechamento", tarefa: "Atualizar Planilha de Controle da Expedição", papel: "operacional", prioridade: "Média" },
 
   // ─── 12 a 6 meses de antecedência ─────────────────────────────────────────
@@ -44,8 +40,6 @@ export const PROCESSOS_EXPEDICAO: ProcessoTemplate[] = [
     subtarefas: ["Lançar custos reservados", "Atualizar status de cada item"] },
   { etapa: "12 a 6 meses", tarefa: "Checar hospedagens mais baratas", papel: "operacional", prioridade: "Média",
     subtarefas: ["Revisar tarifas atuais", "Comparar alternativas", "Trocar se houver economia"] },
-  { etapa: "12 a 6 meses", tarefa: "Criar grupo do Wpp da Expedição após fechamento de 90%", papel: "comercial", prioridade: "Média",
-    subtarefas: ["Criar grupo e adicionar clientes confirmados"] },
 
   // ─── 6 a 2 meses de antecedência ──────────────────────────────────────────
   { etapa: "6 a 2 meses", tarefa: "Conferir se todos os voos estão confirmados", papel: "operacional", prioridade: "Crítica",
@@ -56,8 +50,6 @@ export const PROCESSOS_EXPEDICAO: ProcessoTemplate[] = [
     subtarefas: ["Confirmar horários de transfer com DMC"] },
   { etapa: "6 a 2 meses", tarefa: "Travel Design", papel: "operacional", prioridade: "Média",
     subtarefas: ["Montar roteiro visual day-by-day", "Revisar com o time"] },
-  { etapa: "6 a 2 meses", tarefa: "Oferecer Seguro Viagem", papel: "comercial", prioridade: "Alta",
-    subtarefas: ["Cotar seguro para o grupo", "Enviar proposta aos clientes", "Coletar adesões", "Emitir apólices", "Anexar apólices"] },
   { etapa: "6 a 2 meses", tarefa: "Confirmar com clientes documentação", papel: "operacional", prioridade: "Alta",
     subtarefas: ["Conferir validade de passaportes", "Conferir necessidade de visto"] },
   { etapa: "6 a 2 meses", tarefa: "Caixa Brinde e Logomarca", papel: "operacional", prioridade: "Baixa",
@@ -73,7 +65,6 @@ export const PROCESSOS_EXPEDICAO: ProcessoTemplate[] = [
   { etapa: "2 meses a 15 dias", tarefa: "Receber Travel Design", papel: "operacional", prioridade: "Média",
     subtarefas: ["Receber arte final do Travel Design", "Revisar conteúdo"] },
   { etapa: "2 meses a 15 dias", tarefa: "Colocar todas as informações no app", papel: "operacional", prioridade: "Alta" },
-  { etapa: "2 meses a 15 dias", tarefa: "Agendar última reunião em vídeo no wpp pelo zoom", papel: "comercial", prioridade: "Média" },
   { etapa: "2 meses a 15 dias", tarefa: "Checar restrições alimentares para voo e preferência de assentos pagos", papel: "operacional", prioridade: "Média" },
 
   // ─── Na semana da expedição ───────────────────────────────────────────────
@@ -105,7 +96,7 @@ export type ChecklistPadraoParams = {
 };
 
 /**
- * Instancia os 31 processos (+ subtarefas) como linhas de checklist_itens
+ * Instancia os 23 processos operacionais (+ subtarefas) como linhas de checklist_itens
  * prontas pra inserir, com prazos calculados a partir do embarque. Pai vem
  * antes dos filhos no array; filhos referenciam o pai via parent_id.
  */

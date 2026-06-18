@@ -184,7 +184,7 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
               </Select>
             </div>
             <p className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
-              O <strong className="text-foreground">checklist padrão</strong> (31 processos das 5 fases, com prazos
+              O <strong className="text-foreground">checklist padrão</strong> (23 processos operacionais das 5 fases, com prazos
               calculados a partir do embarque) é gerado <strong className="text-foreground">automaticamente</strong>.
             </p>
           </DrawerBody>

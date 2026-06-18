@@ -912,7 +912,7 @@ export async function criarChecklistItem(
 }
 
 // =============================================================================
-// SEEDING — gera o checklist padrão (31 processos do SOP) numa expedição
+// SEEDING — gera o checklist padrão (23 processos operacionais do SOP) numa expedição
 // =============================================================================
 
 /** Mapeia papel → primeiro usuário daquele papel (pra atribuir responsável padrão). */

@@ -432,7 +432,7 @@ export const mockPagamentos: Tables<"pagamentos">[] = persist("mockPagamentos", 
   { id: "pg004", custo_id: "c0004", fornecedor_id: "f0000000-0000-0000-0000-000000000001", servico: "Ingressos Machu Picchu", moeda: "USD", valor_total: 1200, entrada: 0, saldo: 1200, vencimento_saldo: futureDate(80), status: "Pendente", observacoes: null, created_at: pastDate(8), updated_at: pastDate(8) },
 ]);
 
-// Checklist da expedição Peru = os 31 processos reais do SOP (ClickUp),
+// Checklist da expedição Peru = os 23 processos operacionais do SOP (ClickUp),
 // gerados a partir do template com prazos calculados do embarque (futureDate(95)).
 // Embarque a ~95 dias ⇒ fase atual "6 a 2 meses": as fases anteriores aparecem
 // concluídas, a atual em andamento e as seguintes pendentes (demo realista).

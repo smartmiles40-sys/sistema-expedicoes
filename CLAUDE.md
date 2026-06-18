@@ -174,14 +174,14 @@ Detalhes: `docs/N8N_INTEGRATION.md`.
 ## ✅ Checklist = Motor de Processos (P8)
 
 O checklist espelha o **SOP real da agência** (ClickUp "Processos - Expedição"):
-**31 processos canônicos em 5 fases por ANTECEDÊNCIA ao embarque** (+ "Pós-viagem"
+**23 processos operacionais em 5 fases por ANTECEDÊNCIA ao embarque** (+ "Pós-viagem"
 opcional). Não é mais uma lista genérica por categoria.
 
 - **Fases** (`ETAPA_CHECKLIST` em `lib/constants.ts`, na ordem da timeline):
   `Após o fechamento` → `12 a 6 meses` → `6 a 2 meses` → `2 meses a 15 dias` →
   `Na semana` → `Pós-viagem`. Metadados (janela de dias, prazo de referência) em
   `FASES_CHECKLIST`; `faseAtualChecklist(diasAteEmbarque)` calcula a fase corrente.
-- **Catálogo:** `lib/processos/template.ts` (`PROCESSOS_EXPEDICAO`, 31 itens verbatim
+- **Catálogo:** `lib/processos/template.ts` (`PROCESSOS_EXPEDICAO`, 23 itens operacionais verbatim
   do ClickUp + subtarefas) e o builder puro `construirChecklistPadrao()` que instancia
   os itens calculando `prazo = data_embarque − offset`.
 - **Seeding:** server action `gerarChecklistPadrao(expedicaoId)` (em
