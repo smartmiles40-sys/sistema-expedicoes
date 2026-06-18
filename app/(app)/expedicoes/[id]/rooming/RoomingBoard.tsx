@@ -33,11 +33,11 @@ interface Props {
 
 const CAPACIDADE: Record<string, number> = {
   Single: 1,
-  Duplo: 2,
   Twin: 2,
+  Duplo: 2,
   Triplo: 3,
   Compartilhado: 4,
-  Líder: 1,
+  Líder: 2,
 };
 
 const SEM_QUARTO = "sem-quarto";
@@ -79,6 +79,21 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos }: Props) {
     const atual = localPax.find((p) => p.id === passageiroId);
     if (!atual || (atual.quarto_id ?? null) === novoQuartoId) return;
     const anterior = atual.quarto_id ?? null;
+
+    // Capacidade: cada tipo de quarto comporta um número fixo de pessoas.
+    if (novoQuartoId) {
+      const quarto = quartos.find((q) => q.id === novoQuartoId);
+      const cap = quarto ? CAPACIDADE[quarto.tipo] ?? 1 : 1;
+      const ocupantesAtuais = localPax.filter(
+        (p) => p.quarto_id === novoQuartoId && p.id !== passageiroId,
+      ).length;
+      if (ocupantesAtuais >= cap) {
+        toast.error("Quarto cheio", {
+          description: `${quarto?.tipo ?? "Este quarto"} comporta no máximo ${cap} ${cap === 1 ? "pessoa" : "pessoas"}.`,
+        });
+        return;
+      }
+    }
 
     // Otimista
     setLocalPax((prev) =>
