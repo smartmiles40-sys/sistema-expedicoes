@@ -51,7 +51,7 @@ export type ResultadoProntidao = {
   checagens: ChecagemProntidao[];
 };
 
-type ExpedicaoLite = { data_embarque: string; data_retorno: string };
+type ExpedicaoLite = { data_embarque: string; data_retorno: string; status?: string };
 
 function addMonths(iso: string, months: number): Date {
   const d = parseISO(iso);
@@ -159,6 +159,21 @@ export function avaliarProntidao(params: {
   const { passageiro, expedicao, destino, requisitos } = params;
   const porTipo = new Map(requisitos.map((r) => [r.tipo, r]));
   const templates = requisitosDoDestino(destino);
+
+  // Expedição concluída: a viagem já aconteceu, então não faz sentido alarmar a
+  // prontidão. Todos entram como "Apto" (cada exigência marcada como N/A).
+  if (expedicao.status === "Concluída") {
+    const checagens: ChecagemProntidao[] = templates.map((t) => ({
+      tipo: t.tipo,
+      descricao: t.descricao,
+      obrigatoriedade: t.obrigatoriedade,
+      bloqueia_embarque: t.bloqueia_embarque,
+      semaforo: "na" as Semaforo,
+      detalhe: "Expedição concluída",
+      requisito_id: porTipo.get(t.tipo)?.id ?? null,
+    }));
+    return { passageiro_id: passageiro.id, prontidao: "Apto", bloqueios: 0, atencoes: 0, checagens };
+  }
 
   const checagens: ChecagemProntidao[] = templates.map((t) => {
     if (REQUISITOS_DE_COLUNA.has(t.tipo)) {

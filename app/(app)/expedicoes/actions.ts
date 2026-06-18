@@ -136,6 +136,30 @@ const editarLoteSchema = z.object({
 
 export type EditarExpedicaoInput = z.infer<typeof editarLoteSchema>;
 
+/**
+ * Ao concluir uma expedição, confirma todos os seus passageiros (exceto os
+ * Cancelados): status_reserva = "Confirmado". A prontidão "Apto" é derivada
+ * automaticamente — `avaliarProntidao` curto-circuita para Apto quando a
+ * expedição está Concluída (a viagem já aconteceu).
+ */
+async function confirmarPassageirosDaExpedicao(expedicaoId: string): Promise<void> {
+  if (DEV_USE_MOCK_DATA) {
+    for (const p of mockPassageiros) {
+      if (p.expedicao_id === expedicaoId && p.status_reserva !== "Cancelado") {
+        p.status_reserva = "Confirmado";
+        p.updated_at = new Date().toISOString();
+      }
+    }
+    return;
+  }
+  const supabase = await getServerClient();
+  await supabase
+    .from("passageiros")
+    .update({ status_reserva: "Confirmado" })
+    .eq("expedicao_id", expedicaoId)
+    .neq("status_reserva", "Cancelado");
+}
+
 export async function atualizarExpedicaoLote(
   expedicaoId: string,
   input: EditarExpedicaoInput,
@@ -150,6 +174,7 @@ export async function atualizarExpedicaoLote(
     const idx = mockExpedicoes.findIndex((e) => e.id === expedicaoId);
     if (idx === -1) return { ok: false, error: "Expedição não encontrada" };
     Object.assign(mockExpedicoes[idx], dados, { updated_at: new Date().toISOString() });
+    if (dados.status === "Concluída") await confirmarPassageirosDaExpedicao(expedicaoId);
     revalidatePath("/expedicoes");
     revalidatePath(`/expedicoes/${expedicaoId}`);
     return { ok: true };
@@ -158,6 +183,7 @@ export async function atualizarExpedicaoLote(
   const supabase = await getServerClient();
   const { error } = await supabase.from("expedicoes").update(dados).eq("id", expedicaoId);
   if (error) return { ok: false, error: error.message };
+  if (dados.status === "Concluída") await confirmarPassageirosDaExpedicao(expedicaoId);
   revalidatePath("/expedicoes");
   revalidatePath(`/expedicoes/${expedicaoId}`);
   return { ok: true };
@@ -201,8 +227,10 @@ export async function atualizarExpedicaoCampo(
     if (idx === -1) return { ok: false, error: "Expedição não encontrada" };
     (mockExpedicoes[idx] as unknown as Record<string, unknown>)[campo] = valor;
     mockExpedicoes[idx].updated_at = new Date().toISOString();
+    if (campo === "status" && valor === "Concluída") await confirmarPassageirosDaExpedicao(expedicaoId);
     revalidatePath("/expedicoes");
     revalidatePath("/dashboard");
+    revalidatePath(`/expedicoes/${expedicaoId}`);
     return { ok: true };
   }
 
@@ -212,8 +240,10 @@ export async function atualizarExpedicaoCampo(
     .update({ [campo]: valor })
     .eq("id", expedicaoId);
   if (error) return { ok: false, error: error.message };
+  if (campo === "status" && valor === "Concluída") await confirmarPassageirosDaExpedicao(expedicaoId);
   revalidatePath("/expedicoes");
   revalidatePath("/dashboard");
+  revalidatePath(`/expedicoes/${expedicaoId}`);
   return { ok: true };
 }
 
