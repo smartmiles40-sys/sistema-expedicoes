@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Search, User, Plane, ArrowRight, Upload } from "lucide-react";
+import { Search, User, Plane, ArrowRight, Upload, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
@@ -16,7 +16,8 @@ import { ImportarPassageirosDrawer } from "@/app/(app)/expedicoes/[id]/passageir
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
-import { atualizarDadosPessoais } from "@/app/(app)/expedicoes/actions";
+import { atualizarDadosPessoais, criarPassageiroAvulso, excluirPessoa } from "@/app/(app)/expedicoes/actions";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import type { StatusReserva, ArquivoRow } from "@/types/database";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
@@ -48,6 +49,7 @@ export function PassageirosGlobalTabela({
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
+  const [novoOpen, setNovoOpen] = React.useState(false);
 
   const termo = busca.trim().toLowerCase();
   const filtradas = termo
@@ -78,6 +80,9 @@ export function PassageirosGlobalTabela({
           <p className="text-xs text-muted-foreground">
             {pessoas.length} pessoa{pessoas.length === 1 ? "" : "s"} · {totalParticipacoes} participaç{totalParticipacoes === 1 ? "ão" : "ões"} em expedições
           </p>
+          <Button size="sm" onClick={() => setNovoOpen(true)}>
+            <UserPlus className="h-3 w-3" /> Novo passageiro
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="h-3 w-3" /> Importar CSV
           </Button>
@@ -158,7 +163,128 @@ export function PassageirosGlobalTabela({
         open={importOpen}
         onOpenChange={setImportOpen}
       />
+
+      <NovoPassageiroDrawer open={novoOpen} onOpenChange={setNovoOpen} />
     </div>
+  );
+}
+
+const novoAvulsoSchema = z.object({
+  nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
+  cpf: z.string().optional(),
+  data_nascimento: z.string().optional(),
+  passaporte: z.string().optional(),
+  validade_passaporte: z.string().optional(),
+  email: z.string().email("E-mail inválido").or(z.literal("")).optional(),
+  telefone: z.string().optional(),
+});
+type NovoAvulsoForm = z.infer<typeof novoAvulsoSchema>;
+
+function NovoPassageiroDrawer({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const router = useRouter();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<NovoAvulsoForm>({ resolver: zodResolver(novoAvulsoSchema) });
+
+  async function onSubmit(data: NovoAvulsoForm) {
+    const r = await criarPassageiroAvulso({
+      nome_completo: data.nome_completo,
+      cpf: data.cpf?.trim() || null,
+      data_nascimento: data.data_nascimento || null,
+      passaporte: data.passaporte?.trim() || null,
+      validade_passaporte: data.validade_passaporte || null,
+      email: data.email?.trim() || null,
+      telefone: data.telefone?.trim() || null,
+    });
+    if (r.ok) {
+      toast.success("Passageiro cadastrado na base", {
+        description: "Sem expedição — aloque a uma quando quiser.",
+      });
+      reset();
+      onOpenChange(false);
+      router.refresh();
+    } else {
+      toast.error("Erro ao cadastrar", { description: r.error });
+    }
+  }
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="contents">
+          <DrawerHeader>
+            <DrawerTitle>Novo passageiro</DrawerTitle>
+            <DrawerDescription>
+              Cadastra uma pessoa na base operacional sem vincular a nenhuma expedição.
+              Você pode alocá-la a uma expedição depois, pelo botão “Adicionar existente”.
+            </DrawerDescription>
+          </DrawerHeader>
+          <DrawerBody className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="na-nome">Nome completo</Label>
+              <Input id="na-nome" {...register("nome_completo")} />
+              {errors.nome_completo && <p className="text-[11px] text-critico-600">{errors.nome_completo.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="na-cpf">CPF</Label>
+                <Input id="na-cpf" placeholder="Opcional" {...register("cpf")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="na-nasc">Nascimento</Label>
+                <Input id="na-nasc" type="date" {...register("data_nascimento")} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="na-pass">Passaporte</Label>
+                <Input id="na-pass" {...register("passaporte")} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="na-val">Validade passaporte</Label>
+                <Input id="na-val" type="date" {...register("validade_passaporte")} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="na-email">E-mail</Label>
+                <Input id="na-email" type="email" {...register("email")} />
+                {errors.email && <p className="text-[11px] text-critico-600">{errors.email.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="na-tel">Telefone</Label>
+                <Input id="na-tel" {...register("telefone")} />
+              </div>
+            </div>
+
+            <p className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
+              Dica: informar o <strong className="text-foreground">CPF</strong> evita duplicar a
+              pessoa quando ela for importada ou adicionada a uma expedição.
+            </p>
+          </DrawerBody>
+          <DrawerFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando…" : "Cadastrar"}
+            </Button>
+          </DrawerFooter>
+        </form>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
@@ -377,6 +503,24 @@ function PessoaDrawer({
         </DrawerBody>
 
         <DrawerFooter>
+          <ConfirmDeleteButton
+            triggerLabel="Excluir passageiro"
+            triggerClassName="mr-auto"
+            ariaLabel="Excluir passageiro da base"
+            disabled={!refId}
+            title={`Excluir "${pessoa.nome_completo}" da base?`}
+            description={
+              pessoa.totalExpedicoes > 0
+                ? `Esta pessoa está em ${pessoa.totalExpedicoes} expediç${pessoa.totalExpedicoes === 1 ? "ão" : "ões"}. Excluir remove TODOS os registros dela do sistema, inclusive dessas expedições. Esta ação não pode ser desfeita.`
+                : "Remove o passageiro da base operacional. Esta ação não pode ser desfeita."
+            }
+            successMessage="Passageiro excluído da base"
+            onConfirm={() => excluirPessoa(refId)}
+            onDeleted={() => {
+              onClose();
+              router.refresh();
+            }}
+          />
           <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
           <Button type="submit" form="perfil-pessoa-form" disabled={isSubmitting || !isDirty}>
             {isSubmitting ? "Salvando..." : "Salvar alterações"}

@@ -426,16 +426,18 @@ async function getProntidaoTodas(): Promise<{
   const porExpedicao = new Map<string, ProntidaoPassageiro[]>();
   for (const passageiro of passageiros) {
     if (passageiro.status_reserva === "Cancelado") continue;
-    const exp = expById.get(passageiro.expedicao_id);
+    const expId = passageiro.expedicao_id;
+    if (!expId) continue; // passageiro avulso (sem expedição) não tem prontidão
+    const exp = expById.get(expId);
     if (!exp) continue;
     const reqs = reqPorPax.get(passageiro.id) ?? [];
-    const arr = porExpedicao.get(passageiro.expedicao_id) ?? [];
+    const arr = porExpedicao.get(expId) ?? [];
     arr.push({
       passageiro,
       requisitos: reqs,
       resultado: avaliarProntidao({ passageiro, expedicao: exp, destino: exp.destino, requisitos: reqs }),
     });
-    porExpedicao.set(passageiro.expedicao_id, arr);
+    porExpedicao.set(expId, arr);
   }
 
   return { expedicoes, porExpedicao };

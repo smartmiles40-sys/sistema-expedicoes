@@ -235,6 +235,13 @@ Não existe tabela `pessoas`: uma "pessoa" é a **agregação** de várias linha
 `chaveIdentidade()` (CPF → Bitrix → e-mail → nome) — `lib/data/pessoas.ts`,
 `PessoaAgregada`. A aba global `/passageiros` lista essas pessoas.
 
+- **Passageiro avulso (sem expedição):** `passageiros.expedicao_id` é **anulável**
+  (migration `0014`). Uma pessoa pode existir na base operacional sem estar em
+  nenhuma expedição — criada pelo botão "Novo passageiro" da `/passageiros`
+  (action `criarPassageiroAvulso`, `expedicao_id = null`). A agregação a inclui
+  (aparece com 0 expedições) e ela pode ser alocada depois via
+  `adicionarPassageiroExistente` (cria uma nova linha vinculada). Avulsos não
+  entram em listas de expedição nem em prontidão (sem `expedicao_id`).
 - **Dados PESSOAIS** (`CAMPOS_PESSOAIS` em `actions.ts`: nome, cpf, passaporte,
   validade, nascimento, e-mail, telefone, contato de emergência, restrições,
   condições médicas) pertencem à PESSOA. **Dados da RESERVA** (tipo, status,

@@ -282,7 +282,7 @@ async function propagarDadosPessoais(
     for (const p of mockPassageiros) {
       if (chaveIdentidade(p) !== chave) continue;
       Object.assign(p, patch, { updated_at: new Date().toISOString() });
-      afetados.add(p.expedicao_id);
+      if (p.expedicao_id) afetados.add(p.expedicao_id);
     }
     return [...afetados];
   }
@@ -299,7 +299,7 @@ async function propagarDadosPessoais(
     .update(patch)
     .in("id", irmaos.map((p) => p.id));
   if (error) throw new Error(error.message);
-  return [...new Set(irmaos.map((p) => p.expedicao_id))];
+  return [...new Set(irmaos.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
 }
 
 function revalidarPessoa(expedicaoIds: string[]) {
@@ -535,6 +535,81 @@ export async function criarPassageiro(
   await gerarRequisitosPadrao(d.expedicao_id);
   revalidatePath(`/expedicoes/${d.expedicao_id}`);
   revalidatePath(`/expedicoes/${d.expedicao_id}/passageiros`);
+  return { ok: true, id: (r.data as { id: string }).id };
+}
+
+const novoPassageiroAvulsoSchema = z.object({
+  nome_completo: z.string().min(2, "Nome completo obrigatório"),
+  cpf: z.string().optional().nullable(),
+  data_nascimento: z.string().optional().nullable(),
+  passaporte: z.string().optional().nullable(),
+  validade_passaporte: z.string().optional().nullable(),
+  email: z.string().email().optional().or(z.literal("")).nullable(),
+  telefone: z.string().optional().nullable(),
+  observacoes: z.string().optional().nullable(),
+});
+
+/**
+ * Cria um passageiro AVULSO: uma pessoa na base operacional SEM vínculo a
+ * nenhuma expedição (expedicao_id = null). Pode ser alocada a uma expedição
+ * depois via `adicionarPassageiroExistente`. CPF é opcional, mas, se informado,
+ * precisa ser válido (é a melhor chave pra deduplicar a identidade).
+ */
+export async function criarPassageiroAvulso(
+  input: z.infer<typeof novoPassageiroAvulsoSchema>,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = novoPassageiroAvulsoSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  const d = parsed.data;
+  if (d.cpf && !cpfValido(d.cpf)) return { ok: false, error: "CPF inválido" };
+
+  const payload = {
+    expedicao_id: null,
+    nome_completo: d.nome_completo,
+    tipo: "Pagante" as const,
+    status_reserva: "Lead" as const,
+    cpf: d.cpf || null,
+    passaporte: d.passaporte || null,
+    validade_passaporte: d.validade_passaporte || null,
+    data_nascimento: d.data_nascimento || null,
+    email: d.email || null,
+    telefone: d.telefone || null,
+    observacoes: d.observacoes || null,
+  };
+
+  if (DEV_USE_MOCK_DATA) {
+    const id = genId("p");
+    mockPassageiros.push({
+      ...payload,
+      id,
+      grupo_id: null,
+      bitrix_contact_id: null,
+      bitrix_deal_id: null,
+      voo_nacional_necessario: false,
+      companhia_aerea: null,
+      localizador: null,
+      quarto_id: null,
+      valor_contratado_brl: 0,
+      valor_pago_brl: 0,
+      saldo_brl: 0,
+      status_financeiro: "Em aberto",
+      contato_emergencia_nome: null,
+      contato_emergencia_fone: null,
+      restricoes_alimentares: null,
+      condicoes_medicas: null,
+      contrato_assinado: false,
+      checkin_online_feito: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    revalidatePath("/passageiros");
+    return { ok: true, id };
+  }
+
+  const supabase = await getServerClient();
+  const r = await supabase.from("passageiros").insert(payload).select("id").single();
+  if (r.error) return { ok: false, error: r.error.message };
+  revalidatePath("/passageiros");
   return { ok: true, id: (r.data as { id: string }).id };
 }
 
@@ -1155,6 +1230,65 @@ export async function excluirPassageiro(
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/avisos");
+  return { ok: true };
+}
+
+/**
+ * Exclui a PESSOA inteira da base operacional: remove TODAS as linhas
+ * `passageiros` da mesma identidade (todas as expedições + a linha avulsa) e
+ * seus requisitos. `refId` é qualquer linha da pessoa. Usado no perfil global
+ * (`/passageiros`). Arquivos vinculados continuam no storage (igual à exclusão
+ * por expedição).
+ */
+export async function excluirPessoa(
+  refId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const ref = mockPassageiros.find((p) => p.id === refId);
+    if (!ref) return { ok: false, error: "Passageiro não encontrado" };
+    const chave = chaveIdentidade(ref);
+    const idsAlvo = new Set(
+      mockPassageiros.filter((p) => chaveIdentidade(p) === chave).map((p) => p.id),
+    );
+    const expedicoesAfetadas = new Set<string>();
+    for (let i = mockPassageiros.length - 1; i >= 0; i--) {
+      if (!idsAlvo.has(mockPassageiros[i].id)) continue;
+      const eid = mockPassageiros[i].expedicao_id;
+      if (eid) expedicoesAfetadas.add(eid);
+      mockPassageiros.splice(i, 1);
+    }
+    for (let i = mockPassageiroRequisitos.length - 1; i >= 0; i--) {
+      if (idsAlvo.has(mockPassageiroRequisitos[i].passageiro_id)) {
+        mockPassageiroRequisitos.splice(i, 1);
+      }
+    }
+    revalidatePath("/passageiros");
+    for (const eid of expedicoesAfetadas) {
+      revalidatePath(`/expedicoes/${eid}`);
+      revalidatePath(`/expedicoes/${eid}/passageiros`);
+    }
+    revalidatePath("/avisos");
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data } = await supabase.from("passageiros").select("*");
+  const rows = (data ?? []) as PassageiroRow[];
+  const ref = rows.find((p) => p.id === refId);
+  if (!ref) return { ok: false, error: "Passageiro não encontrado" };
+  const chave = chaveIdentidade(ref);
+  const irmaos = rows.filter((p) => chaveIdentidade(p) === chave);
+  const ids = irmaos.map((p) => p.id);
+  // Requisitos primeiro (FK) e depois as linhas de passageiro.
+  await supabase.from("passageiro_requisitos").delete().in("passageiro_id", ids);
+  const { error } = await supabase.from("passageiros").delete().in("id", ids);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/passageiros");
+  for (const eid of [...new Set(irmaos.map((p) => p.expedicao_id).filter((id): id is string => !!id))]) {
+    revalidatePath(`/expedicoes/${eid}`);
+    revalidatePath(`/expedicoes/${eid}/passageiros`);
+  }
   revalidatePath("/avisos");
   return { ok: true };
 }

@@ -115,7 +115,7 @@ function agregar(
 
     pessoa.idsPassageiros.push(p.id);
 
-    const exp = expById.get(p.expedicao_id);
+    const exp = p.expedicao_id ? expById.get(p.expedicao_id) : undefined;
     if (exp) {
       pessoa.expedicoes.push({
         expedicao_id: exp.id,

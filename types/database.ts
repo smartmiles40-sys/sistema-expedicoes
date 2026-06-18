@@ -115,7 +115,7 @@ export type ExpedicaoRow = {
 
 export type PassageiroRow = {
   id: string;
-  expedicao_id: string;
+  expedicao_id: string | null; // null = passageiro avulso (na base, sem expedição)
   grupo_id: string | null;
   bitrix_contact_id: string | null;
   bitrix_deal_id: string | null;
@@ -350,7 +350,7 @@ export type Database = {
       fornecedores: { Row: FornecedorRow; Insert: Partial<FornecedorRow> & Pick<FornecedorRow, "nome" | "tipo">; Update: Partial<FornecedorRow> };
       cambios: { Row: CambioRow; Insert: { moeda: string; taxa_brl: number; atualizado_em?: string }; Update: Partial<CambioRow> };
       expedicoes: { Row: ExpedicaoRow; Insert: Partial<ExpedicaoRow> & Pick<ExpedicaoRow, "codigo" | "nome" | "destino" | "data_embarque" | "data_retorno">; Update: Partial<ExpedicaoRow> };
-      passageiros: { Row: PassageiroRow; Insert: Partial<PassageiroRow> & Pick<PassageiroRow, "expedicao_id" | "nome_completo">; Update: Partial<PassageiroRow> };
+      passageiros: { Row: PassageiroRow; Insert: Partial<PassageiroRow> & Pick<PassageiroRow, "nome_completo">; Update: Partial<PassageiroRow> };
       grupos_expedicao: { Row: GrupoExpedicaoRow; Insert: Partial<GrupoExpedicaoRow> & Pick<GrupoExpedicaoRow, "expedicao_id" | "nome">; Update: Partial<GrupoExpedicaoRow> };
       arquivos: { Row: ArquivoRow; Insert: Partial<ArquivoRow> & Pick<ArquivoRow, "expedicao_id" | "nome" | "storage_path">; Update: Partial<ArquivoRow> };
       quartos: { Row: QuartoRow; Insert: Partial<QuartoRow> & Pick<QuartoRow, "expedicao_id" | "numero" | "tipo">; Update: Partial<QuartoRow> };
