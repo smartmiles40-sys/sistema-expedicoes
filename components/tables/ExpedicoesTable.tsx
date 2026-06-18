@@ -20,8 +20,8 @@ import { GripVertical, Pencil } from "lucide-react";
 import { EditableSelectCell, type SelectOption } from "./EditableSelectCell";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
-import { formatBRL, formatDate, formatPercent, daysUntil } from "@/lib/utils";
-import { MARGEM_MINIMA, MARGEM_IDEAL, STATUS_EXPEDICAO } from "@/lib/constants";
+import { formatDate, formatPercent, daysUntil } from "@/lib/utils";
+import { STATUS_EXPEDICAO } from "@/lib/constants";
 import type { ExpedicaoComAgregados, StatusExpedicao } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { atualizarExpedicaoCampo, excluirExpedicao } from "@/app/(app)/expedicoes/actions";
@@ -56,9 +56,8 @@ const HEADERS = [
   { key: "data_retorno", label: "Retorno" },
   { key: "status", label: "Status" },
   { key: "pax", label: "Pax" },
-  { key: "preco", label: "Preço (BRL)" },
-  { key: "receita", label: "Receita prev." },
-  { key: "margem", label: "Margem %" },
+  { key: "checklist", label: "Checklist" },
+  { key: "prontidao", label: "Prontidão" },
   { key: "acoes", label: "" },
 ];
 
@@ -158,8 +157,8 @@ function SortableRow({
   };
 
   const dias = daysUntil(expedicao.data_embarque);
-  const m = expedicao.margem_prevista;
-  const margemVariant = m < MARGEM_MINIMA ? "critico" : m < MARGEM_IDEAL ? "atencao" : "vinculado";
+  const prontTodos =
+    expedicao.prontidao_total > 0 && expedicao.prontidao_aptos === expedicao.prontidao_total;
 
   return (
     <tr
@@ -229,12 +228,31 @@ function SortableRow({
         <span className="text-muted-foreground">/{expedicao.pax_planejados}</span>
       </td>
 
-      <td className="px-2 tabular-nums">{formatBRL(expedicao.preco_venda_brl, 0)}</td>
-
-      <td className="px-2 tabular-nums">{formatBRL(expedicao.receita_prevista_brl, 0)}</td>
-
       <td className="px-2">
-        <Badge variant={margemVariant}>{formatPercent(m)}</Badge>
+        <div className="flex items-center gap-1.5">
+          <div className="h-1.5 w-14 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-vinculado-600"
+              style={{ width: `${Math.round(expedicao.checklist_pct * 100)}%` }}
+            />
+          </div>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {formatPercent(expedicao.checklist_pct, 0)}
+          </span>
+        </div>
+      </td>
+
+      <td className="px-2 tabular-nums">
+        {expedicao.prontidao_total > 0 ? (
+          <>
+            <strong className={prontTodos ? "text-vinculado-600" : "text-atencao-600"}>
+              {expedicao.prontidao_aptos}
+            </strong>
+            <span className="text-muted-foreground">/{expedicao.prontidao_total}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </td>
 
       <td className="w-16 px-1" onClick={(e) => e.stopPropagation()}>

@@ -384,11 +384,12 @@ export type TableUpdate<T extends keyof Database["public"]["Tables"]> =
 // Tipos enriquecidos pra UI (com agregados)
 export type ExpedicaoComAgregados = ExpedicaoRow & {
   pax_confirmados: number;
-  receita_prevista_brl: number;
-  custo_planejado_brl: number;
-  margem_prevista: number;
-  pagamentos_vencidos: number;
   docs_pendentes: number;
+  /** Fração (0..1) dos processos do checklist concluídos. */
+  checklist_pct: number;
+  /** Passageiros aptos a embarcar / total avaliado (não cancelados). */
+  prontidao_aptos: number;
+  prontidao_total: number;
   responsavel_op_nome: string | null;
   responsavel_com_nome: string | null;
 };

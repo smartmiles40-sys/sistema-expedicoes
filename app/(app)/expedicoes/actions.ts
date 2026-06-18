@@ -33,7 +33,7 @@ const criarSchema = z.object({
   data_embarque: z.string().min(1),
   data_retorno: z.string().min(1),
   pax_planejados: z.number().int().min(1),
-  preco_venda_brl: z.number().min(0),
+  preco_venda_brl: z.number().min(0).optional(),
   responsavel_operacional_id: z.string().optional(),
   responsavel_comercial_id: z.string().optional(),
 });
@@ -64,15 +64,16 @@ export async function criarExpedicao(input: z.infer<typeof criarSchema>): Promis
       status: "Planejamento",
       pax_planejados: data.pax_planejados,
       pax_cortesia: 0,
-      preco_venda_brl: data.preco_venda_brl,
+      preco_venda_brl: data.preco_venda_brl ?? 0,
       bitrix_pipeline_id: null,
       ordem: null,
       observacoes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+    // Checklist padrão gerado automaticamente em TODA expedição criada.
+    await gerarChecklistPadrao(id);
     revalidatePath("/expedicoes");
-    revalidatePath("/dashboard");
     return { ok: true, id };
   }
 
@@ -88,15 +89,17 @@ export async function criarExpedicao(input: z.infer<typeof criarSchema>): Promis
       responsavel_operacional_id: data.responsavel_operacional_id ?? null,
       responsavel_comercial_id: data.responsavel_comercial_id ?? null,
       pax_planejados: data.pax_planejados,
-      preco_venda_brl: data.preco_venda_brl,
+      preco_venda_brl: data.preco_venda_brl ?? 0,
       status: "Planejamento",
     })
     .select("id")
     .single();
   if (result.error) return { ok: false, error: result.error.message };
+  const novoId = (result.data as { id: string }).id;
+  // Checklist padrão gerado automaticamente em TODA expedição criada.
+  await gerarChecklistPadrao(novoId);
   revalidatePath("/expedicoes");
-  revalidatePath("/dashboard");
-  return { ok: true, id: (result.data as { id: string }).id };
+  return { ok: true, id: novoId };
 }
 
 const CAMPOS_EXPEDICAO_EDITAVEIS = new Set([

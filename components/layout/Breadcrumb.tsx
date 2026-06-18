@@ -9,8 +9,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   cambios: "Câmbios",
   configuracoes: "Configurações",
   passageiros: "Passageiros",
-  custos: "Custos",
-  pagamentos: "Pagamentos",
   checklist: "Checklist",
   documentos: "Documentos",
   rooming: "Rooming",

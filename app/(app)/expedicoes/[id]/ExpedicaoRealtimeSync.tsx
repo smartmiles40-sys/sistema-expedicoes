@@ -18,14 +18,12 @@ export function ExpedicaoRealtimeSync({ expedicaoId }: { expedicaoId: string }) 
       { table: "expedicoes" /* sem filtro: queremos saber se ESTA foi alterada/deletada */ },
       { table: "passageiros", filter: `expedicao_id=eq.${expedicaoId}` },
       { table: "quartos", filter: `expedicao_id=eq.${expedicaoId}` },
-      { table: "custos", filter: `expedicao_id=eq.${expedicaoId}` },
       { table: "checklist_itens", filter: `expedicao_id=eq.${expedicaoId}` },
+      { table: "passageiro_requisitos" },
       { table: "arquivos", filter: `expedicao_id=eq.${expedicaoId}` },
       { table: "links_expedicao", filter: `expedicao_id=eq.${expedicaoId}` },
       // documentos não tem expedicao_id direto — over-trigger aceitável (raros)
       { table: "documentos" },
-      // pagamentos: idem, over-trigger aceitável
-      { table: "pagamentos" },
     ],
   });
   return null;

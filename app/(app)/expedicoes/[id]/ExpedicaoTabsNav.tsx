@@ -7,8 +7,6 @@ const TABS = [
   { slug: "", label: "Visão Geral" },
   { slug: "passageiros", label: "Passageiros" },
   { slug: "rooming", label: "Rooming" },
-  { slug: "custos", label: "Custos" },
-  { slug: "pagamentos", label: "Pagamentos" },
   { slug: "checklist", label: "Checklist" },
   { slug: "documentos", label: "Documentos" },
   { slug: "links", label: "Links" },

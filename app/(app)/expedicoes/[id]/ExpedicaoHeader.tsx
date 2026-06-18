@@ -2,8 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatBRL, formatDate, formatPercent, daysUntil } from "@/lib/utils";
-import { MARGEM_MINIMA, MARGEM_IDEAL } from "@/lib/constants";
+import { formatDate, formatPercent, daysUntil } from "@/lib/utils";
 import type { ExpedicaoComAgregados, StatusExpedicao } from "@/types/database";
 
 const STATUS_VARIANT: Record<StatusExpedicao, "lista" | "vinculado" | "atencao" | "auto" | "critico"> = {
@@ -14,31 +13,14 @@ const STATUS_VARIANT: Record<StatusExpedicao, "lista" | "vinculado" | "atencao" 
   Cancelada: "critico",
 };
 
-interface KPIs {
-  paxConfirmados: number;
-  paxPlanejados: number;
-  receitaPrevista: number;
-  custoPlanejado: number;
-  custoRealizado: number;
-  margemPrevista: number;
-  docsPendentes: number;
-  pagamentosVencidos: number;
-}
-
 export function ExpedicaoHeader({
   expedicao,
-  kpis,
 }: {
   expedicao: ExpedicaoComAgregados;
-  kpis: KPIs;
 }) {
   const dias = daysUntil(expedicao.data_embarque);
-  const margemVariant =
-    kpis.margemPrevista < MARGEM_MINIMA
-      ? "critico"
-      : kpis.margemPrevista < MARGEM_IDEAL
-        ? "atencao"
-        : "vinculado";
+  const ocupacao = expedicao.pax_planejados > 0 ? expedicao.pax_confirmados / expedicao.pax_planejados : 0;
+  const prontidaoPct = expedicao.prontidao_total > 0 ? expedicao.prontidao_aptos / expedicao.prontidao_total : 0;
 
   return (
     <div className="border-b border-border bg-background px-4 py-3 space-y-3">
@@ -95,28 +77,30 @@ export function ExpedicaoHeader({
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs operacionais */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi
           label="Pax confirmados"
-          value={`${kpis.paxConfirmados}/${kpis.paxPlanejados}`}
-          sub={`${formatPercent(kpis.paxPlanejados > 0 ? kpis.paxConfirmados / kpis.paxPlanejados : 0, 0)} ocupação`}
+          value={`${expedicao.pax_confirmados}/${expedicao.pax_planejados}`}
+          sub={`${formatPercent(ocupacao, 0)} ocupação`}
         />
         <Kpi
-          label="Receita prev × real"
-          value={formatBRL(kpis.receitaPrevista, 0)}
-          sub={`Real: ${formatBRL(0, 0)}`}
+          label="Checklist"
+          value={formatPercent(expedicao.checklist_pct, 0)}
+          sub="processos concluídos"
+          variant={expedicao.checklist_pct >= 1 ? "vinculado" : expedicao.checklist_pct >= 0.5 ? "atencao" : undefined}
         />
         <Kpi
-          label="Custo plan × real"
-          value={formatBRL(kpis.custoPlanejado, 0)}
-          sub={`Real: ${formatBRL(kpis.custoRealizado, 0)}`}
+          label="Prontidão"
+          value={`${expedicao.prontidao_aptos}/${expedicao.prontidao_total}`}
+          sub={`${formatPercent(prontidaoPct, 0)} aptos`}
+          variant={expedicao.prontidao_total === 0 ? undefined : prontidaoPct >= 1 ? "vinculado" : "atencao"}
         />
         <Kpi
-          label="Margem prevista"
-          value={formatPercent(kpis.margemPrevista)}
-          sub={`Meta ${formatPercent(MARGEM_IDEAL, 0)}`}
-          variant={margemVariant}
+          label="Embarque"
+          value={dias != null ? (dias >= 0 ? `${dias}d` : "Embarcou") : "—"}
+          sub={dias != null && dias >= 0 ? "até o embarque" : ""}
+          variant={dias != null && dias >= 0 && dias < 30 ? "atencao" : undefined}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockExpedicoes } from "@/lib/mock-data";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
+import { gerarChecklistPadrao } from "@/app/(app)/expedicoes/actions";
 
 export async function POST(req: NextRequest) {
   if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
     mockExpedicoes.push(novo);
+    await gerarChecklistPadrao(novo.id); // checklist automático em toda expedição importada
     return NextResponse.json({ ok: true, expedicao_id: novo.id, action: "created" });
   }
 
@@ -95,6 +97,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
     const r = result as { id: string };
+
+    // checklist automático só quando a expedição é NOVA
+    if (action === "created") await gerarChecklistPadrao(r.id);
 
     return NextResponse.json({ ok: true, expedicao_id: r.id, action });
   } catch (err) {

@@ -62,54 +62,57 @@ async function agregarExpedicoes(
   if (rows.length === 0) return [];
   const ids = rows.map((e) => e.id);
 
-  const [paxRes, custosRes, usuariosRes] = await Promise.all([
-    supabase.from("passageiros").select("id, expedicao_id, status_reserva, passaporte").in("expedicao_id", ids),
-    supabase.from("custos").select("id, expedicao_id, valor_planejado_brl").in("expedicao_id", ids),
+  const [paxRes, reqRes, checklistRes, usuariosRes] = await Promise.all([
+    supabase.from("passageiros").select("*").in("expedicao_id", ids),
+    supabase.from("passageiro_requisitos").select("*"),
+    supabase.from("checklist_itens").select("expedicao_id, parent_id, status").in("expedicao_id", ids),
     supabase.from("usuarios").select("id, nome"),
   ]);
-  const pax = (paxRes.data ?? []) as {
-    id: string; expedicao_id: string; status_reserva: string; passaporte: string | null;
-  }[];
-  const custos = (custosRes.data ?? []) as {
-    id: string; expedicao_id: string; valor_planejado_brl: number | null;
+  const pax = (paxRes.data ?? []) as PassageiroRow[];
+  const requisitos = (reqRes.data ?? []) as PassageiroRequisitoRow[];
+  const checklist = (checklistRes.data ?? []) as {
+    expedicao_id: string; parent_id: string | null; status: string;
   }[];
   const usuariosById = new Map(
     ((usuariosRes.data ?? []) as { id: string; nome: string }[]).map((u) => [u.id, u.nome]),
   );
 
-  const custoExp = new Map(custos.map((c) => [c.id, c.expedicao_id]));
-  let pagamentos: { custo_id: string; status: string }[] = [];
-  if (custos.length) {
-    const { data } = await supabase
-      .from("pagamentos")
-      .select("custo_id, status")
-      .in("custo_id", custos.map((c) => c.id));
-    pagamentos = (data ?? []) as { custo_id: string; status: string }[];
+  const reqPorPax = new Map<string, PassageiroRequisitoRow[]>();
+  for (const r of requisitos) {
+    const arr = reqPorPax.get(r.passageiro_id) ?? [];
+    arr.push(r);
+    reqPorPax.set(r.passageiro_id, arr);
   }
 
   return rows.map((e) => {
-    const paxDaExp = pax.filter((p) => p.expedicao_id === e.id);
+    const paxDaExp = pax.filter((p) => p.expedicao_id === e.id && p.status_reserva !== "Cancelado");
     const pax_confirmados = paxDaExp.filter((p) => p.status_reserva === "Confirmado").length;
-    const receita_prevista_brl = e.preco_venda_brl * (e.pax_planejados - e.pax_cortesia);
-    const custo_planejado_brl = custos
-      .filter((c) => c.expedicao_id === e.id)
-      .reduce((acc, c) => acc + (c.valor_planejado_brl ?? 0), 0);
-    const margem_prevista =
-      receita_prevista_brl > 0 ? (receita_prevista_brl - custo_planejado_brl) / receita_prevista_brl : 0;
-    const pagamentos_vencidos = pagamentos.filter(
-      (p) => p.status === "Vencido" && custoExp.get(p.custo_id) === e.id,
+    const docs_pendentes = paxDaExp.filter((p) => !p.passaporte).length;
+
+    const prontidao_total = paxDaExp.length;
+    const prontidao_aptos = paxDaExp.filter(
+      (p) =>
+        avaliarProntidao({
+          passageiro: p,
+          expedicao: e,
+          destino: e.destino,
+          requisitos: reqPorPax.get(p.id) ?? [],
+        }).prontidao === "Apto",
     ).length;
-    const docs_pendentes = paxDaExp.filter(
-      (p) => p.status_reserva !== "Cancelado" && !p.passaporte,
-    ).length;
+
+    // % do checklist = processos-pai concluídos / total de processos-pai
+    const processos = checklist.filter((c) => c.expedicao_id === e.id && !c.parent_id);
+    const checklist_pct = processos.length
+      ? processos.filter((c) => c.status === "Concluído").length / processos.length
+      : 0;
+
     return {
       ...e,
       pax_confirmados,
-      receita_prevista_brl,
-      custo_planejado_brl,
-      margem_prevista,
-      pagamentos_vencidos,
       docs_pendentes,
+      checklist_pct,
+      prontidao_aptos,
+      prontidao_total,
       responsavel_op_nome: e.responsavel_operacional_id
         ? usuariosById.get(e.responsavel_operacional_id) ?? null : null,
       responsavel_com_nome: e.responsavel_comercial_id

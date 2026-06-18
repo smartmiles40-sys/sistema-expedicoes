@@ -12,6 +12,7 @@ import path from "node:path";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosDestino } from "@/lib/prontidao/requisitos-destino";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
+import { avaliarProntidao } from "@/lib/prontidao/regras";
 import {
   parseCSV,
   parsePassageirosCSV,
@@ -29,7 +30,20 @@ const futureDate = (days: number) => {
 };
 const pastDate = (days: number) => futureDate(-days);
 
-export const mockUsuarios: Tables<"usuarios">[] = [
+// --- Persistência entre re-evaluações de módulo no dev ----------------------
+// No Next dev, o grafo de módulos das Server Actions e o das páginas (RSC) podem
+// avaliar ESTE arquivo separadamente dentro do mesmo processo. Sem um store
+// compartilhado, um `.push()` numa action não é visto pela página que renderiza
+// logo em seguida → criar uma expedição e navegar pra ela dava 404. Ancoramos
+// cada array em globalThis pra que todas as instâncias do módulo (e o boundary
+// action↔RSC) usem o MESMO array. (Não resolve serverless/Vercel, onde cada
+// invocação pode ser um processo novo — lá a fonte é o Supabase real.)
+const __mockStore = globalThis as unknown as Record<string, unknown>;
+function persist<T extends unknown[]>(key: string, init: () => T): T {
+  return (__mockStore[key] ??= init()) as T;
+}
+
+export const mockUsuarios: Tables<"usuarios">[] = persist("mockUsuarios", () => [
   {
     id: "00000000-0000-0000-0000-000000000001",
     email: "smartmiles4.0@gmail.com",
@@ -66,9 +80,9 @@ export const mockUsuarios: Tables<"usuarios">[] = [
     created_at: pastDate(80),
     updated_at: pastDate(1),
   },
-];
+]);
 
-export const mockFornecedores: Tables<"fornecedores">[] = [
+export const mockFornecedores: Tables<"fornecedores">[] = persist("mockFornecedores", () => [
   {
     id: "f0000000-0000-0000-0000-000000000001",
     nome: "Andean DMC",
@@ -149,9 +163,9 @@ export const mockFornecedores: Tables<"fornecedores">[] = [
     created_at: pastDate(250),
     updated_at: pastDate(3),
   },
-];
+]);
 
-export const mockCambios: Tables<"cambios">[] = [
+export const mockCambios: Tables<"cambios">[] = persist("mockCambios", () => [
   { moeda: "USD", taxa_brl: 5.20, atualizado_em: pastDate(1) },
   { moeda: "EUR", taxa_brl: 5.60, atualizado_em: pastDate(1) },
   { moeda: "PEN", taxa_brl: 1.40, atualizado_em: pastDate(1) },
@@ -160,9 +174,9 @@ export const mockCambios: Tables<"cambios">[] = [
   { moeda: "ARS", taxa_brl: 0.005, atualizado_em: pastDate(1) },
   { moeda: "CLP", taxa_brl: 0.0055, atualizado_em: pastDate(1) },
   { moeda: "BRL", taxa_brl: 1.0, atualizado_em: pastDate(1) },
-];
+]);
 
-export const mockExpedicoes: Tables<"expedicoes">[] = [
+export const mockExpedicoes: Tables<"expedicoes">[] = persist("mockExpedicoes", () => [
   {
     id: "e0000000-0000-0000-0000-000000000001",
     codigo: "PERU-AGO2026",
@@ -283,7 +297,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = [
     created_at: iso(today),
     updated_at: iso(today),
   },
-];
+]);
 
 /**
  * Campos do passageiro anteriores à migration 0010 (financeiro + dados de
@@ -393,36 +407,36 @@ function normalizarPassageiro(p: PassageiroBase): Tables<"passageiros"> {
   };
 }
 
-export const mockPassageiros: Tables<"passageiros">[] =
-  passageirosBase.map(normalizarPassageiro);
+export const mockPassageiros: Tables<"passageiros">[] = persist("mockPassageiros", () =>
+  passageirosBase.map(normalizarPassageiro));
 
-export const mockQuartos: Tables<"quartos">[] = [
+export const mockQuartos: Tables<"quartos">[] = persist("mockQuartos", () => [
   { id: "q001", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "101", tipo: "Duplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
   { id: "q002", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "102", tipo: "Twin", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
   { id: "q003", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "103", tipo: "Triplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
   { id: "q004", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "201", tipo: "Líder", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-];
+]);
 
-export const mockCustos: Tables<"custos">[] = [
+export const mockCustos: Tables<"custos">[] = persist("mockCustos", () => [
   { id: "c0001", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Hotelaria", servico: "Hospedagem Cusco 3 noites", fornecedor_id: "f0000000-0000-0000-0000-000000000003", cidade: "Cusco", data_servico: futureDate(95), moeda: "USD", valor_planejado: 5200, valor_realizado: 5350, cambio_aplicado: 5.20, valor_planejado_brl: 27040, valor_realizado_brl: 27820, status: "Programado", pago_por: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(5) },
   { id: "c0002", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Aéreo", servico: "Voo internacional GRU-LIM", fornecedor_id: "f0000000-0000-0000-0000-000000000004", cidade: null, data_servico: futureDate(95), moeda: "BRL", valor_planejado: 96000, valor_realizado: null, cambio_aplicado: 1.0, valor_planejado_brl: 96000, valor_realizado_brl: null, status: "A programar", pago_por: null, observacoes: null, created_at: pastDate(38), updated_at: pastDate(5) },
   { id: "c0003", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Terrestre", servico: "Trekking Caminho Inca 4d", fornecedor_id: "f0000000-0000-0000-0000-000000000001", cidade: "Cusco", data_servico: futureDate(98), moeda: "USD", valor_planejado: 14400, valor_realizado: null, cambio_aplicado: 5.20, valor_planejado_brl: 74880, valor_realizado_brl: null, status: "Programado", pago_por: null, observacoes: null, created_at: pastDate(38), updated_at: pastDate(5) },
   { id: "c0004", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Ingressos", servico: "Machu Picchu", fornecedor_id: "f0000000-0000-0000-0000-000000000001", cidade: "Aguas Calientes", data_servico: futureDate(101), moeda: "USD", valor_planejado: 1200, valor_realizado: null, cambio_aplicado: 5.20, valor_planejado_brl: 6240, valor_realizado_brl: null, status: "A programar", pago_por: null, observacoes: null, created_at: pastDate(30), updated_at: pastDate(5) },
   { id: "c0005", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Seguro", servico: "Seguro Viagem grupo 24 pax", fornecedor_id: "f0000000-0000-0000-0000-000000000005", cidade: null, data_servico: futureDate(95), moeda: "BRL", valor_planejado: 4800, valor_realizado: null, cambio_aplicado: 1.0, valor_planejado_brl: 4800, valor_realizado_brl: null, status: "A programar", pago_por: null, observacoes: null, created_at: pastDate(25), updated_at: pastDate(5) },
-];
+]);
 
-export const mockPagamentos: Tables<"pagamentos">[] = [
+export const mockPagamentos: Tables<"pagamentos">[] = persist("mockPagamentos", () => [
   { id: "pg001", custo_id: "c0001", fornecedor_id: "f0000000-0000-0000-0000-000000000003", servico: "Hospedagem Cusco — sinal", moeda: "USD", valor_total: 5200, entrada: 1560, saldo: 3640, vencimento_saldo: futureDate(60), status: "Programado", observacoes: "30% sinal pago em 15/03", created_at: pastDate(15), updated_at: pastDate(15) },
   { id: "pg002", custo_id: "c0002", fornecedor_id: "f0000000-0000-0000-0000-000000000004", servico: "Voo internacional", moeda: "BRL", valor_total: 96000, entrada: 0, saldo: 96000, vencimento_saldo: futureDate(45), status: "Pendente", observacoes: null, created_at: pastDate(10), updated_at: pastDate(10) },
   { id: "pg003", custo_id: "c0003", fornecedor_id: "f0000000-0000-0000-0000-000000000001", servico: "Trekking — sinal", moeda: "USD", valor_total: 14400, entrada: 4320, saldo: 10080, vencimento_saldo: pastDate(2), status: "Vencido", observacoes: "Atenção: vencido", created_at: pastDate(20), updated_at: pastDate(2) },
   { id: "pg004", custo_id: "c0004", fornecedor_id: "f0000000-0000-0000-0000-000000000001", servico: "Ingressos Machu Picchu", moeda: "USD", valor_total: 1200, entrada: 0, saldo: 1200, vencimento_saldo: futureDate(80), status: "Pendente", observacoes: null, created_at: pastDate(8), updated_at: pastDate(8) },
-];
+]);
 
 // Checklist da expedição Peru = os 31 processos reais do SOP (ClickUp),
 // gerados a partir do template com prazos calculados do embarque (futureDate(95)).
 // Embarque a ~95 dias ⇒ fase atual "6 a 2 meses": as fases anteriores aparecem
 // concluídas, a atual em andamento e as seguintes pendentes (demo realista).
-export const mockChecklistItens: Tables<"checklist_itens">[] = (() => {
+export const mockChecklistItens: Tables<"checklist_itens">[] = persist("mockChecklistItens", () => {
   const peruId = "e0000000-0000-0000-0000-000000000001";
   const peru = mockExpedicoes.find((e) => e.id === peruId);
   if (!peru) return [];
@@ -471,19 +485,19 @@ export const mockChecklistItens: Tables<"checklist_itens">[] = (() => {
     }
   }
   return itens;
-})();
+});
 
-export const mockDocumentos: Tables<"documentos">[] = [
+export const mockDocumentos: Tables<"documentos">[] = persist("mockDocumentos", () => [
   { id: "d001", passageiro_id: "p0000001", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Emitido", apolice_url: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(2) },
   { id: "d002", passageiro_id: "p0000002", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Pendente", apolice_url: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(2) },
   { id: "d003", passageiro_id: "p0000003", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Pendente", apolice_url: null, observacoes: "Aguardando passaporte", created_at: pastDate(35), updated_at: pastDate(2) },
   { id: "d004", passageiro_id: "p0000004", visto_necessario: false, status_visto: "Não necessário", seguro_status: "Solicitado", apolice_url: null, observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-];
+]);
 
-export const mockLinksExpedicao: Tables<"links_expedicao">[] = [];
+export const mockLinksExpedicao: Tables<"links_expedicao">[] = persist("mockLinksExpedicao", () => []);
 
 // Catálogo de requisitos (0010) para os destinos das expedições de demo.
-export const mockRequisitosDestino: Tables<"requisitos_destino">[] = (() => {
+export const mockRequisitosDestino: Tables<"requisitos_destino">[] = persist("mockRequisitosDestino", () => {
   const destinos = [...new Set(mockExpedicoes.map((e) => e.destino))];
   return destinos.flatMap((destino) =>
     construirRequisitosDestino({
@@ -492,7 +506,7 @@ export const mockRequisitosDestino: Tables<"requisitos_destino">[] = (() => {
       createdAt: pastDate(200),
     }),
   );
-})();
+});
 
 /**
  * Instâncias de requisito por passageiro (0010). Geradas do catálogo do destino
@@ -529,7 +543,7 @@ const reqOverrides: Record<
   "p0000012:Seguro": { status: "Aprovado", numero: "TA-77012", validade: futureDate(165) },
 };
 
-export const mockPassageiroRequisitos: Tables<"passageiro_requisitos">[] =
+export const mockPassageiroRequisitos: Tables<"passageiro_requisitos">[] = persist("mockPassageiroRequisitos", () =>
   mockPassageiros.flatMap((pax) => {
     const exp = mockExpedicoes.find((e) => e.id === pax.expedicao_id);
     if (!exp) return [];
@@ -544,36 +558,40 @@ export const mockPassageiroRequisitos: Tables<"passageiro_requisitos">[] =
       if (ov) Object.assign(r, ov);
     }
     return rows;
-  });
+  }));
 
 export function getExpedicoesComAgregados(): ExpedicaoComAgregados[] {
   const usuariosById = new Map(mockUsuarios.map((u) => [u.id, u]));
   return mockExpedicoes.map((e) => {
-    const pax = mockPassageiros.filter((p) => p.expedicao_id === e.id);
+    const pax = mockPassageiros.filter(
+      (p) => p.expedicao_id === e.id && p.status_reserva !== "Cancelado",
+    );
     const pax_confirmados = pax.filter((p) => p.status_reserva === "Confirmado").length;
-    const receita_prevista_brl = e.preco_venda_brl * (e.pax_planejados - e.pax_cortesia);
-    const custos = mockCustos.filter((c) => c.expedicao_id === e.id);
-    const custo_planejado_brl = custos.reduce((acc, c) => acc + c.valor_planejado_brl, 0);
-    const margem_prevista = receita_prevista_brl > 0
-      ? (receita_prevista_brl - custo_planejado_brl) / receita_prevista_brl
+    const docs_pendentes = pax.filter((p) => !p.passaporte).length;
+
+    const prontidao_total = pax.length;
+    const prontidao_aptos = pax.filter(
+      (p) =>
+        avaliarProntidao({
+          passageiro: p,
+          expedicao: e,
+          destino: e.destino,
+          requisitos: mockPassageiroRequisitos.filter((r) => r.passageiro_id === p.id),
+        }).prontidao === "Apto",
+    ).length;
+
+    const processos = mockChecklistItens.filter((c) => c.expedicao_id === e.id && !c.parent_id);
+    const checklist_pct = processos.length
+      ? processos.filter((c) => c.status === "Concluído").length / processos.length
       : 0;
-    const pagamentos_vencidos = mockPagamentos.filter((p) => {
-      const c = mockCustos.find((cc) => cc.id === p.custo_id);
-      if (!c || c.expedicao_id !== e.id) return false;
-      return p.status === "Vencido";
-    }).length;
-    const docs_pendentes = pax.filter((p) => {
-      const d = mockDocumentos.find((dd) => dd.passageiro_id === p.id);
-      return !p.passaporte || (d?.seguro_status !== "Emitido");
-    }).length;
+
     return {
       ...e,
       pax_confirmados,
-      receita_prevista_brl,
-      custo_planejado_brl,
-      margem_prevista,
-      pagamentos_vencidos,
       docs_pendentes,
+      checklist_pct,
+      prontidao_aptos,
+      prontidao_total,
       responsavel_op_nome: e.responsavel_operacional_id ? (usuariosById.get(e.responsavel_operacional_id)?.nome ?? null) : null,
       responsavel_com_nome: e.responsavel_comercial_id ? (usuariosById.get(e.responsavel_comercial_id)?.nome ?? null) : null,
     };
