@@ -100,6 +100,18 @@ export const REQUISITOS_POR_DESTINO: Record<string, RequisitoDestinoTemplate[]> 
   ],
 };
 
+/**
+ * Destinos cadastrados = chaves do catálogo acima. É a lista de opções
+ * oferecidas ao criar uma expedição: só se cria expedição num destino
+ * previamente cadastrado, já com suas condicionais (requisitos) definidas.
+ */
+export const DESTINOS_CADASTRADOS = Object.keys(REQUISITOS_POR_DESTINO);
+
+/** True se o destino tem cadastro (condicionais definidas). */
+export function destinoCadastrado(destino: string): boolean {
+  return Object.prototype.hasOwnProperty.call(REQUISITOS_POR_DESTINO, destino);
+}
+
 /** Templates do destino, com fallback para a base internacional. */
 export function requisitosDoDestino(destino: string): RequisitoDestinoTemplate[] {
   return REQUISITOS_POR_DESTINO[destino] ?? BASE_INTERNACIONAL;

@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { generateExpedicaoCodigo } from "@/lib/utils";
+import { DESTINOS_CADASTRADOS } from "@/lib/prontidao/requisitos-destino";
 import { criarExpedicao } from "./actions";
 import type { Tables } from "@/types/database";
 
@@ -104,7 +105,21 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
 
             <div className="space-y-1">
               <Label htmlFor="destino">Destino</Label>
-              <Input id="destino" placeholder="Peru" {...register("destino")} />
+              <Input
+                id="destino"
+                list="destinos-cadastrados"
+                placeholder="Peru, Egito… (ou digite outro)"
+                {...register("destino")}
+              />
+              <datalist id="destinos-cadastrados">
+                {DESTINOS_CADASTRADOS.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+              <p className="text-[11px] text-muted-foreground">
+                Cadastrados aparecem como sugestão (com condicionais próprias); outros destinos
+                caem nos requisitos internacionais padrão.
+              </p>
               {errors.destino && <p className="text-[11px] text-critico-600">{errors.destino.message}</p>}
             </div>
 
