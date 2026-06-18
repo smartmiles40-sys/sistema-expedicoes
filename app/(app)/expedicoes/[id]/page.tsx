@@ -1,13 +1,16 @@
 import {
   listPassageiros,
   listChecklist,
-  listDocumentos,
   getProntidaoExpedicao,
+  getExpedicao,
+  listUsuarios,
 } from "@/lib/data/expedicoes";
+import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate, daysUntil } from "@/lib/utils";
-import { CheckCircle2, FileText, Calendar, ShieldCheck } from "lucide-react";
+import { Calendar, ShieldCheck } from "lucide-react";
+import { DocumentosPendentesCard } from "./DocumentosPendentesCard";
 
 export default async function VisaoGeralPage({
   params,
@@ -15,11 +18,13 @@ export default async function VisaoGeralPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pax, checklist, docs, prontidao] = await Promise.all([
+  const [pax, checklist, prontidao, expedicao, usuarios, arquivos] = await Promise.all([
     listPassageiros(id),
     listChecklist(id),
-    listDocumentos(id),
     getProntidaoExpedicao(id),
+    getExpedicao(id),
+    listUsuarios(),
+    listArquivosExpedicao(id),
   ]);
 
   const proximosPrazos = checklist
@@ -32,13 +37,6 @@ export default async function VisaoGeralPage({
   const aptos = prontidao.filter((l) => l.resultado.prontidao === "Apto").length;
   const atencao = prontidao.filter((l) => l.resultado.prontidao === "Atenção").length;
   const bloqueados = prontidao.filter((l) => l.resultado.prontidao === "Bloqueado").length;
-
-  const docsPendentes = pax
-    .filter((p) => {
-      const d = docs.find((dd) => dd.passageiro_id === p.id);
-      return !p.passaporte || (d?.seguro_status !== "Emitido");
-    })
-    .slice(0, 5);
 
   const checklistConcluido = checklist.filter((c) => c.status === "Concluído").length;
 
@@ -98,42 +96,13 @@ export default async function VisaoGeralPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            Documentos pendentes (top 5)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1.5">
-          {docsPendentes.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2 inline-flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-vinculado-600" /> Tudo OK.
-            </p>
-          ) : (
-            docsPendentes.map((p) => {
-              const d = docs.find((dd) => dd.passageiro_id === p.id);
-              const faltas: string[] = [];
-              if (!p.passaporte) faltas.push("Passaporte");
-              if (d?.seguro_status !== "Emitido") faltas.push("Seguro");
-              return (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-md p-2 hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] truncate">{p.nome_completo}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {faltas.join(" · ")}
-                    </div>
-                  </div>
-                  <Badge variant="atencao">{faltas.length}</Badge>
-                </div>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
+      <DocumentosPendentesCard
+        expedicaoId={id}
+        destino={expedicao?.destino ?? ""}
+        prontidao={prontidao}
+        usuarios={usuarios}
+        arquivos={arquivos}
+      />
 
       <Card>
         <CardHeader>
