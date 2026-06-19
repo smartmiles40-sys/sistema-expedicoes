@@ -11,6 +11,7 @@ import {
   mockChecklistItens,
   mockDocumentos,
   mockQuartos,
+  mockAlocacoes,
   mockUsuarios,
   mockLinksExpedicao,
   mockPassageiroRequisitos,
@@ -30,6 +31,7 @@ import type {
   ChecklistItemRow,
   DocumentoRow,
   QuartoRow,
+  AlocacaoQuartoRow,
   UsuarioRow,
   LinkExpedicaoRow,
   EtapaChecklist,
@@ -201,6 +203,20 @@ export async function listQuartos(expedicaoId: string): Promise<QuartoRow[]> {
   const supabase = await getServerClient();
   const { data } = await supabase.from("quartos").select("*").eq("expedicao_id", expedicaoId);
   return (data ?? []) as QuartoRow[];
+}
+
+/** Alocações (passageiro↔quarto) de uma expedição — base do rooming por hotel. */
+export async function listAlocacoes(expedicaoId: string): Promise<AlocacaoQuartoRow[]> {
+  if (DEV_USE_MOCK_DATA) {
+    const ids = new Set(mockQuartos.filter((q) => q.expedicao_id === expedicaoId).map((q) => q.id));
+    return mockAlocacoes.filter((a) => ids.has(a.quarto_id));
+  }
+  const supabase = await getServerClient();
+  const { data: qs } = await supabase.from("quartos").select("id").eq("expedicao_id", expedicaoId);
+  const ids = ((qs ?? []) as { id: string }[]).map((q) => q.id);
+  if (!ids.length) return [];
+  const { data } = await supabase.from("passageiro_quarto").select("*").in("quarto_id", ids);
+  return (data ?? []) as AlocacaoQuartoRow[];
 }
 
 export async function listUsuarios(): Promise<UsuarioRow[]> {

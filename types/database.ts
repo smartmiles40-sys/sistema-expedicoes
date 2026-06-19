@@ -251,6 +251,14 @@ export type QuartoRow = {
   updated_at: string;
 }
 
+/** Alocação muitos-para-muitos: um passageiro pode ter um quarto por hotel/trecho. */
+export type AlocacaoQuartoRow = {
+  id: string;
+  passageiro_id: string;
+  quarto_id: string;
+  created_at: string;
+}
+
 export type CustoRow = {
   id: string;
   expedicao_id: string;
@@ -354,6 +362,7 @@ export type Database = {
       grupos_expedicao: { Row: GrupoExpedicaoRow; Insert: Partial<GrupoExpedicaoRow> & Pick<GrupoExpedicaoRow, "expedicao_id" | "nome">; Update: Partial<GrupoExpedicaoRow> };
       arquivos: { Row: ArquivoRow; Insert: Partial<ArquivoRow> & Pick<ArquivoRow, "expedicao_id" | "nome" | "storage_path">; Update: Partial<ArquivoRow> };
       quartos: { Row: QuartoRow; Insert: Partial<QuartoRow> & Pick<QuartoRow, "expedicao_id" | "numero" | "tipo">; Update: Partial<QuartoRow> };
+      passageiro_quarto: { Row: AlocacaoQuartoRow; Insert: Partial<AlocacaoQuartoRow> & Pick<AlocacaoQuartoRow, "passageiro_id" | "quarto_id">; Update: Partial<AlocacaoQuartoRow> };
       custos: { Row: CustoRow; Insert: Partial<CustoRow> & Pick<CustoRow, "expedicao_id" | "categoria" | "servico" | "moeda" | "valor_planejado">; Update: Partial<CustoRow> };
       pagamentos: { Row: PagamentoRow; Insert: Partial<PagamentoRow> & Pick<PagamentoRow, "custo_id" | "servico" | "moeda" | "valor_total">; Update: Partial<PagamentoRow> };
       checklist_itens: { Row: ChecklistItemRow; Insert: Partial<ChecklistItemRow> & Pick<ChecklistItemRow, "expedicao_id" | "etapa" | "tarefa">; Update: Partial<ChecklistItemRow> };

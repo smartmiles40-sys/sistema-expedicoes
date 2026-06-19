@@ -415,7 +415,14 @@ export const mockQuartos: Tables<"quartos">[] = persist("mockQuartos", () => [
   { id: "q002", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "102", tipo: "Twin", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
   { id: "q003", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "103", tipo: "Triplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
   { id: "q004", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "201", tipo: "Líder", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  // Segundo hotel/trecho (Lima) — pra testar rooming por hotel.
+  { id: "q005", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "501", tipo: "Duplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q006", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "502", tipo: "Triplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q007", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "503", tipo: "Twin", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
 ]);
+
+/** Alocações passageiro↔quarto (M2M): um quarto por hotel/trecho. */
+export const mockAlocacoes: Tables<"passageiro_quarto">[] = persist("mockAlocacoes", () => []);
 
 export const mockCustos: Tables<"custos">[] = persist("mockCustos", () => [
   { id: "c0001", expedicao_id: "e0000000-0000-0000-0000-000000000001", categoria: "Hotelaria", servico: "Hospedagem Cusco 3 noites", fornecedor_id: "f0000000-0000-0000-0000-000000000003", cidade: "Cusco", data_servico: futureDate(95), moeda: "USD", valor_planejado: 5200, valor_realizado: 5350, cambio_aplicado: 5.20, valor_planejado_brl: 27040, valor_realizado_brl: 27820, status: "Programado", pago_por: null, observacoes: null, created_at: pastDate(40), updated_at: pastDate(5) },

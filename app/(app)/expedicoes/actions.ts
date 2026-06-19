@@ -7,6 +7,7 @@ import {
   mockExpedicoes,
   mockPassageiros,
   mockQuartos,
+  mockAlocacoes,
   mockCustos,
   mockPagamentos,
   mockChecklistItens,
@@ -1416,18 +1417,97 @@ export async function excluirQuarto(
     const idx = mockQuartos.findIndex((q) => q.id === quartoId);
     if (idx === -1) return { ok: false, error: "Quarto não encontrado" };
     mockQuartos.splice(idx, 1);
-    // Desvincula passageiros
+    // Desvincula passageiros (coluna legada + alocações M2M)
     for (const p of mockPassageiros) {
       if (p.quarto_id === quartoId) p.quarto_id = null;
+    }
+    for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
+      if (mockAlocacoes[i].quarto_id === quartoId) mockAlocacoes.splice(i, 1);
     }
     revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
     return { ok: true };
   }
 
   const supabase = await getServerClient();
-  // Desvincula passageiros antes
+  // Desvincula passageiros antes (coluna legada + alocações M2M)
   await supabase.from("passageiros").update({ quarto_id: null }).eq("quarto_id", quartoId);
+  await supabase.from("passageiro_quarto").delete().eq("quarto_id", quartoId);
   const { error } = await supabase.from("quartos").delete().eq("id", quartoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
+// --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
+type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null };
+/** Chave do "trecho/hotel": mesmo hotel/cidade + mesmas datas. */
+function trechoKey(q: QuartoTrecho): string {
+  return `${q.hotel_cidade ?? ""}|${q.check_in ?? ""}|${q.check_out ?? ""}`;
+}
+
+/**
+ * Aloca um passageiro a um quarto. Cada passageiro só pode ter UM quarto por
+ * hotel/trecho, então remove antes qualquer alocação dele em outro quarto do
+ * mesmo trecho (mover de quarto dentro do mesmo hotel).
+ */
+export async function alocarPassageiro(
+  passageiroId: string,
+  quartoId: string,
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const alvo = mockQuartos.find((q) => q.id === quartoId);
+    if (!alvo) return { ok: false, error: "Quarto não encontrado" };
+    const tk = trechoKey(alvo);
+    const idsTrecho = new Set(
+      mockQuartos.filter((q) => q.expedicao_id === expedicaoId && trechoKey(q) === tk).map((q) => q.id),
+    );
+    for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
+      if (mockAlocacoes[i].passageiro_id === passageiroId && idsTrecho.has(mockAlocacoes[i].quarto_id)) {
+        mockAlocacoes.splice(i, 1);
+      }
+    }
+    mockAlocacoes.push({ id: genId("al"), passageiro_id: passageiroId, quarto_id: quartoId, created_at: new Date().toISOString() });
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data: alvo } = await supabase
+    .from("quartos").select("hotel_cidade, check_in, check_out").eq("id", quartoId).maybeSingle();
+  if (!alvo) return { ok: false, error: "Quarto não encontrado" };
+  const { data: qs } = await supabase
+    .from("quartos").select("id, hotel_cidade, check_in, check_out").eq("expedicao_id", expedicaoId);
+  const tk = trechoKey(alvo as QuartoTrecho);
+  const idsTrecho = ((qs ?? []) as (QuartoTrecho & { id: string })[])
+    .filter((q) => trechoKey(q) === tk).map((q) => q.id);
+  if (idsTrecho.length) {
+    await supabase.from("passageiro_quarto").delete().eq("passageiro_id", passageiroId).in("quarto_id", idsTrecho);
+  }
+  const { error } = await supabase.from("passageiro_quarto").insert({ passageiro_id: passageiroId, quarto_id: quartoId });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
+/** Remove a alocação de um passageiro num quarto (mandar pra "Sem quarto" do trecho). */
+export async function desalocarPassageiro(
+  passageiroId: string,
+  quartoId: string,
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
+      if (mockAlocacoes[i].passageiro_id === passageiroId && mockAlocacoes[i].quarto_id === quartoId) {
+        mockAlocacoes.splice(i, 1);
+      }
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true };
+  }
+  const supabase = await getServerClient();
+  const { error } = await supabase
+    .from("passageiro_quarto").delete().eq("passageiro_id", passageiroId).eq("quarto_id", quartoId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
   return { ok: true };
