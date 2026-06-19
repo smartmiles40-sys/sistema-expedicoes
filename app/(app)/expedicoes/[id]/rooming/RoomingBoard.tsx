@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
@@ -21,6 +21,7 @@ import { formatDate, cn } from "@/lib/utils";
 import type { PassageiroRow, QuartoRow, AlocacaoQuartoRow } from "@/types/database";
 import { toast } from "sonner";
 import { NovoQuartoDrawer } from "./NovoQuartoDrawer";
+import { QuartosAutomaticosDrawer } from "./QuartosAutomaticosDrawer";
 import { EditarQuartoDrawer } from "./EditarQuartoDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -57,6 +58,7 @@ type Trecho = {
 export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: Props) {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [autoOpen, setAutoOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
@@ -289,6 +291,9 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
             >
               <Download className="h-3 w-3" /> Exportar Excel
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setAutoOpen(true)}>
+              <Wand2 className="h-3 w-3" /> Criar quartos automáticos
+            </Button>
             <Button size="sm" onClick={() => setDrawerOpen(true)}>
               <Plus className="h-3 w-3" /> Novo quarto
             </Button>
@@ -421,6 +426,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
         )}
 
         <NovoQuartoDrawer expedicaoId={expedicaoId} open={drawerOpen} onOpenChange={setDrawerOpen} />
+        <QuartosAutomaticosDrawer expedicaoId={expedicaoId} open={autoOpen} onOpenChange={setAutoOpen} />
         <EditarQuartoDrawer
           expedicaoId={expedicaoId}
           quarto={quartoEditando}

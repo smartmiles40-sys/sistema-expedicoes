@@ -808,6 +808,74 @@ export async function criarQuarto(
   return { ok: true, id: (r.data as { id: string }).id };
 }
 
+const quartosAutoSchema = z.object({
+  expedicao_id: z.string().min(1),
+  hotel_cidade: z.string().min(1, "Informe o hotel/cidade"),
+  check_in: z.string().min(1, "Informe o check-in"),
+  check_out: z.string().min(1, "Informe o check-out"),
+  tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
+  quantidade: z.number().int().min(1, "Mínimo 1 quarto").max(100, "Máximo 100 por vez"),
+});
+
+/**
+ * Cria N quartos de um mesmo tipo para um hotel/trecho (mesmo hotel + datas).
+ * Numera automaticamente, continuando a partir dos quartos já existentes nesse
+ * trecho (ex.: já há 3 → novos viram 4, 5, 6…).
+ */
+export async function criarQuartosAutomaticos(
+  input: z.infer<typeof quartosAutoSchema>,
+): Promise<{ ok: true; criados: number } | { ok: false; error: string }> {
+  const parsed = quartosAutoSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  const d = parsed.data;
+  const now = new Date().toISOString();
+  const mesmoTrecho = (q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }) =>
+    q.hotel_cidade === d.hotel_cidade && q.check_in === d.check_in && q.check_out === d.check_out;
+
+  if (DEV_USE_MOCK_DATA) {
+    const base = mockQuartos.filter((q) => q.expedicao_id === d.expedicao_id && mesmoTrecho(q)).length;
+    for (let i = 0; i < d.quantidade; i++) {
+      mockQuartos.push({
+        id: genId("q"),
+        expedicao_id: d.expedicao_id,
+        numero: String(base + i + 1),
+        tipo: d.tipo,
+        hotel_cidade: d.hotel_cidade,
+        check_in: d.check_in,
+        check_out: d.check_out,
+        status: "ativo",
+        observacoes: null,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+    revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
+    return { ok: true, criados: d.quantidade };
+  }
+
+  const supabase = await getServerClient();
+  const { data: existentes } = await supabase
+    .from("quartos").select("id")
+    .eq("expedicao_id", d.expedicao_id)
+    .eq("hotel_cidade", d.hotel_cidade)
+    .eq("check_in", d.check_in)
+    .eq("check_out", d.check_out);
+  const base = (existentes ?? []).length;
+  const rows = Array.from({ length: d.quantidade }, (_, i) => ({
+    expedicao_id: d.expedicao_id,
+    numero: String(base + i + 1),
+    tipo: d.tipo,
+    hotel_cidade: d.hotel_cidade,
+    check_in: d.check_in,
+    check_out: d.check_out,
+    status: "ativo",
+  }));
+  const { error } = await supabase.from("quartos").insert(rows);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
+  return { ok: true, criados: d.quantidade };
+}
+
 const novoCustoSchema = z.object({
   expedicao_id: z.string().min(1),
   categoria: z.enum([
