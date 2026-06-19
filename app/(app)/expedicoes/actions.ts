@@ -1280,6 +1280,13 @@ export async function excluirExpedicao(
   return { ok: true };
 }
 
+/**
+ * Remove um passageiro de UMA expedição (não da base). Se a pessoa estiver em
+ * outras expedições (mesma identidade por CPF/etc.), só apaga esta linha. Se
+ * esta for a única presença dela, converte a linha em avulso (expedicao_id =
+ * null) — assim a pessoa CONTINUA NO SISTEMA, na base global. Para apagar a
+ * pessoa por completo, use `excluirPessoa` (perfil global).
+ */
 export async function excluirPassageiro(
   passageiroId: string,
   expedicaoId: string,
@@ -1287,18 +1294,57 @@ export async function excluirPassageiro(
   if (DEV_USE_MOCK_DATA) {
     const idx = mockPassageiros.findIndex((p) => p.id === passageiroId);
     if (idx === -1) return { ok: false, error: "Passageiro não encontrado" };
-    mockPassageiros.splice(idx, 1);
+    const chave = chaveIdentidade(mockPassageiros[idx]);
+    const temOutras = mockPassageiros.some((p) => p.id !== passageiroId && chaveIdentidade(p) === chave);
+    if (temOutras) {
+      mockPassageiros.splice(idx, 1);
+    } else {
+      // Última presença: vira avulso (mantém na base global).
+      mockPassageiros[idx].expedicao_id = null;
+      mockPassageiros[idx].grupo_id = null;
+      mockPassageiros[idx].quarto_id = null;
+      mockPassageiros[idx].updated_at = new Date().toISOString();
+      for (let i = mockPassageiroRequisitos.length - 1; i >= 0; i--) {
+        if (mockPassageiroRequisitos[i].passageiro_id === passageiroId) mockPassageiroRequisitos.splice(i, 1);
+      }
+    }
     revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
     revalidatePath(`/expedicoes/${expedicaoId}`);
+    revalidatePath("/passageiros");
     revalidatePath("/avisos");
     return { ok: true };
   }
 
   const supabase = await getServerClient();
-  const { error } = await supabase.from("passageiros").delete().eq("id", passageiroId);
-  if (error) return { ok: false, error: error.message };
+  const { data: alvo } = await supabase
+    .from("passageiros")
+    .select("id, cpf, bitrix_contact_id, email, nome_completo")
+    .eq("id", passageiroId)
+    .maybeSingle();
+  if (!alvo) return { ok: false, error: "Passageiro não encontrado" };
+  const chave = chaveIdentidade(alvo as PassageiroRow);
+  const { data: todos } = await supabase
+    .from("passageiros")
+    .select("id, cpf, bitrix_contact_id, email, nome_completo");
+  const temOutras = ((todos ?? []) as PassageiroRow[]).some(
+    (p) => p.id !== passageiroId && chaveIdentidade(p) === chave,
+  );
+
+  if (temOutras) {
+    const { error } = await supabase.from("passageiros").delete().eq("id", passageiroId);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    // Última presença: remove os requisitos (eram da expedição) e converte em avulso.
+    await supabase.from("passageiro_requisitos").delete().eq("passageiro_id", passageiroId);
+    const { error } = await supabase
+      .from("passageiros")
+      .update({ expedicao_id: null, grupo_id: null, quarto_id: null })
+      .eq("id", passageiroId);
+    if (error) return { ok: false, error: error.message };
+  }
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/passageiros");
   revalidatePath("/avisos");
   return { ok: true };
 }

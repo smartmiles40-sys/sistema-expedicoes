@@ -271,12 +271,12 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOp
         <DrawerFooter>
           {passageiro && (
             <ConfirmDeleteButton
-              triggerLabel="Excluir passageiro"
+              triggerLabel="Remover desta expedição"
               triggerClassName="mr-auto"
-              ariaLabel="Excluir passageiro"
-              title={`Excluir "${passageiro.nome_completo}"?`}
-              description="Esta ação não pode ser desfeita. Arquivos vinculados continuarão no storage."
-              successMessage="Passageiro excluído"
+              ariaLabel="Remover passageiro desta expedição"
+              title={`Remover "${passageiro.nome_completo}" desta expedição?`}
+              description="Remove o passageiro apenas desta expedição. A pessoa continua no sistema (na base global e em outras expedições, se houver). Para apagá-la de vez, use o perfil em Passageiros."
+              successMessage="Passageiro removido desta expedição"
               onConfirm={() => excluirPassageiro(passageiro.id, expedicaoId)}
               onDeleted={() => {
                 onOpenChange(false);
