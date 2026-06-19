@@ -30,6 +30,18 @@ export const REQUISITOS_DE_COLUNA: ReadonlySet<TipoRequisito> = new Set([
   "Dados Pessoais",
 ]);
 
+/**
+ * Requisitos que NÃO se aplicam a passageiros do tipo "Líder" (vai a trabalho,
+ * não-pagante): contrato, seguro, aéreo internacional e vacina. Ficam como
+ * "não necessário" (semáforo N/A) e não geram atenção/bloqueio.
+ */
+export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
+  "Contrato",
+  "Seguro",
+  "Aéreo Internacional",
+  "Vacina",
+]);
+
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
 
 export type ChecagemProntidao = {
@@ -176,6 +188,18 @@ export function avaliarProntidao(params: {
   }
 
   const checagens: ChecagemProntidao[] = templates.map((t) => {
+    // Líder não precisa de contrato, seguro, aéreo internacional nem vacina.
+    if (passageiro.tipo === "Líder" && DISPENSAVEIS_LIDER.has(t.tipo)) {
+      return {
+        tipo: t.tipo,
+        descricao: t.descricao,
+        obrigatoriedade: t.obrigatoriedade,
+        bloqueia_embarque: t.bloqueia_embarque,
+        semaforo: "na" as Semaforo,
+        detalhe: "Não necessário (líder)",
+        requisito_id: porTipo.get(t.tipo)?.id ?? null,
+      };
+    }
     if (REQUISITOS_DE_COLUNA.has(t.tipo)) {
       let semaforo: Semaforo;
       switch (t.tipo) {
