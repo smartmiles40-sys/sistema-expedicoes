@@ -497,8 +497,8 @@ const novoPassageiroSchema = z.object({
   nome_completo: z.string().min(2, "Nome completo obrigatório"),
   tipo: z.enum(["Pagante", "Cortesia", "Líder"]),
   status_reserva: z.enum(["Lead", "Pré-reserva", "Confirmado", "Cancelado"]).default("Lead"),
-  cpf: z.string().refine(cpfValido, "CPF inválido ou ausente"),
-  data_nascimento: z.string().min(1, "Data de nascimento obrigatória"),
+  cpf: z.string().optional().nullable().refine((v) => !v || cpfValido(v), "CPF inválido"),
+  data_nascimento: z.string().optional().nullable(),
   passaporte: z.string().optional().nullable(),
   validade_passaporte: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
@@ -515,7 +515,7 @@ export async function criarPassageiro(
 
   // Dedup por CPF: não permite o mesmo CPF (ignorando pontuação) duas vezes na
   // mesma expedição — o CPF é a chave de identidade do passageiro.
-  const cpfNovo = cpfDigitos(d.cpf);
+  const cpfNovo = cpfDigitos(d.cpf ?? null);
   if (cpfNovo) {
     const jaExiste = DEV_USE_MOCK_DATA
       ? mockPassageiros.some((p) => p.expedicao_id === d.expedicao_id && cpfDigitos(p.cpf) === cpfNovo)

@@ -56,9 +56,9 @@ export function ImportarPassageirosDrawer(props: Props) {
   }
 
   function carregarTexto(texto: string) {
-    // Cadastro exige CPF válido + data de nascimento (modo estrito).
+    // Só o nome é obrigatório (CPF e nascimento são opcionais na importação).
     // Passageiro importado entra como "Confirmado" (salvo status explícito no CSV).
-    setParse(parsePassageirosCSV(texto, { exigirObrigatorios: true, statusPadrao: "Confirmado" }));
+    setParse(parsePassageirosCSV(texto, { exigirObrigatorios: false, statusPadrao: "Confirmado" }));
   }
 
   async function onArquivo(e: React.ChangeEvent<HTMLInputElement>) {
