@@ -1765,7 +1765,9 @@ const importRowSchema = z.object({
   nome_completo: z.string().min(2),
   tipo: z.enum([...TIPO_PASSAGEIRO] as [TipoPassageiroEnum, ...TipoPassageiroEnum[]]),
   status_reserva: z.enum([...STATUS_RESERVA] as [StatusReservaEnum, ...StatusReservaEnum[]]),
-  cpf: z.string().nullable().optional().refine((v) => !v || cpfValido(v), { message: "CPF inválido" }),
+  // Importação aceita qualquer CPF (inclusive inválido/incompleto) — só o nome é
+  // obrigatório. O dedup por CPF segue funcionando por dígitos quando há CPF.
+  cpf: z.string().nullable().optional(),
   passaporte: z.string().nullable().optional(),
   validade_passaporte: z.string().nullable().optional(),
   data_nascimento: z.string().nullable().optional(),
