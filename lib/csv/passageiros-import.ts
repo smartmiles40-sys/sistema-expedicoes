@@ -180,10 +180,10 @@ function coerceTipo(valor: string): TipoPassageiro {
   return achado ?? "Pagante";
 }
 
-function coerceStatus(valor: string): StatusReserva {
+function coerceStatus(valor: string, padrao: StatusReserva = "Lead"): StatusReserva {
   const n = normalizar(valor);
   const achado = STATUS_RESERVA.find((s) => normalizar(s) === n);
-  return achado ?? "Lead";
+  return achado ?? padrao;
 }
 
 /**
@@ -192,9 +192,10 @@ function coerceStatus(valor: string): StatusReserva {
  */
 export function parsePassageirosCSV(
   texto: string,
-  opcoes?: { exigirObrigatorios?: boolean },
+  opcoes?: { exigirObrigatorios?: boolean; statusPadrao?: StatusReserva },
 ): ResultadoParse {
   const exigir = opcoes?.exigirObrigatorios ?? false;
+  const statusPadrao = opcoes?.statusPadrao ?? "Lead";
   const grade = parseCSV(texto);
   if (grade.length === 0) {
     return { linhas: [], erroGeral: "Arquivo vazio.", colunasReconhecidas: [] };
@@ -252,7 +253,7 @@ export function parsePassageirosCSV(
       email: emailRaw || null,
       telefone: get("telefone") || null,
       tipo: coerceTipo(get("tipo")),
-      status_reserva: coerceStatus(get("status_reserva")),
+      status_reserva: coerceStatus(get("status_reserva"), statusPadrao),
       observacoes: get("observacoes") || null,
       valor_contratado_brl: contratado.num,
       valor_pago_brl: pago.num,
