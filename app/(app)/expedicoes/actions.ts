@@ -512,6 +512,26 @@ export async function criarPassageiro(
   const parsed = novoPassageiroSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
+
+  // Dedup por CPF: não permite o mesmo CPF (ignorando pontuação) duas vezes na
+  // mesma expedição — o CPF é a chave de identidade do passageiro.
+  const cpfNovo = cpfDigitos(d.cpf);
+  if (cpfNovo) {
+    const jaExiste = DEV_USE_MOCK_DATA
+      ? mockPassageiros.some((p) => p.expedicao_id === d.expedicao_id && cpfDigitos(p.cpf) === cpfNovo)
+      : await (async () => {
+          const supabase = await getServerClient();
+          const { data } = await supabase
+            .from("passageiros")
+            .select("cpf")
+            .eq("expedicao_id", d.expedicao_id);
+          return (data ?? []).some((p) => cpfDigitos(p.cpf) === cpfNovo);
+        })();
+    if (jaExiste) {
+      return { ok: false, error: "Já existe um passageiro com este CPF nesta expedição." };
+    }
+  }
+
   const payload = {
     expedicao_id: d.expedicao_id,
     nome_completo: d.nome_completo,
@@ -592,6 +612,25 @@ export async function criarPassageiroAvulso(
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
   if (d.cpf && !cpfValido(d.cpf)) return { ok: false, error: "CPF inválido" };
+
+  // Dedup por CPF: se a pessoa (CPF) já existe em qualquer área do sistema
+  // (avulso ou em alguma expedição), não cria um avulso duplicado.
+  const cpfNovo = cpfDigitos(d.cpf ?? null);
+  if (cpfNovo) {
+    const jaExiste = DEV_USE_MOCK_DATA
+      ? mockPassageiros.some((p) => cpfDigitos(p.cpf) === cpfNovo)
+      : await (async () => {
+          const supabase = await getServerClient();
+          const { data } = await supabase
+            .from("passageiros")
+            .select("cpf")
+            .not("cpf", "is", null);
+          return (data ?? []).some((p) => cpfDigitos(p.cpf) === cpfNovo);
+        })();
+    if (jaExiste) {
+      return { ok: false, error: "Já existe um passageiro com este CPF no sistema." };
+    }
+  }
 
   const payload = {
     expedicao_id: null,
