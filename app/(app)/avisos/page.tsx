@@ -1,6 +1,9 @@
 import { getAlertasOperacionais } from "@/lib/data/expedicoes";
 import { AvisosLista } from "./AvisosLista";
 
+// Avisos calculados ao vivo — sempre frescos (evita página estática desatualizada).
+export const dynamic = "force-dynamic";
+
 export default async function AvisosPage() {
   const alertas = await getAlertasOperacionais();
 

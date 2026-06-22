@@ -3,6 +3,9 @@ import { listExpedicoesComAgregados } from "@/lib/data/expedicoes";
 import { listArquivosDePassageiros } from "@/lib/data/arquivos";
 import { PassageirosGlobalTabela } from "./PassageirosGlobalTabela";
 
+// Base consolidada ao vivo — sempre fresca (evita lista estática desatualizada).
+export const dynamic = "force-dynamic";
+
 export default async function PassageirosGlobalPage() {
   const [pessoas, expedicoes, arquivos] = await Promise.all([
     listPessoas(),
