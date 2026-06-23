@@ -46,3 +46,6 @@ next-env.d.ts
 
 # uploads do modo mock (arquivos de teste local) — NUNCA versionar.
 /.dev-uploads/
+
+# Scripts one-off: ignorar JSONs intermediarios (contem dados pessoais)
+scripts/_*.json
