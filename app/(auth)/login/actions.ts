@@ -1,26 +1,29 @@
 "use server";
-import { headers } from "next/headers";
 import { z } from "zod";
-import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
 import { createClient } from "@/lib/supabase/server";
 
-const schema = z.object({ email: z.string().email() });
+const schema = z.object({
+  email: z.string().email("E-mail inválido"),
+  senha: z.string().min(1, "Informe a senha"),
+});
 
-export async function sendMagicLink(email: string): Promise<{ ok: boolean; error?: string }> {
-  const parsed = schema.safeParse({ email });
-  if (!parsed.success) return { ok: false, error: "Email inválido" };
+/**
+ * Login por e-mail + senha (Supabase Auth). As contas são criadas pelo admin no
+ * painel do Supabase — não há cadastro aberto aqui. A sessão é gravada nos
+ * cookies pelo client de servidor; o `(app)/layout` exige sessão (getCurrentUser).
+ */
+export async function entrarComSenha(
+  email: string,
+  senha: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = schema.safeParse({ email, senha });
+  if (!parsed.success) return { ok: false, error: "Informe um e-mail e uma senha válidos." };
 
-  if (DEV_AUTH_BYPASS) {
-    return { ok: true };
-  }
-
-  const h = await headers();
-  const origin = h.get("origin") ?? "http://localhost:3000";
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
-    options: { emailRedirectTo: `${origin}/auth/callback` },
+    password: parsed.data.senha,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: "E-mail ou senha inválidos." };
   return { ok: true };
 }
