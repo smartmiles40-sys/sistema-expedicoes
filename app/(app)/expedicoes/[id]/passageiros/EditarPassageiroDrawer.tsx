@@ -30,7 +30,9 @@ import { TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
 import { Drive } from "@/components/arquivos/Drive";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
-import type { ArquivoRow, PassageiroRow } from "@/types/database";
+import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
+import type { ArquivoRow, PassageiroRow, Tables } from "@/types/database";
+import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 
 const schema = z.object({
   nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
@@ -55,10 +57,13 @@ interface Props {
   expedicaoId: string;
   passageiro: PassageiroRow | null;
   arquivos: ArquivoRow[];
+  destino: string;
+  prontidao: ProntidaoPassageiro | null;
+  usuarios: Tables<"usuarios">[];
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOpenChange }: Props) {
+export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, prontidao, usuarios, onOpenChange }: Props) {
   const router = useRouter();
   const open = passageiro !== null;
 
@@ -249,6 +254,26 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, onOp
               />
             </div>
           </form>
+
+          {/* Prontidão de embarque — ver e editar sem sair do perfil */}
+          {passageiro && prontidao && (
+            <div className="mt-5 pt-4 border-t border-border space-y-2">
+              <div>
+                <h3 className="text-sm font-semibold">Prontidão de embarque</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Requisitos do destino — clique numa exigência para editar ou anexar.
+                </p>
+              </div>
+              <ProntidaoConteudo
+                expedicaoId={expedicaoId}
+                destino={destino}
+                item={prontidao}
+                usuarios={usuarios}
+                arquivos={arquivos}
+                showBadge
+              />
+            </div>
+          )}
 
           {/* Drive — arquivos do passageiro */}
           {passageiro && (

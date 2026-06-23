@@ -44,7 +44,8 @@ export type TipoRequisito =
   | "Contrato"
   | "Autorização de Menor"
   | "Pagamento"
-  | "Dados Pessoais";
+  | "Dados Pessoais"
+  | "Documento Pessoal";
 export type Obrigatoriedade = "Obrigatório" | "Condicional" | "Recomendado";
 export type StatusRequisito =
   | "Pendente"

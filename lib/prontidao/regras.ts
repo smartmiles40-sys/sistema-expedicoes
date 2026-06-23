@@ -42,6 +42,15 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
   "Vacina",
 ]);
 
+/**
+ * Requisitos que só são "ok" com o ARQUIVO de evidência anexado — não basta
+ * mudar o status. Hoje: a foto do documento pessoal (RG/CNH/passaporte).
+ * A prontidão lê `arquivo_id` da instância em passageiro_requisitos.
+ */
+export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
+  "Documento Pessoal",
+]);
+
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
 
 export type ChecagemProntidao = {
@@ -151,6 +160,28 @@ function checarInstancia(
   return r.bloqueia_embarque ? "bloqueio" : "atencao";
 }
 
+/**
+ * Requisito que exige evidência anexada (ex.: foto do documento pessoal):
+ * só fica "ok" quando há um arquivo vinculado. Dispensado segue valendo como ok;
+ * Reprovado/Vencido derrubam.
+ */
+function checarDocumentoAnexo(r: PassageiroRequisitoRow): Semaforo {
+  if (r.status === "Dispensado") return "ok";
+  if (r.status === "Reprovado" || r.status === "Vencido") {
+    return r.bloqueia_embarque ? "bloqueio" : "atencao";
+  }
+  if (r.arquivo_id) return "ok";
+  return r.bloqueia_embarque ? "bloqueio" : "atencao";
+}
+
+function detalheAnexo(r: PassageiroRequisitoRow | undefined): string {
+  if (!r) return "Falta anexar o documento";
+  if (r.status === "Dispensado") return "Dispensado";
+  if (r.status === "Reprovado") return "Documento reprovado — reenviar";
+  if (r.arquivo_id) return "Documento anexado";
+  return "Falta anexar o documento";
+}
+
 function detalheInstancia(r: PassageiroRequisitoRow | undefined, sem: Semaforo): string {
   if (!r) return "Ainda não iniciado";
   if (sem === "ok") return r.status + (r.validade ? ` (val. ${r.validade.slice(0, 10)})` : "");
@@ -226,8 +257,11 @@ export function avaliarProntidao(params: {
       };
     }
     const inst = porTipo.get(t.tipo);
+    const exigeAnexo = REQUISITOS_COM_ANEXO_OBRIGATORIO.has(t.tipo);
     const semaforo: Semaforo = inst
-      ? checarInstancia(inst, expedicao)
+      ? exigeAnexo
+        ? checarDocumentoAnexo(inst)
+        : checarInstancia(inst, expedicao)
       : t.bloqueia_embarque
         ? "bloqueio"
         : "atencao";
@@ -237,7 +271,7 @@ export function avaliarProntidao(params: {
       obrigatoriedade: inst?.obrigatoriedade ?? t.obrigatoriedade,
       bloqueia_embarque: inst?.bloqueia_embarque ?? t.bloqueia_embarque,
       semaforo,
-      detalhe: detalheInstancia(inst, semaforo),
+      detalhe: exigeAnexo ? detalheAnexo(inst) : detalheInstancia(inst, semaforo),
       requisito_id: inst?.id ?? null,
     };
   });

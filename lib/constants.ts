@@ -162,6 +162,7 @@ export const TIPO_REQUISITO = [
   "Autorização de Menor",
   "Pagamento",
   "Dados Pessoais",
+  "Documento Pessoal",
 ] as const;
 export type TipoRequisito = (typeof TIPO_REQUISITO)[number];
 

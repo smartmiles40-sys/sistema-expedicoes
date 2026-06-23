@@ -100,11 +100,19 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     return true;
   });
 
+  // Líderes primeiro; dentro de cada grupo, mantém a ordem de cadastro (indiceById).
+  const ordenados = [...filtrados].sort((a, b) => {
+    const liderA = a.tipo === "Líder" ? 0 : 1;
+    const liderB = b.tipo === "Líder" ? 0 : 1;
+    if (liderA !== liderB) return liderA - liderB;
+    return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
+  });
+
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
 
   function exportarCSV() {
     const header = ["Nome", "Tipo", "CPF", "Passaporte", "Validade", "Email", "Telefone", "Status", "Quarto"];
-    const linhas = filtrados.map((p) => [
+    const linhas = ordenados.map((p) => [
       p.nome_completo,
       p.tipo,
       p.cpf ?? "",
@@ -194,14 +202,14 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
               </tr>
             </thead>
             <tbody>
-              {filtrados.length === 0 ? (
+              {ordenados.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="text-center text-muted-foreground py-8">
                     Nenhum passageiro encontrado.
                   </td>
                 </tr>
               ) : (
-                filtrados.map((p) => {
+                ordenados.map((p) => {
                   const validadeDias = daysUntil(p.validade_passaporte);
                   const embarqueDias = daysUntil(dataEmbarque);
                   const validadeAlerta = validadeDias != null && embarqueDias != null
@@ -319,6 +327,9 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         expedicaoId={expedicaoId}
         passageiro={passageiroEditando}
         arquivos={arquivos}
+        destino={destino}
+        prontidao={passageiroEditando ? prontidaoByPax.get(passageiroEditando.id) ?? null : null}
+        usuarios={usuarios}
         onOpenChange={(open) => !open && setEditandoId(null)}
       />
 

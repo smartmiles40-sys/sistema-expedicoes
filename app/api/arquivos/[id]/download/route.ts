@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 const BUCKET = "arquivos-expedicoes";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
   if (!DEV_AUTH_BYPASS) {
@@ -18,6 +18,8 @@ export async function GET(
     if (!u) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await ctx.params;
+  // ?inline=1 → exibe no navegador (preview) em vez de forçar o download.
+  const inline = req.nextUrl.searchParams.get("inline") === "1";
 
   // Modo mock: serve o arquivo direto do disco (inline pra pré-visualizar imagens).
   if (DEV_USE_MOCK_DATA) {
@@ -42,7 +44,7 @@ export async function GET(
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(r.storage_path, 60 * 5, { download: r.nome });
+    .createSignedUrl(r.storage_path, 60 * 5, inline ? {} : { download: r.nome });
   if (error || !data?.signedUrl) {
     return NextResponse.json({ ok: false, error: error?.message ?? "falha" }, { status: 500 });
   }

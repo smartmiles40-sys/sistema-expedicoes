@@ -15,7 +15,7 @@ import { Drive } from "@/components/arquivos/Drive";
 import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
-import type { Semaforo } from "@/lib/prontidao/regras";
+import { REQUISITOS_COM_ANEXO_OBRIGATORIO, type Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type { PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables } from "@/types/database";
 
@@ -41,6 +41,58 @@ interface Props {
  * aba "Prontidão" — agora acessível pela coluna da tabela de Passageiros.
  */
 export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, arquivos, onClose }: Props) {
+  if (!item) return null;
+  return (
+    <Drawer open onOpenChange={(v) => !v && onClose()}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-vinculado-600" />
+            {item.passageiro.nome_completo}
+          </DrawerTitle>
+          <DrawerDescription className="flex items-center gap-2">
+            Prontidão de embarque
+            <Badge variant={COR_PRONTIDAO[item.resultado.prontidao]}>{item.resultado.prontidao}</Badge>
+          </DrawerDescription>
+        </DrawerHeader>
+        <DrawerBody>
+          <ProntidaoConteudo
+            expedicaoId={expedicaoId}
+            destino={destino}
+            item={item}
+            usuarios={usuarios}
+            arquivos={arquivos}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+/**
+ * Conteúdo da prontidão (lista de exigências + edição/anexo). Reutilizável:
+ * aparece no ProntidaoPaxDrawer (badge da tabela) e embutido no
+ * EditarPassageiroDrawer (clique no nome do passageiro). Os sub-drawers de
+ * edição (Requisito/Contrato) portalam pro body, então funcionam aninhados.
+ */
+export function ProntidaoConteudo({
+  expedicaoId,
+  destino,
+  item,
+  usuarios,
+  arquivos,
+  showBadge = false,
+}: {
+  expedicaoId: string;
+  destino: string;
+  item: ProntidaoPassageiro;
+  usuarios: Tables<"usuarios">[];
+  arquivos: ArquivoRow[];
+  showBadge?: boolean;
+}) {
   const router = useRouter();
   const [editando, setEditando] = React.useState<PassageiroRequisitoRow | null>(null);
   const [contratoOpen, setContratoOpen] = React.useState(false);
@@ -51,7 +103,6 @@ export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, arqui
     [usuarios],
   );
 
-  if (!item) return null;
   const { passageiro, resultado, requisitos } = item;
   const reqById = new Map(requisitos.map((r) => [r.id, r]));
   const temInstancias = requisitos.length > 0;
@@ -70,66 +121,53 @@ export function ProntidaoPaxDrawer({ expedicaoId, destino, item, usuarios, arqui
 
   return (
     <>
-      <Drawer open onOpenChange={(v) => !v && onClose()}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-vinculado-600" />
-              {passageiro.nome_completo}
-            </DrawerTitle>
-            <DrawerDescription className="flex items-center gap-2">
-              Prontidão de embarque
-              <Badge variant={COR_PRONTIDAO[resultado.prontidao]}>{resultado.prontidao}</Badge>
-            </DrawerDescription>
-          </DrawerHeader>
-          <DrawerBody>
-            <ul className="divide-y divide-border rounded-md border border-border overflow-hidden">
-              {resultado.checagens.map((c) => {
-                const req = c.requisito_id ? reqById.get(c.requisito_id) : null;
-                const ehContrato = c.tipo === "Contrato";
-                const clicavel = Boolean(req) || ehContrato;
-                return (
-                  <li key={c.tipo}>
-                    <button
-                      type="button"
-                      disabled={!clicavel}
-                      onClick={() => {
-                        if (req) setEditando(req);
-                        else if (ehContrato) setContratoOpen(true);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 text-left",
-                        clicavel ? "hover:bg-accent/40 cursor-pointer" : "cursor-default",
-                      )}
-                    >
-                      <span className={cn("inline-block h-2.5 w-2.5 rounded-full shrink-0", DOT[c.semaforo])} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-medium">{c.tipo}</span>
-                        <span className="block text-[11px] text-muted-foreground truncate">{c.detalhe}</span>
-                      </span>
-                      {clicavel && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+      {showBadge && (
+        <div className="flex items-center gap-2">
+          <Badge variant={COR_PRONTIDAO[resultado.prontidao]}>{resultado.prontidao}</Badge>
+          <span className="text-[12px] text-muted-foreground">Status geral de embarque</span>
+        </div>
+      )}
+      <ul className="divide-y divide-border rounded-md border border-border overflow-hidden">
+        {resultado.checagens.map((c) => {
+          const req = c.requisito_id ? reqById.get(c.requisito_id) : null;
+          const ehContrato = c.tipo === "Contrato";
+          const clicavel = Boolean(req) || ehContrato;
+          return (
+            <li key={c.tipo}>
+              <button
+                type="button"
+                disabled={!clicavel}
+                onClick={() => {
+                  if (req) setEditando(req);
+                  else if (ehContrato) setContratoOpen(true);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 py-2 text-left",
+                  clicavel ? "hover:bg-accent/40 cursor-pointer" : "cursor-default",
+                )}
+              >
+                <span className={cn("inline-block h-2.5 w-2.5 rounded-full shrink-0", DOT[c.semaforo])} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium">{c.tipo}</span>
+                  <span className="block text-[11px] text-muted-foreground truncate">{c.detalhe}</span>
+                </span>
+                {clicavel && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
 
-            {!temInstancias && (
-              <div className="mt-3 rounded-md border border-dashed border-border p-3 text-center">
-                <p className="text-[12px] text-muted-foreground mb-2">
-                  Requisitos de {destino} ainda não instanciados para esta expedição.
-                </p>
-                <Button onClick={gerar} disabled={gerando} size="sm">
-                  {gerando ? "Gerando..." : `Gerar requisitos de ${destino}`}
-                </Button>
-              </div>
-            )}
-          </DrawerBody>
-          <DrawerFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      {!temInstancias && (
+        <div className="mt-3 rounded-md border border-dashed border-border p-3 text-center">
+          <p className="text-[12px] text-muted-foreground mb-2">
+            Requisitos de {destino} ainda não instanciados para esta expedição.
+          </p>
+          <Button onClick={gerar} disabled={gerando} size="sm">
+            {gerando ? "Gerando..." : `Gerar requisitos de ${destino}`}
+          </Button>
+        </div>
+      )}
 
       {editando && (
         <RequisitoDrawer
@@ -246,6 +284,55 @@ function RequisitoDrawer({
   const [responsavel, setResponsavel] = React.useState(req.responsavel_id ?? "_none");
   const [observacoes, setObservacoes] = React.useState(req.observacoes ?? "");
   const [salvando, setSalvando] = React.useState(false);
+  const [arquivoId, setArquivoId] = React.useState(req.arquivo_id);
+  const [anexando, setAnexando] = React.useState(false);
+  const [previewErro, setPreviewErro] = React.useState(false);
+  const [lightboxOpen, setLightboxOpen] = React.useState(false);
+  const exigeAnexo = REQUISITOS_COM_ANEXO_OBRIGATORIO.has(req.tipo);
+  const previewUrl = arquivoId ? `/api/arquivos/${arquivoId}/download?inline=1` : null;
+
+  async function anexarDocumento(file: File) {
+    setAnexando(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("expedicao_id", expedicaoId);
+    fd.append("passageiro_id", req.passageiro_id);
+    fd.append("categoria", "Documentos pessoais");
+    fd.append("descricao", `${req.tipo} — prontidão`);
+    let json: { ok: boolean; id?: string; error?: string };
+    try {
+      const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+      json = await res.json();
+    } catch {
+      json = { ok: false, error: "Falha de rede no upload" };
+    }
+    if (!json.ok || !json.id) {
+      toast.error("Erro ao anexar", { description: json.error });
+      setAnexando(false);
+      return;
+    }
+    const r = await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", json.id);
+    setAnexando(false);
+    if (!r.ok) {
+      toast.error("Erro ao vincular o anexo", { description: r.error });
+      return;
+    }
+    setArquivoId(json.id);
+    setPreviewErro(false);
+    toast.success("Documento anexado");
+    router.refresh();
+  }
+
+  async function removerAnexo() {
+    const r = await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", null);
+    if (!r.ok) {
+      toast.error("Erro ao remover o anexo", { description: r.error });
+      return;
+    }
+    setArquivoId(null);
+    toast.success("Anexo removido");
+    router.refresh();
+  }
 
   async function salvar() {
     setSalvando(true);
@@ -277,6 +364,7 @@ function RequisitoDrawer({
   }
 
   return (
+    <>
     <Drawer open onOpenChange={(v) => !v && onClose()}>
       <DrawerContent>
         <DrawerHeader>
@@ -296,16 +384,58 @@ function RequisitoDrawer({
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          {exigeAnexo && (
             <div className="space-y-1">
-              <Label htmlFor="req-validade">Validade</Label>
-              <Input id="req-validade" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+              <Label>Documento anexado</Label>
+              {arquivoId && previewUrl ? (
+                <div className="flex items-center gap-2 rounded-md border border-border p-2">
+                  <span className="flex-1 text-[13px] text-vinculado-700">Documento anexado</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setLightboxOpen(true)}>
+                    Ver documento
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={removerAnexo}>
+                    Remover
+                  </Button>
+                </div>
+              ) : (
+                <label
+                  className={cn(
+                    "flex items-center justify-center rounded-md border border-dashed border-border px-3 py-2 text-[13px] cursor-pointer hover:bg-accent/40",
+                    anexando && "opacity-60 pointer-events-none",
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    disabled={anexando}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) anexarDocumento(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  {anexando ? "Anexando..." : "Anexar foto do documento"}
+                </label>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Obrigatório para a prontidão. Fica na pasta &quot;Documentos pessoais&quot; do passageiro.
+              </p>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="req-numero">Número / Localizador</Label>
-              <Input id="req-numero" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="nº apólice, visto…" />
+          )}
+
+          {!exigeAnexo && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="req-validade">Validade</Label>
+                <Input id="req-validade" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="req-numero">Número / Localizador</Label>
+                <Input id="req-numero" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="nº apólice, visto…" />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1">
             <Label>Responsável</Label>
@@ -318,16 +448,18 @@ function RequisitoDrawer({
             </Select>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="req-obs">Observações</Label>
-            <textarea
-              id="req-obs"
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              rows={2}
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
-            />
-          </div>
+          {!exigeAnexo && (
+            <div className="space-y-1">
+              <Label htmlFor="req-obs">Observações</Label>
+              <textarea
+                id="req-obs"
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                rows={2}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+              />
+            </div>
+          )}
 
           {req.verificado_em && (
             <p className="text-[11px] text-muted-foreground">
@@ -346,5 +478,41 @@ function RequisitoDrawer({
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+
+    {lightboxOpen && previewUrl && (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4"
+        onClick={() => setLightboxOpen(false)}
+      >
+        {previewErro ? (
+          <a
+            href={previewUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-md bg-background px-4 py-3 text-[13px] text-editavel-700 hover:underline"
+          >
+            Abrir documento (PDF) em nova aba
+          </a>
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={previewUrl}
+            alt="Documento anexado"
+            onError={() => setPreviewErro(true)}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-xl"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setLightboxOpen(false)}
+          className="absolute top-4 right-4 rounded-full bg-background/90 px-3 py-1 text-[13px] font-medium hover:bg-background"
+        >
+          Fechar
+        </button>
+      </div>
+    )}
+    </>
   );
 }
