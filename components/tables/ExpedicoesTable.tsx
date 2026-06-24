@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil } from "lucide-react";
+import { GripVertical, Pencil, Star } from "lucide-react";
 import { EditableSelectCell, type SelectOption } from "./EditableSelectCell";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
@@ -68,9 +68,11 @@ interface Props {
   onEdit?: (e: ExpedicaoComAgregados) => void;
   /** Chamado depois de cada reorder com a nova ordem de ids. */
   onReorder?: (ids: string[]) => void;
+  /** id da expedição mais próxima a embarcar — recebe destaque visual. */
+  destaqueId?: string | null;
 }
 
-export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder }: Props) {
+export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder, destaqueId }: Props) {
   const [items, setItems] = React.useState(expedicoes);
 
   React.useEffect(() => {
@@ -123,7 +125,7 @@ export function ExpedicoesTable({ expedicoes, onRowClick, onEdit, onReorder }: P
             <SortableContext items={items.map((e) => e.id)} strategy={verticalListSortingStrategy}>
               <tbody>
                 {items.map((e) => (
-                  <SortableRow key={e.id} expedicao={e} onRowClick={onRowClick} onEdit={onEdit} />
+                  <SortableRow key={e.id} expedicao={e} onRowClick={onRowClick} onEdit={onEdit} destaque={e.id === destaqueId} />
                 ))}
               </tbody>
             </SortableContext>
@@ -138,10 +140,12 @@ function SortableRow({
   expedicao,
   onRowClick,
   onEdit,
+  destaque,
 }: {
   expedicao: ExpedicaoComAgregados;
   onRowClick?: (e: ExpedicaoComAgregados) => void;
   onEdit?: (e: ExpedicaoComAgregados) => void;
+  destaque?: boolean;
 }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -167,6 +171,7 @@ function SortableRow({
       className={cn(
         "border-b border-border transition-colors",
         onRowClick && "cursor-pointer hover:bg-accent/50",
+        destaque && "bg-editavel-600/5 ring-1 ring-inset ring-editavel-600/40",
         isDragging && "bg-accent/70 shadow-lg",
       )}
       onClick={onRowClick ? () => onRowClick(expedicao) : undefined}
@@ -183,7 +188,16 @@ function SortableRow({
         </button>
       </td>
 
-      <td className="px-2 font-medium">{expedicao.nome}</td>
+      <td className="px-2 font-medium">
+        <div className="flex items-center gap-1.5">
+          <span>{expedicao.nome}</span>
+          {destaque && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-editavel-600 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shrink-0">
+              <Star className="h-2.5 w-2.5 fill-current" /> Próxima
+            </span>
+          )}
+        </div>
+      </td>
 
       <td className="px-2 text-muted-foreground">{expedicao.destino}</td>
 

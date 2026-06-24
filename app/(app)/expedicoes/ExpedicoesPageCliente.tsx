@@ -91,6 +91,8 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
   const ativaCount = statusSel.size + destinoSel.size + (periodo !== "todos" ? 1 : 0) + (responsavelOp ? 1 : 0);
 
   const agrupadoPorAno = React.useMemo(() => {
+    const anoAtual = new Date().getFullYear();
+    const encerrada = (s: string) => s === "Concluída" || s === "Cancelada";
     const grupos = new Map<number | "sem-data", ExpedicaoComAgregados[]>();
     for (const e of filtradas) {
       const key: number | "sem-data" = e.data_embarque
@@ -100,11 +102,31 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
       arr.push(e);
       grupos.set(key, arr);
     }
+    // Dentro de cada ano: ativas no topo, concluídas/canceladas no rodapé (mantém ordem manual).
+    for (const arr of grupos.values()) {
+      arr.sort((a, b) => Number(encerrada(a.status)) - Number(encerrada(b.status)));
+    }
+    // Seções: ano atual/futuro primeiro (crescente), passado depois (decrescente), sem-data por último.
     return Array.from(grupos.entries()).sort(([a], [b]) => {
-      if (a === "sem-data") return 1;
-      if (b === "sem-data") return -1;
-      return a - b;
+      const rank = (y: number | "sem-data") => (y === "sem-data" ? 2 : y >= anoAtual ? 0 : 1);
+      const ra = rank(a), rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      if (a === "sem-data" || b === "sem-data") return 0;
+      return ra === 0 ? a - b : b - a;
     });
+  }, [filtradas]);
+
+  // Expedição mais próxima a embarcar (ativa, menor dias até o embarque) → ganha destaque.
+  const proximaId = React.useMemo(() => {
+    let best: string | null = null;
+    let bestDias = Infinity;
+    for (const e of filtradas) {
+      if (e.status === "Concluída" || e.status === "Cancelada") continue;
+      const d = daysUntil(e.data_embarque);
+      if (d == null || d < 0) continue;
+      if (d < bestDias) { bestDias = d; best = e.id; }
+    }
+    return best;
   }, [filtradas]);
 
   // Atalhos
@@ -379,6 +401,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
                   </header>
                   <ExpedicoesTable
                     expedicoes={lista}
+                    destaqueId={proximaId}
                     selecionada={
                       selecionada >= offsetGrupo && selecionada < offsetGrupo + lista.length
                         ? selecionada - offsetGrupo

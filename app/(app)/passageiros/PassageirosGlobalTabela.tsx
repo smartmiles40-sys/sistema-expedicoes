@@ -73,6 +73,7 @@ export function PassageirosGlobalTabela({
 }) {
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
+  const [expedicoesDe, setExpedicoesDe] = React.useState<PessoaAgregada | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
   const [novoOpen, setNovoOpen] = React.useState(false);
   const [sortCol, setSortCol] = React.useState("nome");
@@ -176,16 +177,14 @@ export function PassageirosGlobalTabela({
                 ordenadas.map((p) => {
                   const id = idade(p.data_nascimento);
                   return (
-                    <tr key={p.chave} className="border-b border-border hover:bg-accent/30">
+                    <tr
+                      key={p.chave}
+                      onClick={() => setAberta(p)}
+                      title="Abrir perfil do passageiro"
+                      className="group border-b border-border hover:bg-accent/30 cursor-pointer"
+                    >
                       <td className="px-2.5 font-medium whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setAberta(p)}
-                          title="Abrir perfil do passageiro"
-                          className="text-left text-editavel-700 hover:underline"
-                        >
-                          {p.nome_completo}
-                        </button>
+                        <span className="text-editavel-700 group-hover:underline">{p.nome_completo}</span>
                       </td>
                       <td className="px-2.5 tabular-nums font-mono text-[12px] text-muted-foreground">{p.cpf ?? "—"}</td>
                       <td className="px-2.5 tabular-nums">{id != null ? `${id}` : "—"}</td>
@@ -197,8 +196,17 @@ export function PassageirosGlobalTabela({
                       </td>
                       <td className="px-2.5 text-[12px] text-muted-foreground">{p.email ?? "—"}</td>
                       <td className="px-2.5 text-[12px] text-muted-foreground whitespace-nowrap">{p.telefone ?? "—"}</td>
-                      <td className="px-2.5 text-center">
-                        <Badge variant={p.totalExpedicoes > 0 ? "lista" : "auto"}>{p.totalExpedicoes}</Badge>
+                      <td className="px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          disabled={p.totalExpedicoes === 0}
+                          onClick={() => setExpedicoesDe(p)}
+                          title={p.totalExpedicoes > 0 ? "Ver as expedições desta pessoa" : "Sem expedições"}
+                          className="inline-flex items-center gap-1 hover:opacity-80 disabled:cursor-default disabled:opacity-60 cursor-pointer"
+                        >
+                          <Plane className="h-3 w-3 text-muted-foreground" />
+                          <Badge variant={p.totalExpedicoes > 0 ? "lista" : "auto"}>{p.totalExpedicoes}</Badge>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -215,6 +223,10 @@ export function PassageirosGlobalTabela({
           arquivos={arquivos.filter((a) => a.passageiro_id && aberta.idsPassageiros.includes(a.passageiro_id))}
           onClose={() => setAberta(null)}
         />
+      )}
+
+      {expedicoesDe && (
+        <ExpedicoesDePessoaDrawer pessoa={expedicoesDe} onClose={() => setExpedicoesDe(null)} />
       )}
 
       <ImportarPassageirosDrawer
@@ -343,6 +355,57 @@ function NovoPassageiroDrawer({
             </Button>
           </DrawerFooter>
         </form>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+/** Drawer enxuto: só a lista de expedições que a pessoa fez (atalho da coluna). */
+function ExpedicoesDePessoaDrawer({
+  pessoa,
+  onClose,
+}: {
+  pessoa: PessoaAgregada;
+  onClose: () => void;
+}) {
+  return (
+    <Drawer open onOpenChange={(v) => !v && onClose()}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="flex items-center gap-2">
+            <Plane className="h-4 w-4 text-editavel-600" /> {pessoa.nome_completo}
+          </DrawerTitle>
+          <DrawerDescription>
+            {pessoa.expedicoes.length} expediç{pessoa.expedicoes.length === 1 ? "ão" : "ões"} — clique para abrir.
+          </DrawerDescription>
+        </DrawerHeader>
+        <DrawerBody>
+          <ul className="space-y-1">
+            {pessoa.expedicoes.map((e, i) => (
+              <li key={`${e.expedicao_id}-${i}`}>
+                <Link
+                  href={`/expedicoes/${e.expedicao_id}/passageiros`}
+                  className="flex items-center justify-between rounded-md border border-border p-2 hover:bg-accent transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium truncate">{e.nome}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {e.destino} · {formatDate(e.data_embarque)}
+                      {e.tipo !== "Pagante" && ` · ${e.tipo}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Badge variant={RESERVA_VARIANT[e.status_reserva]}>{e.status_reserva}</Badge>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </DrawerBody>
+        <DrawerFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
+        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   );
