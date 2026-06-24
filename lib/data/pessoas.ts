@@ -14,6 +14,7 @@ import type {
   ExpedicaoRow,
   StatusReserva,
   TipoPassageiro,
+  SaudePassageiro,
 } from "@/types/database";
 
 export type ExpedicaoDoPassageiro = {
@@ -40,6 +41,7 @@ export type PessoaAgregada = {
   contato_emergencia_fone: string | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
+  saude: SaudePassageiro | null;
   /** Todas as linhas `passageiros` desta pessoa (todas as expedições). */
   idsPassageiros: string[];
   /** Linha/expedição mais recente — âncora pra anexar novos documentos. */
@@ -91,6 +93,7 @@ function agregar(
         contato_emergencia_fone: p.contato_emergencia_fone,
         restricoes_alimentares: p.restricoes_alimentares,
         condicoes_medicas: p.condicoes_medicas,
+        saude: p.saude ?? null,
         idsPassageiros: [],
         expedicaoIdAncora: null,
         passageiroIdAncora: null,
@@ -111,6 +114,7 @@ function agregar(
       pessoa.contato_emergencia_fone = maisRecente(pessoa.contato_emergencia_fone, p.contato_emergencia_fone);
       pessoa.restricoes_alimentares = maisRecente(pessoa.restricoes_alimentares, p.restricoes_alimentares);
       pessoa.condicoes_medicas = maisRecente(pessoa.condicoes_medicas, p.condicoes_medicas);
+      pessoa.saude = maisRecente(pessoa.saude, p.saude ?? null);
     }
 
     pessoa.idsPassageiros.push(p.id);

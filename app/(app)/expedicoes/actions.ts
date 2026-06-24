@@ -393,6 +393,7 @@ const dadosPessoaisSchema = z.object({
   contato_emergencia_fone: z.string().nullable().optional(),
   restricoes_alimentares: z.string().nullable().optional(),
   condicoes_medicas: z.string().nullable().optional(),
+  saude: z.record(z.string(), z.string()).nullable().optional(),
 });
 
 /**

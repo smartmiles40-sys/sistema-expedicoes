@@ -14,13 +14,14 @@ import { Badge } from "@/components/ui/Badge";
 import { FilterPopover } from "@/components/ui/FilterPopover";
 import { Drive } from "@/components/arquivos/Drive";
 import { ImportarPassageirosDrawer } from "@/app/(app)/expedicoes/[id]/passageiros/ImportarPassageirosDrawer";
+import { SaudeCampos } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
 import { atualizarDadosPessoais, criarPassageiroAvulso, excluirPessoa } from "@/app/(app)/expedicoes/actions";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
-import type { StatusReserva, ArquivoRow } from "@/types/database";
+import type { StatusReserva, ArquivoRow, SaudePassageiro } from "@/types/database";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
 
 const RESERVA_VARIANT: Record<StatusReserva, "vinculado" | "atencao" | "auto" | "critico"> = {
@@ -475,6 +476,7 @@ const perfilSchema = z.object({
   contato_emergencia_fone: z.string().optional(),
   restricoes_alimentares: z.string().optional(),
   condicoes_medicas: z.string().optional(),
+  saude: z.record(z.string(), z.string()).optional(),
 });
 type PerfilForm = z.infer<typeof perfilSchema>;
 
@@ -490,8 +492,9 @@ function PessoaDrawer({
   const router = useRouter();
   const id = idade(pessoa.data_nascimento);
   const refId = pessoa.idsPassageiros[0];
+  const [tab, setTab] = React.useState<"passageiro" | "saude" | "expedicoes">("passageiro");
 
-  const { register, handleSubmit, formState: { errors, isSubmitting, isDirty } } = useForm<PerfilForm>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting, isDirty } } = useForm<PerfilForm>({
     resolver: zodResolver(perfilSchema),
     defaultValues: {
       nome_completo: pessoa.nome_completo,
@@ -505,6 +508,7 @@ function PessoaDrawer({
       contato_emergencia_fone: pessoa.contato_emergencia_fone ?? "",
       restricoes_alimentares: pessoa.restricoes_alimentares ?? "",
       condicoes_medicas: pessoa.condicoes_medicas ?? "",
+      saude: (pessoa.saude as Record<string, string>) ?? {},
     },
   });
 
@@ -525,6 +529,9 @@ function PessoaDrawer({
       contato_emergencia_fone: data.contato_emergencia_fone?.trim() || null,
       restricoes_alimentares: data.restricoes_alimentares?.trim() || null,
       condicoes_medicas: data.condicoes_medicas?.trim() || null,
+      saude: Object.fromEntries(
+        Object.entries(data.saude ?? {}).filter(([, v]) => v != null && String(v).trim() !== ""),
+      ),
     });
     if (r.ok) {
       toast.success(
@@ -552,8 +559,27 @@ function PessoaDrawer({
           </DrawerDescription>
         </DrawerHeader>
         <DrawerBody>
-          {/* Dados pessoais — editáveis */}
-          <form id="perfil-pessoa-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <div className="flex gap-3">
+            <nav className="w-32 shrink-0 space-y-1 self-start sticky top-0">
+              <MenuBtn ativo={tab === "passageiro"} onClick={() => setTab("passageiro")}>
+                Passageiro
+              </MenuBtn>
+              <MenuBtn ativo={tab === "saude"} onClick={() => setTab("saude")}>
+                Saúde
+              </MenuBtn>
+              <MenuBtn ativo={tab === "expedicoes"} onClick={() => setTab("expedicoes")}>
+                <span className="flex w-full items-center justify-between gap-1">
+                  Expedições
+                  <span className="text-[11px] opacity-70">{pessoa.totalExpedicoes}</span>
+                </span>
+              </MenuBtn>
+            </nav>
+
+            <div className="flex-1 min-w-0">
+              {/* ABA: Passageiro (dados pessoais + documentos) */}
+              <div className={cn("space-y-4", tab !== "passageiro" && "hidden")}>
+                {/* Dados pessoais — editáveis */}
+                <form id="perfil-pessoa-form" onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="pp-nome">Nome completo</Label>
               <Input id="pp-nome" {...register("nome_completo")} />
@@ -615,55 +641,74 @@ function PessoaDrawer({
             </div>
           </form>
 
-          {/* Documentos */}
-          <section className="mt-5 pt-4 border-t border-border space-y-2">
-            <div>
-              <h3 className="text-sm font-semibold">Documentos do passageiro</h3>
-              <p className="text-[11px] text-muted-foreground">
-                Passaporte, CNH, RG e demais documentos pessoais — compartilhados por todas as expedições.
-              </p>
-            </div>
-            {pessoa.expedicaoIdAncora && pessoa.passageiroIdAncora ? (
-              <Drive
-                expedicaoId={pessoa.expedicaoIdAncora}
-                passageiroId={pessoa.passageiroIdAncora}
-                arquivos={arquivos}
-              />
-            ) : (
-              <p className="text-[12px] text-muted-foreground italic">
-                Vincule a pessoa a uma expedição para anexar documentos.
-              </p>
-            )}
-          </section>
+                {/* Documentos — dentro da aba Passageiro */}
+                <section className="pt-4 border-t border-border space-y-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Documentos do passageiro</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Passaporte, CNH, RG e demais documentos pessoais — compartilhados por todas as expedições.
+                    </p>
+                  </div>
+                  {pessoa.expedicaoIdAncora && pessoa.passageiroIdAncora ? (
+                    <Drive
+                      expedicaoId={pessoa.expedicaoIdAncora}
+                      passageiroId={pessoa.passageiroIdAncora}
+                      arquivos={arquivos}
+                    />
+                  ) : (
+                    <p className="text-[12px] text-muted-foreground italic">
+                      Vincule a pessoa a uma expedição para anexar documentos.
+                    </p>
+                  )}
+                </section>
+              </div>
 
-          {/* Histórico de expedições */}
-          <section className="mt-5">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 flex items-center gap-1.5">
-              <Plane className="h-3.5 w-3.5" /> Expedições ({pessoa.expedicoes.length})
-            </h3>
-            <ul className="space-y-1">
-              {pessoa.expedicoes.map((e, i) => (
-                <li key={`${e.expedicao_id}-${i}`}>
-                  <Link
-                    href={`/expedicoes/${e.expedicao_id}/passageiros`}
-                    className="flex items-center justify-between rounded-md border border-border p-2 hover:bg-accent transition-colors group"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium truncate">{e.nome}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {e.destino} · {formatDate(e.data_embarque)}
-                        {e.tipo !== "Pagante" && ` · ${e.tipo}`}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge variant={RESERVA_VARIANT[e.status_reserva]}>{e.status_reserva}</Badge>
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+              {/* ABA: Saúde */}
+              <div className={cn("space-y-3", tab !== "saude" && "hidden")}>
+                <div>
+                  <h3 className="text-sm font-semibold">Saúde</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Questionário de saúde — compartilhado entre todas as expedições da pessoa.
+                  </p>
+                </div>
+                <SaudeCampos
+                  value={(watch("saude") as SaudePassageiro) ?? {}}
+                  onChange={(next) => setValue("saude", next as never, { shouldDirty: true })}
+                  expedicaoId={pessoa.expedicaoIdAncora}
+                  passageiroId={pessoa.passageiroIdAncora}
+                />
+              </div>
+
+              {/* ABA: Expedições */}
+              <div className={cn(tab !== "expedicoes" && "hidden")}>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                  <Plane className="h-3.5 w-3.5" /> Expedições ({pessoa.expedicoes.length})
+                </h3>
+                <ul className="space-y-1">
+                  {pessoa.expedicoes.map((e, i) => (
+                    <li key={`${e.expedicao_id}-${i}`}>
+                      <Link
+                        href={`/expedicoes/${e.expedicao_id}/passageiros`}
+                        className="flex items-center justify-between rounded-md border border-border p-2 hover:bg-accent transition-colors group"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium truncate">{e.nome}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {e.destino} · {formatDate(e.data_embarque)}
+                            {e.tipo !== "Pagante" && ` · ${e.tipo}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant={RESERVA_VARIANT[e.status_reserva]}>{e.status_reserva}</Badge>
+                          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
         </DrawerBody>
 
         <DrawerFooter>
@@ -692,5 +737,29 @@ function PessoaDrawer({
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/** Item do menu vertical do perfil (Passageiro / Saúde / Expedições). */
+function MenuBtn({
+  ativo,
+  onClick,
+  children,
+}: {
+  ativo: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full text-left rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+        ativo ? "bg-foreground text-background" : "text-foreground hover:bg-muted",
+      )}
+    >
+      {children}
+    </button>
   );
 }
