@@ -264,6 +264,7 @@ const editarPassageiroLoteSchema = z.object({
   contrato_assinado: z.boolean().optional(),
   checkin_online_feito: z.boolean().optional(),
   observacoes: z.string().nullable().optional(),
+  saude: z.record(z.string(), z.string()).nullable().optional(),
 });
 
 // =============================================================================
@@ -285,6 +286,7 @@ const CAMPOS_PESSOAIS = [
   "contato_emergencia_fone",
   "restricoes_alimentares",
   "condicoes_medicas",
+  "saude",
 ] as const;
 
 function soPessoais(dados: Record<string, unknown>): Record<string, unknown> {

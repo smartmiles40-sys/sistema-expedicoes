@@ -143,12 +143,38 @@ export type PassageiroRow = {
   contato_emergencia_fone: string | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
+  saude?: SaudePassageiro | null;
   contrato_assinado: boolean;
   checkin_online_feito: boolean;
   observacoes: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * Questionário de saúde do passageiro (coluna jsonb `saude`). Dado PESSOAL —
+ * propaga entre as expedições da pessoa. Perguntas Sim/Não guardam "Sim"/"Não";
+ * os "_qual" guardam o detalhe (texto). Campos ausentes = não respondido.
+ */
+export type SaudePassageiro = {
+  problema_saude?: string;
+  problema_saude_qual?: string;
+  medicamento_diario?: string;
+  medicamento_diario_qual?: string;
+  alergia_medicamento?: string;
+  alergia_medicamento_qual?: string;
+  alergia_alimentar?: string;
+  alergia_alimentar_qual?: string;
+  restricao_alimentar?: string;
+  restricao_alimentar_qual?: string;
+  limitacao_fisica?: string;
+  limitacao_fisica_qual?: string;
+  cirurgia_importante?: string;
+  cirurgia_qual?: string;
+  vacina_febre_amarela?: string;
+  /** id do arquivo do Certificado de Vacinação (Febre Amarela), quando anexado. */
+  vacina_febre_amarela_arquivo_id?: string;
+};
 
 export type RequisitoDestinoRow = {
   id: string;
