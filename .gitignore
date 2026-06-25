@@ -49,3 +49,7 @@ next-env.d.ts
 
 # Scripts one-off: ignorar JSONs intermediarios (contem dados pessoais)
 scripts/_*.json
+
+# Backups do banco (CPF + saude = PII) — por padrao gravam em ~/Backups, fora do
+# repo; isto e so uma rede de seguranca caso BACKUP_DIR aponte pra dentro do repo.
+/backups/
