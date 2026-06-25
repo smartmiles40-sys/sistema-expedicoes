@@ -158,10 +158,14 @@ body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Safety: Radix/react-remove-scroll às vezes deixa pointer-events:none preso
-     no body ao fechar um drawer + navegar — isso travaria TODOS os cliques
-     (scroll por toque ainda funciona). O overlay do modal continua bloqueando
-     o fundo, então forçar auto é seguro. */
+}
+
+/* Safety (ALTA especificidade p/ vencer estilos injetados pelo Radix): às vezes
+   fica um pointer-events:none preso no body ao fechar um drawer + navegar, o que
+   trava TODOS os cliques (o scroll por toque ainda funciona). O overlay do modal
+   continua bloqueando o fundo, então forçar auto é seguro. */
+html body,
+html body[style] {
   pointer-events: auto !important;
 }
 

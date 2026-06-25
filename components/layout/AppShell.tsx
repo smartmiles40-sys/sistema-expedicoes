@@ -2,6 +2,7 @@
 import * as React from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { PointerEventsGuard } from "./PointerEventsGuard";
 import type { CurrentUser } from "@/lib/supabase/auth";
 
 export function AppShell({
@@ -17,6 +18,7 @@ export function AppShell({
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
+      <PointerEventsGuard />
       <Sidebar
         user={user}
         alertCount={alertCount}
