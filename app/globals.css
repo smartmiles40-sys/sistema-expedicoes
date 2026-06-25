@@ -146,6 +146,10 @@
 html, body {
   background: var(--background);
   color: var(--foreground);
+  /* Trava o eixo horizontal: só rola vertical (evita "puxar pros lados" no mobile). */
+  overflow-x: hidden;
+  max-width: 100%;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -154,6 +158,16 @@ body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Safety: Radix/react-remove-scroll às vezes deixa pointer-events:none preso
+     no body ao fechar um drawer + navegar — isso travaria TODOS os cliques
+     (scroll por toque ainda funciona). O overlay do modal continua bloqueando
+     o fundo, então forçar auto é seguro. */
+  pointer-events: auto !important;
+}
+
+/* Toque ágil: remove o atraso de 300ms e o duplo-toque-zoom em interativos. */
+button, a, [role="button"], label, summary {
+  touch-action: manipulation;
 }
 
 /* Gradiente da marca (vibe jovem / rede social) */

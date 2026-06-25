@@ -104,7 +104,7 @@ export function ExpedicaoCard({
         onClick={onEdit}
         aria-label="Editar expedição"
         title="Editar"
-        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white/70 opacity-0 transition-all hover:bg-white/20 hover:text-white group-hover:opacity-100"
+        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white/70 opacity-100 transition-all hover:bg-white/20 hover:text-white lg:opacity-0 lg:group-hover:opacity-100"
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>

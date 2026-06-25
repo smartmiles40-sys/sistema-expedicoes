@@ -1,11 +1,21 @@
 "use client";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Menu } from "lucide-react";
 import { Breadcrumb } from "./Breadcrumb";
 
-export function Header() {
+export function Header({ onMenu }: { onMenu?: () => void }) {
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
-      <Breadcrumb />
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-3 sm:px-4">
+      <div className="flex min-w-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onMenu}
+          aria-label="Abrir menu"
+          className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-accent lg:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Breadcrumb />
+      </div>
       <div className="flex items-center gap-2">
         <button
           className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors"

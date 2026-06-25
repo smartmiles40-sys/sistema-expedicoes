@@ -23,7 +23,7 @@ export function ExpedicaoHeader({ expedicao }: { expedicao: ExpedicaoComAgregado
     <div>
       {/* HERO — banner em gradiente da marca */}
       <div className="bg-brand-gradient relative overflow-hidden px-5 py-5 text-white">
-        <div className="relative z-10 flex items-start justify-between gap-4">
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2.5">
             <Link
               href="/expedicoes"
@@ -34,7 +34,7 @@ export function ExpedicaoHeader({ expedicao }: { expedicao: ExpedicaoComAgregado
             </Link>
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="font-display text-[26px] font-semibold leading-tight text-white truncate">
+                <h1 className="font-display text-[20px] sm:text-[26px] font-semibold leading-tight text-white truncate">
                   {expedicao.nome}
                 </h1>
                 <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_PILL[expedicao.status]}`}>

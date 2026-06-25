@@ -32,7 +32,14 @@ export interface DrawerContentProps extends React.ComponentPropsWithoutRef<typeo
 export const DrawerContent = React.forwardRef<
   React.ElementRef<typeof Dialog.Content>,
   DrawerContentProps
->(({ className, children, side = "right", width = "w-[480px]", ...props }, ref) => (
+>(({ className, children, side = "right", width = "w-[480px]", ...props }, ref) => {
+  // No mobile o drawer ocupa a tela inteira; a largura fixa só vale a partir do sm.
+  const widthSm = width
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((c) => (c.startsWith("sm:") ? c : `sm:${c}`))
+    .join(" ");
+  return (
   <DrawerPortal>
     <DrawerOverlay />
     <Dialog.Content
@@ -40,7 +47,8 @@ export const DrawerContent = React.forwardRef<
       className={cn(
         "fixed top-0 z-50 h-full bg-background border-border shadow-lg outline-none flex flex-col",
         side === "right" ? "right-0 border-l" : "left-0 border-r",
-        width,
+        "w-full max-w-full",
+        widthSm,
         "animate-slide-in-right",
         className,
       )}
@@ -53,7 +61,8 @@ export const DrawerContent = React.forwardRef<
       </Dialog.Close>
     </Dialog.Content>
   </DrawerPortal>
-));
+  );
+});
 DrawerContent.displayName = "DrawerContent";
 
 export function DrawerHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
