@@ -36,6 +36,7 @@ import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
 import type { ArquivoRow, PassageiroRow, Tables, SaudePassageiro } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { SaudeCampos } from "./SaudeCampos";
+import { FidelidadeBadge } from "./FidelidadeBadge";
 
 const schema = z.object({
   nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
@@ -64,10 +65,12 @@ interface Props {
   destino: string;
   prontidao: ProntidaoPassageiro | null;
   usuarios: Tables<"usuarios">[];
+  /** Posição cronológica desta expedição na história da pessoa (1ª, 2ª...). */
+  posicaoFidelidade?: number | null;
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, prontidao, usuarios, onOpenChange }: Props) {
+export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, prontidao, usuarios, posicaoFidelidade, onOpenChange }: Props) {
   const router = useRouter();
   const open = passageiro !== null;
   const [tab, setTab] = React.useState<"passageiro" | "prontidao" | "saude">("passageiro");
@@ -133,7 +136,10 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
       <DrawerContent width="w-[600px]">
         <DrawerHeader>
           <div className="flex items-center justify-between gap-2">
-            <DrawerTitle className="truncate">{passageiro?.nome_completo ?? "Passageiro"}</DrawerTitle>
+            <DrawerTitle className="truncate flex items-center gap-2">
+              <span className="truncate">{passageiro?.nome_completo ?? "Passageiro"}</span>
+              <FidelidadeBadge posicao={posicaoFidelidade} />
+            </DrawerTitle>
             {passageiro && (
               <Link
                 href={`/expedicoes/${expedicaoId}/passageiros/${passageiro.id}`}

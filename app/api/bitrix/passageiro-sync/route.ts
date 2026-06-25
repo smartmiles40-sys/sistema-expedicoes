@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
       id: `p${Math.random().toString(36).slice(2, 14)}`,
       expedicao_id: expedicao.id,
       grupo_id: null,
+      conexao_viagem_id: null,
       bitrix_contact_id: data.bitrix_contact_id ?? null,
       bitrix_deal_id: data.bitrix_deal_id,
       nome_completo: data.nome_completo,

@@ -2,6 +2,7 @@ import { listPassageiros, listQuartos, getProntidaoExpedicao, listUsuarios } fro
 import { getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { listPessoas } from "@/lib/data/pessoas";
+import { construirPosicoesFidelidade } from "@/lib/fidelidade";
 import { PassageirosTabela } from "./PassageirosTabela";
 import { notFound } from "next/navigation";
 
@@ -22,6 +23,8 @@ export default async function PassageirosPage({
   ]);
   if (!expedicao) notFound();
 
+  const posicoesFidelidade = construirPosicoesFidelidade(pessoas, id);
+
   return (
     <div className="p-4">
       <PassageirosTabela
@@ -34,6 +37,7 @@ export default async function PassageirosPage({
         prontidao={prontidao}
         usuarios={usuarios}
         pessoas={pessoas}
+        posicoesFidelidade={posicoesFidelidade}
       />
     </div>
   );

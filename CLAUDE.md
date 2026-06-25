@@ -261,6 +261,30 @@ Não existe tabela `pessoas`: uma "pessoa" é a **agregação** de várias linha
   delete de documentos funcionam localmente sem Supabase; com Supabase conectado,
   o branch real assume e o store fica inerte. `.dev-uploads/` é gitignorado.
 
+## 🎖️ Fidelidade (marco de expedições)
+
+Mostra em que viagem (cronológica) da PESSOA a expedição atual entra — destaca os
+marcos 3ª/5ª/10ª. Lógica pura em `lib/fidelidade.ts` (`construirPosicoesFidelidade`
+usa `PessoaAgregada.expedicoes` ordenadas por `data_embarque`, ignora canceladas;
+`ehMarco` = {3,5,10}). Calculada **no servidor** em `passageiros/page.tsx` e passada
+como `posicoesFidelidade: Record<passageiroId, posição>`. UI: `FidelidadeBadge`
+(1ª viagem não exibe; ≥2ª mostra "Nª" discreto; marco vira selo "★ Nª expedição"),
+usado na tabela de passageiros e no header do `EditarPassageiroDrawer`. Testes em
+`lib/fidelidade.test.ts`.
+
+## 🛏️ Conexão "viajam juntas" (mesmo quarto)
+
+Marca pessoas que viajam juntas (casal/família) **por expedição** para o rooming.
+Modelo: coluna `passageiros.conexao_viagem_id uuid` (token de agrupamento, sem
+tabela própria; mesmo token na mesma expedição = mesma conexão; `null` = sem
+conexão) — migration **`0019_conexao_viagem.sql`**. Actions em `expedicoes/actions.ts`:
+`conectarPassageiros` (≥2, faz merge de conexões pré-existentes), `removerDaConexao`
+(dissolve se sobrar <2), `desfazerConexao`, `alocarConexaoNoQuarto` (aloca todos no
+mesmo quarto; valida `CAPACIDADE_QUARTO` de `lib/constants.ts`). UI no `RoomingBoard`:
+painel "Viajam juntas" (criar/editar via `ConexaoViagemDrawer`/desfazer), dot colorido
+por conexão nos cards, e por hotel um status "juntos/separados" com botão **"Juntar no
+Quarto X"**. Enforcement é **sugestivo** (avisa, não bloqueia o export).
+
 ## 🧪 Como rodar
 
 ```bash

@@ -129,6 +129,16 @@ export const TIPO_QUARTO = [
 ] as const;
 export type TipoQuarto = (typeof TIPO_QUARTO)[number];
 
+/** Quantas pessoas cabem em cada tipo de quarto (usado no rooming). */
+export const CAPACIDADE_QUARTO: Record<string, number> = {
+  Single: 1,
+  Twin: 2,
+  Duplo: 2,
+  Triplo: 3,
+  Compartilhado: 4,
+  Líder: 2,
+};
+
 export const PAPEL_USUARIO = [
   "admin",
   "operacional",

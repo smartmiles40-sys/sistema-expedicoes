@@ -11,18 +11,26 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2 } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
-import { excluirQuarto, alocarPassageiro, desalocarPassageiro } from "@/app/(app)/expedicoes/actions";
+import {
+  excluirQuarto,
+  alocarPassageiro,
+  desalocarPassageiro,
+  desfazerConexao,
+  alocarConexaoNoQuarto,
+} from "@/app/(app)/expedicoes/actions";
+import { CAPACIDADE_QUARTO } from "@/lib/constants";
 import { formatDate, cn } from "@/lib/utils";
 import type { PassageiroRow, QuartoRow, AlocacaoQuartoRow } from "@/types/database";
 import { toast } from "sonner";
 import { NovoQuartoDrawer } from "./NovoQuartoDrawer";
 import { QuartosAutomaticosDrawer } from "./QuartosAutomaticosDrawer";
 import { EditarQuartoDrawer } from "./EditarQuartoDrawer";
+import { ConexaoViagemDrawer } from "./ConexaoViagemDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 
@@ -33,14 +41,10 @@ interface Props {
   alocacoes: AlocacaoQuartoRow[];
 }
 
-const CAPACIDADE: Record<string, number> = {
-  Single: 1,
-  Twin: 2,
-  Duplo: 2,
-  Triplo: 3,
-  Compartilhado: 4,
-  Líder: 2,
-};
+const CAPACIDADE = CAPACIDADE_QUARTO;
+
+/** Cores estáveis por conexão (dot ao lado do pax / na lista de conexões). */
+const CORES_CONEXAO = ["#2563eb", "#16a34a", "#db2777", "#d97706", "#7c3aed", "#0891b2", "#ca8a04", "#e11d48"];
 
 /** Chave do hotel/trecho: mesmo hotel/cidade + mesmas datas de check-in/out. */
 function trechoKey(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
@@ -60,6 +64,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [autoOpen, setAutoOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  // null = fechado; { membros } = aberto (vazio cria, preenchido edita).
+  const [conexaoDrawer, setConexaoDrawer] = React.useState<{ membros: string[] } | null>(null);
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
   // Cópia local das alocações pra atualização otimista do drag.
@@ -82,6 +88,32 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     [passageiros],
   );
   const paxById = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p])), [passageiros]);
+
+  // Conexões "viajam juntas": grupos de pax (≥2) com o mesmo conexao_viagem_id.
+  const conexoes = React.useMemo(() => {
+    const m = new Map<string, PassageiroRow[]>();
+    for (const p of paxAtivos) {
+      if (!p.conexao_viagem_id) continue;
+      const arr = m.get(p.conexao_viagem_id) ?? [];
+      arr.push(p);
+      m.set(p.conexao_viagem_id, arr);
+    }
+    return [...m.entries()]
+      .filter(([, membros]) => membros.length >= 2)
+      .map(([id, membros], i) => ({ id, membros, cor: CORES_CONEXAO[i % CORES_CONEXAO.length] }));
+  }, [paxAtivos]);
+
+  // paxId -> { cor, nomesCompanheiros } pra marcar o card no board.
+  const conexaoByPax = React.useMemo(() => {
+    const m = new Map<string, { cor: string; companheiros: string }>();
+    for (const c of conexoes) {
+      for (const membro of c.membros) {
+        const outros = c.membros.filter((x) => x.id !== membro.id).map((x) => x.nome_completo);
+        m.set(membro.id, { cor: c.cor, companheiros: outros.join(", ") });
+      }
+    }
+    return m;
+  }, [conexoes]);
 
   // Trechos (hotéis) ordenados por check-in.
   const trechos: Trecho[] = React.useMemo(() => {
@@ -116,6 +148,32 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   /** Pax sem quarto num trecho (não-cancelados, sem alocação naquele hotel). */
   function semQuartoNoTrecho(trecho: Trecho): PassageiroRow[] {
     return paxAtivos.filter((p) => !quartoDoPaxNoTrecho(p.id, trecho));
+  }
+
+  /** Onde os membros de uma conexão estão dentro de um trecho. */
+  function conexaoNoTrecho(membros: PassageiroRow[], trecho: Trecho) {
+    const porQuarto = new Map<string, number>();
+    let semQuarto = 0;
+    for (const m of membros) {
+      const q = quartoDoPaxNoTrecho(m.id, trecho);
+      if (q) porQuarto.set(q, (porQuarto.get(q) ?? 0) + 1);
+      else semQuarto++;
+    }
+    let quartoAncora: string | null = null;
+    let max = 0;
+    for (const [q, n] of porQuarto) if (n > max) { max = n; quartoAncora = q; }
+    const juntos = semQuarto === 0 && porQuarto.size === 1;
+    return { porQuarto, semQuarto, quartoAncora, juntos };
+  }
+
+  async function juntarConexao(membros: PassageiroRow[], quartoId: string) {
+    const r = await alocarConexaoNoQuarto(membros.map((m) => m.id), quartoId, expedicaoId);
+    if (!r.ok) {
+      toast.error("Não foi possível juntar", { description: r.error });
+      return;
+    }
+    toast.success("Conexão alocada no mesmo quarto");
+    router.refresh();
   }
 
   async function alocar(paxId: string, quartoId: string) {
@@ -326,6 +384,53 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
           </div>
         )}
 
+        {/* Conexões "viajam juntas" (mesmo quarto) */}
+        <section className="rounded-md border border-border">
+          <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-semibold text-[13px]">Viajam juntas</span>
+              <span className="text-[11px] text-muted-foreground">ficam no mesmo quarto</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setConexaoDrawer({ membros: [] })}>
+              <Link2 className="h-3 w-3" /> Nova conexão
+            </Button>
+          </header>
+          <div className="p-3">
+            {conexoes.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Marque pessoas que viajam juntas (casal, família) para alocá-las no mesmo quarto e ser
+                avisado se ficarem separadas em algum hotel.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {conexoes.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.cor }} />
+                    <span className="text-[12px] truncate flex-1">{c.membros.map((m) => m.nome_completo).join(" · ")}</span>
+                    <Badge variant="auto">{c.membros.length}</Badge>
+                    <button
+                      type="button"
+                      onClick={() => setConexaoDrawer({ membros: c.membros.map((m) => m.id) })}
+                      className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted"
+                    >
+                      Editar
+                    </button>
+                    <ConfirmDeleteButton
+                      ariaLabel="Desfazer conexão"
+                      triggerLabel="Desfazer"
+                      title="Desfazer esta conexão?"
+                      description="As pessoas deixam de ser tratadas como grupo de quarto. As alocações atuais de quarto não mudam."
+                      successMessage="Conexão desfeita"
+                      onConfirm={() => desfazerConexao(expedicaoId, c.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
         {trechos.length === 0 ? (
           <div className="text-xs text-muted-foreground py-10 text-center border border-dashed border-border rounded-md">
             Nenhum quarto cadastrado. Crie quartos (com hotel e datas) para montar o rooming por hotel.
@@ -348,6 +453,43 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                   </Badge>
                 </header>
 
+                {/* Status das conexões neste hotel */}
+                {conexoes.length > 0 && (
+                  <div className="border-b border-border bg-background px-3 py-2 space-y-1">
+                    {conexoes.map((c) => {
+                      const st = conexaoNoTrecho(c.membros, t);
+                      const ancoraNum = st.quartoAncora ? quartos.find((q) => q.id === st.quartoAncora)?.numero : null;
+                      const nenhumAlocado = st.porQuarto.size === 0;
+                      return (
+                        <div key={c.id} className="flex items-center gap-2 text-[11px]">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: c.cor }} />
+                          <span className="truncate text-muted-foreground">
+                            {c.membros.map((m) => m.nome_completo.split(" ")[0]).join(" + ")}
+                          </span>
+                          {st.juntos ? (
+                            <Badge variant="vinculado">juntos{ancoraNum ? ` · Quarto ${ancoraNum}` : ""}</Badge>
+                          ) : nenhumAlocado ? (
+                            <span className="text-muted-foreground">a alocar</span>
+                          ) : (
+                            <>
+                              <Badge variant="atencao">separados</Badge>
+                              {st.quartoAncora && (
+                                <button
+                                  type="button"
+                                  onClick={() => juntarConexao(c.membros, st.quartoAncora!)}
+                                  className="text-editavel-700 hover:underline font-medium"
+                                >
+                                  Juntar no Quarto {ancoraNum}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-3">
                   {/* Sem quarto neste hotel */}
                   <Dropzone id={`sem::${t.key}`} className="rounded-md border border-border bg-muted/20 p-3">
@@ -359,7 +501,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                       {sem.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground py-2">Todos alocados neste hotel 👌</p>
                       ) : (
-                        sem.map((p) => <PaxCard key={p.id} p={p} trechoKey={t.key} />)
+                        sem.map((p) => <PaxCard key={p.id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} />)
                       )}
                     </div>
                   </Dropzone>
@@ -411,7 +553,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                             ) : (
                               ocupIds.map((id) => {
                                 const p = paxById.get(id);
-                                return p ? <PaxCard key={id} p={p} trechoKey={t.key} /> : null;
+                                return p ? <PaxCard key={id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} /> : null;
                               })
                             )}
                           </div>
@@ -432,6 +574,13 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
           quarto={quartoEditando}
           onOpenChange={(open) => !open && setEditandoId(null)}
         />
+        <ConexaoViagemDrawer
+          expedicaoId={expedicaoId}
+          passageiros={paxAtivos}
+          membrosIniciais={conexaoDrawer?.membros ?? []}
+          open={conexaoDrawer !== null}
+          onOpenChange={(open) => !open && setConexaoDrawer(null)}
+        />
       </div>
     </DndContext>
   );
@@ -446,7 +595,15 @@ function Dropzone({ id, className, children }: { id: string; className?: string;
   );
 }
 
-function PaxCard({ p, trechoKey }: { p: PassageiroRow; trechoKey: string }) {
+function PaxCard({
+  p,
+  trechoKey,
+  conexao,
+}: {
+  p: PassageiroRow;
+  trechoKey: string;
+  conexao?: { cor: string; companheiros: string };
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `${trechoKey}::${p.id}` });
   const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 50 } : undefined;
   return (
@@ -461,6 +618,13 @@ function PaxCard({ p, trechoKey }: { p: PassageiroRow; trechoKey: string }) {
       )}
     >
       <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {conexao && (
+        <span
+          className="h-2.5 w-2.5 rounded-full shrink-0"
+          style={{ background: conexao.cor }}
+          title={`Viaja com: ${conexao.companheiros}`}
+        />
+      )}
       <Avatar nome={p.nome_completo} size={20} />
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-medium truncate">{p.nome_completo}</div>

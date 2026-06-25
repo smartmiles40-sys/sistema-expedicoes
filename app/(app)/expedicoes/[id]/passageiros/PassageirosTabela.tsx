@@ -20,6 +20,7 @@ import { EditarPassageiroDrawer } from "./EditarPassageiroDrawer";
 import { ImportarPassageirosDrawer } from "./ImportarPassageirosDrawer";
 import { AdicionarExistenteDrawer } from "./AdicionarExistenteDrawer";
 import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
+import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
@@ -39,9 +40,11 @@ interface Props {
   prontidao: ProntidaoPassageiro[];
   usuarios: UsuarioRow[];
   pessoas: PessoaAgregada[];
+  /** passageiro_id → posição cronológica desta expedição na história da pessoa. */
+  posicoesFidelidade: Record<string, number>;
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios, pessoas }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios, pessoas, posicoesFidelidade }: Props) {
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
@@ -222,14 +225,17 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                         #{String(indiceById.get(p.id) ?? "").padStart(3, "0")}
                       </td>
                       <td className="font-medium px-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditandoId(p.id)}
-                          title="Abrir perfil do passageiro"
-                          className="text-left text-editavel-700 hover:underline"
-                        >
-                          {p.nome_completo}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditandoId(p.id)}
+                            title="Abrir perfil do passageiro"
+                            className="text-left text-editavel-700 hover:underline"
+                          >
+                            {p.nome_completo}
+                          </button>
+                          <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
+                        </div>
                       </td>
                       <td className="px-2.5">
                         <Badge variant={p.tipo === "Líder" ? "lista" : p.tipo === "Cortesia" ? "auto" : "vinculado"}>
@@ -330,6 +336,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         destino={destino}
         prontidao={passageiroEditando ? prontidaoByPax.get(passageiroEditando.id) ?? null : null}
         usuarios={usuarios}
+        posicaoFidelidade={passageiroEditando ? posicoesFidelidade[passageiroEditando.id] ?? null : null}
         onOpenChange={(open) => !open && setEditandoId(null)}
       />
 

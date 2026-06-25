@@ -315,7 +315,14 @@ type PassageiroBase = Omit<
   | "condicoes_medicas"
   | "contrato_assinado"
   | "checkin_online_feito"
+  | "conexao_viagem_id"
 >;
+
+/** Conexões "viajam juntas" de demonstração (mesmo token = mesmo quarto). */
+const CONEXAO_DEMO: Record<string, string> = {
+  p0000001: "conx-demo-peru", // Mariana
+  p0000002: "conx-demo-peru", // João — viajam juntos no Peru
+};
 
 const passageirosBase: PassageiroBase[] = [
   // Peru
@@ -394,6 +401,7 @@ function normalizarPassageiro(p: PassageiroBase): Tables<"passageiros"> {
   const valor_pago_brl = extra.valor_pago_brl ?? 0;
   return {
     ...p,
+    conexao_viagem_id: CONEXAO_DEMO[p.id] ?? null,
     valor_contratado_brl,
     valor_pago_brl,
     saldo_brl: valor_contratado_brl - valor_pago_brl, // espelha a coluna gerada
@@ -627,6 +635,7 @@ function passageiroDeSeed(
     id,
     expedicao_id: expedicaoId,
     grupo_id: null,
+    conexao_viagem_id: null,
     bitrix_contact_id: null,
     bitrix_deal_id: null,
     nome_completo: d.nome_completo,

@@ -118,6 +118,9 @@ export type PassageiroRow = {
   id: string;
   expedicao_id: string | null; // null = passageiro avulso (na base, sem expedição)
   grupo_id: string | null;
+  // Token de "viajam juntas" (mesmo quarto no rooming). Pax com o mesmo valor,
+  // dentro da expedição, formam uma conexão. Null = sem conexão. (migration 0019)
+  conexao_viagem_id: string | null;
   bitrix_contact_id: string | null;
   bitrix_deal_id: string | null;
   nome_completo: string;

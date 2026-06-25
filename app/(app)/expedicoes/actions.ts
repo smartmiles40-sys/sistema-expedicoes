@@ -16,7 +16,7 @@ import {
 } from "@/lib/mock-data";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
-import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA } from "@/lib/constants";
+import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
 import { chaveIdentidade } from "@/lib/data/pessoas";
@@ -556,6 +556,7 @@ export async function criarPassageiro(
       ...payload,
       id,
       grupo_id: null,
+      conexao_viagem_id: null,
       bitrix_contact_id: null,
       bitrix_deal_id: null,
       voo_nacional_necessario: false,
@@ -656,6 +657,7 @@ export async function criarPassageiroAvulso(
       ...payload,
       id,
       grupo_id: null,
+      conexao_viagem_id: null,
       bitrix_contact_id: null,
       bitrix_deal_id: null,
       voo_nacional_necessario: false,
@@ -716,6 +718,7 @@ export async function adicionarPassageiroExistente(
       id,
       expedicao_id: expedicaoId,
       grupo_id: null,
+      conexao_viagem_id: null,
       quarto_id: null,
       tipo: "Pagante",
       status_reserva: "Lead",
@@ -1410,7 +1413,7 @@ export async function excluirPassageiro(
     await supabase.from("passageiro_requisitos").delete().eq("passageiro_id", passageiroId);
     const { error } = await supabase
       .from("passageiros")
-      .update({ expedicao_id: null, grupo_id: null, quarto_id: null })
+      .update({ expedicao_id: null, grupo_id: null, conexao_viagem_id: null, quarto_id: null })
       .eq("id", passageiroId);
     if (error) return { ok: false, error: error.message };
   }
@@ -1579,6 +1582,173 @@ export async function desalocarPassageiro(
   const supabase = await getServerClient();
   const { error } = await supabase
     .from("passageiro_quarto").delete().eq("passageiro_id", passageiroId).eq("quarto_id", quartoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
+// --- Conexão "viajam juntas" (mesmo quarto no rooming) -----------------------
+function revalidarConexao(expedicaoId: string) {
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+}
+
+/**
+ * Conecta passageiros (≥2) de uma expedição: passam a "viajar juntos" (mesmo
+ * quarto). Reaproveita o token se todos os selecionados já compartilham um; se
+ * houver tokens diferentes em jogo, faz merge (absorve as conexões pré-existentes).
+ */
+export async function conectarPassageiros(
+  expedicaoId: string,
+  passageiroIds: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  const ids = [...new Set(passageiroIds)];
+  if (ids.length < 2) return { ok: false, error: "Selecione ao menos 2 pessoas." };
+
+  if (DEV_USE_MOCK_DATA) {
+    const sel = mockPassageiros.filter((p) => ids.includes(p.id) && p.expedicao_id === expedicaoId);
+    if (sel.length < 2) return { ok: false, error: "Passageiros inválidos." };
+    const tokens = new Set(sel.map((p) => p.conexao_viagem_id).filter(Boolean) as string[]);
+    const token = tokens.size === 1 ? [...tokens][0] : genId("conx");
+    for (const p of mockPassageiros) {
+      if (p.expedicao_id !== expedicaoId) continue;
+      if (ids.includes(p.id) || (p.conexao_viagem_id && tokens.has(p.conexao_viagem_id))) {
+        p.conexao_viagem_id = token;
+      }
+    }
+    revalidarConexao(expedicaoId);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data: sel } = await supabase
+    .from("passageiros").select("id, conexao_viagem_id").eq("expedicao_id", expedicaoId).in("id", ids);
+  if (!sel || sel.length < 2) return { ok: false, error: "Passageiros inválidos." };
+  const tokens = [...new Set(sel.map((p) => p.conexao_viagem_id).filter(Boolean) as string[])];
+  const token = tokens.length === 1 ? tokens[0] : crypto.randomUUID();
+  let err = (await supabase.from("passageiros").update({ conexao_viagem_id: token }).in("id", ids)).error;
+  if (!err && tokens.length) {
+    err = (
+      await supabase.from("passageiros").update({ conexao_viagem_id: token })
+        .eq("expedicao_id", expedicaoId).in("conexao_viagem_id", tokens)
+    ).error;
+  }
+  if (err) return { ok: false, error: err.message };
+  revalidarConexao(expedicaoId);
+  return { ok: true };
+}
+
+/** Tira um passageiro da conexão; se sobrar <2 membros, dissolve a conexão. */
+export async function removerDaConexao(
+  passageiroId: string,
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockPassageiros.find((x) => x.id === passageiroId);
+    if (!p || !p.conexao_viagem_id) return { ok: true };
+    const token = p.conexao_viagem_id;
+    p.conexao_viagem_id = null;
+    const restantes = mockPassageiros.filter((x) => x.expedicao_id === expedicaoId && x.conexao_viagem_id === token);
+    if (restantes.length < 2) restantes.forEach((x) => (x.conexao_viagem_id = null));
+    revalidarConexao(expedicaoId);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data: p } = await supabase
+    .from("passageiros").select("conexao_viagem_id").eq("id", passageiroId).maybeSingle();
+  const token = p?.conexao_viagem_id;
+  if (!token) return { ok: true };
+  let err = (await supabase.from("passageiros").update({ conexao_viagem_id: null }).eq("id", passageiroId)).error;
+  if (!err) {
+    const { data: rest } = await supabase
+      .from("passageiros").select("id").eq("expedicao_id", expedicaoId).eq("conexao_viagem_id", token);
+    if (rest && rest.length < 2) {
+      err = (
+        await supabase.from("passageiros").update({ conexao_viagem_id: null })
+          .eq("expedicao_id", expedicaoId).eq("conexao_viagem_id", token)
+      ).error;
+    }
+  }
+  if (err) return { ok: false, error: err.message };
+  revalidarConexao(expedicaoId);
+  return { ok: true };
+}
+
+/** Desfaz a conexão inteira (todos os membros voltam a ficar sem conexão). */
+export async function desfazerConexao(
+  expedicaoId: string,
+  conexaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    for (const p of mockPassageiros) {
+      if (p.expedicao_id === expedicaoId && p.conexao_viagem_id === conexaoId) p.conexao_viagem_id = null;
+    }
+    revalidarConexao(expedicaoId);
+    return { ok: true };
+  }
+  const supabase = await getServerClient();
+  const { error } = await supabase
+    .from("passageiros").update({ conexao_viagem_id: null })
+    .eq("expedicao_id", expedicaoId).eq("conexao_viagem_id", conexaoId);
+  if (error) return { ok: false, error: error.message };
+  revalidarConexao(expedicaoId);
+  return { ok: true };
+}
+
+/**
+ * Aloca TODOS os passageiros informados (uma conexão) no mesmo quarto, dentro do
+ * trecho daquele quarto. Falha se o quarto não comporta a conexão inteira.
+ */
+export async function alocarConexaoNoQuarto(
+  passageiroIds: string[],
+  quartoId: string,
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const ids = [...new Set(passageiroIds)];
+  if (!ids.length) return { ok: false, error: "Sem passageiros." };
+
+  if (DEV_USE_MOCK_DATA) {
+    const alvo = mockQuartos.find((q) => q.id === quartoId);
+    if (!alvo) return { ok: false, error: "Quarto não encontrado" };
+    const cap = CAPACIDADE_QUARTO[alvo.tipo] ?? 1;
+    if (ids.length > cap) {
+      return { ok: false, error: `O quarto (${alvo.tipo}) comporta ${cap}; a conexão tem ${ids.length}.` };
+    }
+    const tk = trechoKey(alvo);
+    const idsTrecho = new Set(
+      mockQuartos.filter((q) => q.expedicao_id === expedicaoId && trechoKey(q) === tk).map((q) => q.id),
+    );
+    for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
+      if (ids.includes(mockAlocacoes[i].passageiro_id) && idsTrecho.has(mockAlocacoes[i].quarto_id)) {
+        mockAlocacoes.splice(i, 1);
+      }
+    }
+    for (const pid of ids) {
+      mockAlocacoes.push({ id: genId("al"), passageiro_id: pid, quarto_id: quartoId, created_at: new Date().toISOString() });
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data: alvo } = await supabase
+    .from("quartos").select("hotel_cidade, check_in, check_out, tipo").eq("id", quartoId).maybeSingle();
+  if (!alvo) return { ok: false, error: "Quarto não encontrado" };
+  const cap = CAPACIDADE_QUARTO[(alvo as { tipo: string }).tipo] ?? 1;
+  if (ids.length > cap) {
+    return { ok: false, error: `O quarto (${(alvo as { tipo: string }).tipo}) comporta ${cap}; a conexão tem ${ids.length}.` };
+  }
+  const { data: qs } = await supabase
+    .from("quartos").select("id, hotel_cidade, check_in, check_out").eq("expedicao_id", expedicaoId);
+  const tk = trechoKey(alvo as QuartoTrecho);
+  const idsTrecho = ((qs ?? []) as (QuartoTrecho & { id: string })[])
+    .filter((q) => trechoKey(q) === tk).map((q) => q.id);
+  if (idsTrecho.length) {
+    await supabase.from("passageiro_quarto").delete().in("passageiro_id", ids).in("quarto_id", idsTrecho);
+  }
+  const { error } = await supabase
+    .from("passageiro_quarto").insert(ids.map((pid) => ({ passageiro_id: pid, quarto_id: quartoId })));
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
   return { ok: true };
@@ -1958,6 +2128,7 @@ function novoPassageiroDeImport(
     id: genId("p"),
     expedicao_id: expedicaoId,
     grupo_id: null,
+    conexao_viagem_id: null,
     bitrix_contact_id: null,
     bitrix_deal_id: null,
     nome_completo: d.nome_completo,
