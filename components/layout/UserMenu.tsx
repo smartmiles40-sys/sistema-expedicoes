@@ -2,6 +2,7 @@
 import { LogOut, Moon, Sun, ChevronUp } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Avatar } from "@/components/ui/Avatar";
+import { cn } from "@/lib/utils";
 import { useTheme } from "./ThemeProvider";
 import type { CurrentUser } from "@/lib/supabase/auth";
 
@@ -13,22 +14,27 @@ const PAPEL_LABEL: Record<string, string> = {
   leitura: "Leitura",
 };
 
-export function UserMenu({ user }: { user: CurrentUser | null }) {
+export function UserMenu({ user, onDark = false }: { user: CurrentUser | null; onDark?: boolean }) {
   const { theme, toggle } = useTheme();
 
   if (!user) return null;
 
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="flex w-full items-center gap-2 rounded-md p-1.5 text-left hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <DropdownMenu.Trigger
+        className={cn(
+          "flex w-full items-center gap-2 rounded-xl p-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          onDark ? "hover:bg-white/10" : "hover:bg-accent",
+        )}
+      >
         <Avatar nome={user.nome} size={28} />
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-medium truncate">{user.nome}</div>
-          <div className="text-[10px] text-muted-foreground truncate">
+          <div className={cn("text-[12px] font-medium truncate", onDark && "text-white")}>{user.nome}</div>
+          <div className={cn("text-[10px] truncate", onDark ? "text-white/50" : "text-muted-foreground")}>
             {PAPEL_LABEL[user.papel] ?? user.papel}
           </div>
         </div>
-        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+        <ChevronUp className={cn("h-3.5 w-3.5", onDark ? "text-white/50" : "text-muted-foreground")} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

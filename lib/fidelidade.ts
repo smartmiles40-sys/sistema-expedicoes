@@ -14,6 +14,33 @@ export function ehMarco(posicao: number | null | undefined): boolean {
   return posicao != null && (MARCOS_FIDELIDADE as readonly number[]).includes(posicao);
 }
 
+export type NivelFidelidade = {
+  /** Nome do nível ("Estreante" → "Lenda"). */
+  tier: string;
+  /** Marcos já conquistados (subconjunto de [3,5,10]). */
+  conquistados: number[];
+  /** Próximo marco a alcançar, ou null se já passou de todos. */
+  proximo: number | null;
+  /** Quantas viagens faltam para o próximo marco. */
+  faltam: number;
+  /** Progresso 0..1 dentro da faixa atual (do marco anterior ao próximo). */
+  progresso: number;
+};
+
+/** Nível de fidelidade de uma pessoa pelo total de expedições (estilo clube). */
+export function nivelFidelidade(totalExpedicoes: number): NivelFidelidade {
+  const marcos = MARCOS_FIDELIDADE as readonly number[];
+  const n = Math.max(0, totalExpedicoes);
+  const conquistados = marcos.filter((m) => n >= m);
+  const proximo = marcos.find((m) => n < m) ?? null;
+  const anterior = [0, ...marcos].filter((m) => m <= n).pop() ?? 0;
+  const faltam = proximo != null ? proximo - n : 0;
+  const progresso = proximo != null ? (n - anterior) / (proximo - anterior) : 1;
+  const tier =
+    n >= 10 ? "Lenda" : n >= 5 ? "Aventureiro" : n >= 3 ? "Explorador" : n >= 1 ? "Viajante" : "Estreante";
+  return { tier, conquistados, proximo, faltam, progresso };
+}
+
 /** Ordinal feminino pt-BR (combina com "expedição"): 1 → "1ª". */
 export function ordinalFem(n: number): string {
   return `${n}ª`;

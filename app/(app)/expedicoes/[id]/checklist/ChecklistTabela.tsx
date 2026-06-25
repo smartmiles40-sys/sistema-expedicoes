@@ -2,9 +2,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LayoutGrid, List as ListIcon, Plus, ChevronRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { LayoutGrid, List as ListIcon, Plus, ChevronRight, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
+import { StatPill } from "@/components/ui/StatPill";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { EditableCell } from "@/components/tables/EditableCell";
@@ -141,11 +142,13 @@ export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: 
               <LayoutGrid className="h-3 w-3" /> Kanban
             </button>
           </div>
-          <Button size="sm" onClick={() => setDrawerOpen(true)}>
+          <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
             <Plus className="h-3 w-3" /> Nova tarefa
           </Button>
         </div>
       </div>
+
+      <ChecklistTriagem itens={itens} usuariosById={usuariosById} />
 
       <FaseTimeline itens={topLevel} faseAtual={faseAtual} />
 
@@ -222,6 +225,74 @@ function ChecklistVazio({
         </p>
       )}
       {drawerSlot}
+    </div>
+  );
+}
+
+/* ───────────────────────── Triagem de alertas ───────────────────────── */
+
+function ChecklistTriagem({
+  itens,
+  usuariosById,
+}: {
+  itens: ChecklistItemRow[];
+  usuariosById: Map<string, UsuarioRow>;
+}) {
+  const ativos = itens.filter((i) => i.status !== "Concluído");
+  const comDias = ativos.map((i) => ({ it: i, dias: daysUntil(i.prazo) }));
+  const atrasados = comDias.filter((a) => a.dias != null && a.dias < 0).sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
+  const venceBreve = comDias.filter((a) => a.dias != null && a.dias >= 0 && a.dias <= 3).sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
+  const bloqueados = ativos.filter((i) => i.status === "Bloqueado");
+  const totalAlertas = atrasados.length + venceBreve.length + bloqueados.length;
+
+  if (totalAlertas === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl border border-vinculado-600/30 bg-vinculado-50 px-4 py-2.5 text-[13px] font-medium text-vinculado-700 dark:bg-vinculado-600/10 dark:text-vinculado-300">
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
+        Tudo em dia — nenhum processo atrasado ou vencendo nos próximos dias. 🎉
+      </div>
+    );
+  }
+
+  // Lista priorizada: atrasados (mais atrasado primeiro) → vencendo (mais perto primeiro).
+  const urgentes = [...atrasados, ...venceBreve];
+  const lista = urgentes.slice(0, 6);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-critico-600/30 bg-gradient-to-br from-critico-50 to-atencao-50 shadow-sm dark:from-critico-600/10 dark:to-atencao-600/10">
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+        <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-critico-100 text-critico-600">
+          <AlertTriangle className="h-4 w-4" />
+        </span>
+        <h3 className="text-[14px] font-semibold">Precisa de atenção</h3>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {atrasados.length > 0 && <StatPill value={atrasados.length} label="atrasados" variant="critico" />}
+          {venceBreve.length > 0 && <StatPill value={venceBreve.length} label="vencendo" variant="atencao" />}
+          {bloqueados.length > 0 && <StatPill value={bloqueados.length} label="bloqueados" variant="critico" />}
+        </div>
+      </div>
+      <div className="mt-2.5 divide-y divide-border/50">
+        {lista.map(({ it, dias }) => {
+          const atrasado = dias != null && dias < 0;
+          const resp = it.responsavel_id ? usuariosById.get(it.responsavel_id) : null;
+          return (
+            <div key={it.id} className="flex items-center gap-2.5 px-4 py-2 text-[12px]">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", atrasado ? "bg-critico-600" : "bg-atencao-500")} />
+              <span className="min-w-0 flex-1 truncate font-medium">{it.tarefa}</span>
+              <Badge variant="lista" className="hidden sm:inline-flex">{it.etapa}</Badge>
+              {resp && <Avatar nome={resp.nome} size={20} className="hidden shrink-0 sm:flex" />}
+              <span className={cn("shrink-0 font-semibold tabular-nums", atrasado ? "text-critico-600" : "text-atencao-600")}>
+                {atrasado ? `${-(dias ?? 0)}d de atraso` : dias === 0 ? "vence hoje" : `vence em ${dias}d`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {urgentes.length > lista.length && (
+        <div className="px-4 py-1.5 text-[11px] text-muted-foreground">
+          + {urgentes.length - lista.length} outro(s) na lista abaixo
+        </div>
+      )}
     </div>
   );
 }

@@ -1,133 +1,147 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, MapPin, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
+import { ArrowLeft, Calendar, MapPin, RefreshCw, Plane } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { formatDate, formatPercent, daysUntil } from "@/lib/utils";
 import type { ExpedicaoComAgregados, StatusExpedicao } from "@/types/database";
 
-const STATUS_VARIANT: Record<StatusExpedicao, "lista" | "vinculado" | "atencao" | "auto" | "critico"> = {
-  Planejamento: "lista",
-  "Vendas Abertas": "vinculado",
-  "Em andamento": "atencao",
-  Concluída: "auto",
-  Cancelada: "critico",
+const STATUS_PILL: Record<StatusExpedicao, string> = {
+  Planejamento: "bg-white/15 text-white",
+  "Vendas Abertas": "bg-[var(--brand-lime)] text-[var(--brand-dark)]",
+  "Em andamento": "bg-[var(--brand-lime)] text-[var(--brand-dark)]",
+  Concluída: "bg-white/15 text-white/80",
+  Cancelada: "bg-critico-600 text-white",
 };
 
-export function ExpedicaoHeader({
-  expedicao,
-}: {
-  expedicao: ExpedicaoComAgregados;
-}) {
+export function ExpedicaoHeader({ expedicao }: { expedicao: ExpedicaoComAgregados }) {
   const dias = daysUntil(expedicao.data_embarque);
   const ocupacao = expedicao.pax_planejados > 0 ? expedicao.pax_confirmados / expedicao.pax_planejados : 0;
   const prontidaoPct = expedicao.prontidao_total > 0 ? expedicao.prontidao_aptos / expedicao.prontidao_total : 0;
+  const embarcou = dias != null && dias < 0;
 
   return (
-    <div className="border-b border-border bg-background px-4 py-3 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2 min-w-0 flex-1">
-          <Link
-            href="/expedicoes"
-            className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Voltar para lista"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base font-semibold truncate">{expedicao.nome}</h1>
-              <span className="font-mono text-xs text-muted-foreground">{expedicao.codigo}</span>
-              <Badge variant={STATUS_VARIANT[expedicao.status]}>{expedicao.status}</Badge>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3 w-3" /> {expedicao.destino}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDate(expedicao.data_embarque)} → {formatDate(expedicao.data_retorno)}
-                {dias != null && dias >= 0 && (
-                  <span className={dias < 30 ? "text-atencao-600 ml-1" : "ml-1"}>
-                    (em {dias}d)
-                  </span>
-                )}
-              </span>
+    <div>
+      {/* HERO — banner em gradiente da marca */}
+      <div className="bg-brand-gradient relative overflow-hidden px-5 py-5 text-white">
+        <div className="relative z-10 flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <Link
+              href="/expedicoes"
+              className="mt-1 text-white/60 transition-colors hover:text-[var(--brand-lime)]"
+              aria-label="Voltar para lista"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="font-display text-[26px] font-semibold leading-tight text-white truncate">
+                  {expedicao.nome}
+                </h1>
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_PILL[expedicao.status]}`}>
+                  {expedicao.status}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/75">
+                <span className="font-mono text-white/45">{expedicao.codigo}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-[var(--brand-lime)]" /> {expedicao.destino}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-[var(--brand-lime)]" />
+                  {formatDate(expedicao.data_embarque)} → {formatDate(expedicao.data_retorno)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {expedicao.responsavel_op_nome && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-muted-foreground">Op:</span>
-              <Avatar nome={expedicao.responsavel_op_nome} size={20} />
-              <span className="hidden md:inline">{expedicao.responsavel_op_nome}</span>
+
+          {/* Contagem regressiva + ações */}
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex items-center gap-2">
+              {expedicao.responsavel_op_nome && (
+                <span title={`Op: ${expedicao.responsavel_op_nome}`}>
+                  <Avatar nome={expedicao.responsavel_op_nome} size={26} className="ring-2 ring-white/20" />
+                </span>
+              )}
+              {expedicao.responsavel_com_nome && (
+                <span title={`Com: ${expedicao.responsavel_com_nome}`} className="-ml-3">
+                  <Avatar nome={expedicao.responsavel_com_nome} size={26} className="ring-2 ring-white/20" />
+                </span>
+              )}
             </div>
-          )}
-          {expedicao.responsavel_com_nome && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-muted-foreground">Com:</span>
-              <Avatar nome={expedicao.responsavel_com_nome} size={20} />
-              <span className="hidden md:inline">{expedicao.responsavel_com_nome}</span>
-            </div>
-          )}
-          <button className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1 transition-colors">
-            <RefreshCw className="h-3 w-3" />
-            Sync Bitrix
-          </button>
+
+            {dias != null && !embarcou ? (
+              <div className="rounded-2xl bg-[var(--brand-lime)] px-4 py-1.5 text-center text-[var(--brand-dark)] shadow-sm">
+                <div className="text-[22px] font-bold leading-none tabular-nums">{dias}</div>
+                <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide">
+                  {dias === 0 ? "embarca hoje" : dias === 1 ? "dia p/ embarcar" : "dias p/ embarcar"}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-white/15 px-4 py-2 text-center">
+                <div className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+                  <Plane className="h-4 w-4" /> {embarcou ? "Embarcou" : "—"}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* brilho decorativo */}
+        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[var(--brand-lime)] opacity-[0.06] blur-3xl" />
       </div>
 
-      {/* KPIs operacionais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi
-          label="Pax confirmados"
-          value={`${expedicao.pax_confirmados}/${expedicao.pax_planejados}`}
-          sub={`${formatPercent(ocupacao, 0)} ocupação`}
+      {/* Faixa de anéis + Sync */}
+      <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 flex-wrap">
+        <RingStat
+          value={ocupacao}
+          color="var(--brand-dark)"
+          label="Ocupação"
+          big={`${expedicao.pax_confirmados}/${expedicao.pax_planejados}`}
+          sub="confirmados"
         />
-        <Kpi
+        <RingStat
+          value={expedicao.checklist_pct}
+          color="var(--brand-lime-deep)"
           label="Checklist"
-          value={formatPercent(expedicao.checklist_pct, 0)}
-          sub="processos concluídos"
-          variant={expedicao.checklist_pct >= 1 ? "vinculado" : expedicao.checklist_pct >= 0.5 ? "atencao" : undefined}
+          big={formatPercent(expedicao.checklist_pct, 0)}
+          sub="concluído"
         />
-        <Kpi
+        <RingStat
+          value={prontidaoPct}
+          color={expedicao.prontidao_total === 0 ? "var(--muted-foreground)" : prontidaoPct >= 1 ? "var(--vinculado-600)" : "var(--atencao-600)"}
           label="Prontidão"
-          value={`${expedicao.prontidao_aptos}/${expedicao.prontidao_total}`}
-          sub={`${formatPercent(prontidaoPct, 0)} aptos`}
-          variant={expedicao.prontidao_total === 0 ? undefined : prontidaoPct >= 1 ? "vinculado" : "atencao"}
+          big={`${expedicao.prontidao_aptos}/${expedicao.prontidao_total}`}
+          sub="aptos p/ embarque"
         />
-        <Kpi
-          label="Embarque"
-          value={dias != null ? (dias >= 0 ? `${dias}d` : "Embarcou") : "—"}
-          sub={dias != null && dias >= 0 ? "até o embarque" : ""}
-          variant={dias != null && dias >= 0 && dias < 30 ? "atencao" : undefined}
-        />
+        <button className="ml-auto inline-flex items-center gap-1.5 self-center rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <RefreshCw className="h-3.5 w-3.5" /> Sync Bitrix
+        </button>
       </div>
     </div>
   );
 }
 
-function Kpi({
-  label,
+function RingStat({
   value,
+  color,
+  label,
+  big,
   sub,
-  variant,
 }: {
+  value: number;
+  color: string;
   label: string;
-  value: string;
-  sub?: string;
-  variant?: "atencao" | "critico" | "vinculado";
+  big: string;
+  sub: string;
 }) {
-  const colors = {
-    atencao: "text-atencao-600",
-    critico: "text-critico-600",
-    vinculado: "text-vinculado-600",
-  };
   return (
-    <div className="rounded-md border border-border p-2.5">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`text-base font-semibold tabular-nums ${variant ? colors[variant] : ""}`}>{value}</div>
-      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+    <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
+      <ProgressRing value={value} color={color} label={`${Math.round((value || 0) * 100)}%`} />
+      <div className="leading-tight">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-[15px] font-semibold tabular-nums">{big}</div>
+        <div className="text-[10px] text-muted-foreground">{sub}</div>
+      </div>
     </div>
   );
 }

@@ -11,9 +11,10 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2 } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import {
@@ -414,7 +415,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
             <Button variant="outline" size="sm" onClick={() => setAutoOpen(true)}>
               <Wand2 className="h-3 w-3" /> Criar quartos automáticos
             </Button>
-            <Button size="sm" onClick={() => setDrawerOpen(true)}>
+            <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
               <Plus className="h-3 w-3" /> Novo quarto
             </Button>
           </div>
@@ -513,8 +514,14 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
         </section>
 
         {trechos.length === 0 ? (
-          <div className="text-xs text-muted-foreground py-10 text-center border border-dashed border-border rounded-md">
-            Nenhum quarto cadastrado. Crie quartos (com hotel e datas) para montar o rooming por hotel.
+          <div className="rounded-2xl border border-dashed border-border bg-muted/20">
+            <EmptyState
+              icon={BedDouble}
+              title="Monte o rooming por hotel"
+              description="Crie os quartos (com hotel e datas de check-in/out) e depois arraste os passageiros para distribuí-los. O jeito rápido é gerar vários de uma vez."
+              actionLabel="Criar quartos automáticos"
+              onAction={() => setAutoOpen(true)}
+            />
           </div>
         ) : (
           trechos.map((t) => {

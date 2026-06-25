@@ -6,9 +6,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Search, User, Plane, ArrowRight, Upload, UserPlus } from "lucide-react";
+import { Search, User, Users, Plane, ArrowRight, Upload, UserPlus, LayoutGrid, List } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Avatar } from "@/components/ui/Avatar";
+import { StatPill } from "@/components/ui/StatPill";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ViajanteCard } from "./ViajanteCard";
 import { Label } from "@/components/ui/Label";
 import { Badge } from "@/components/ui/Badge";
 import { FilterPopover } from "@/components/ui/FilterPopover";
@@ -74,6 +78,7 @@ export function PassageirosGlobalTabela({
 }) {
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
+  const [view, setView] = React.useState<"clube" | "lista">("clube");
   const [expedicoesDe, setExpedicoesDe] = React.useState<PessoaAgregada | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
   const [novoOpen, setNovoOpen] = React.useState(false);
@@ -135,10 +140,30 @@ export function PassageirosGlobalTabela({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <p className="text-xs text-muted-foreground">
+          <p className="hidden text-xs text-muted-foreground sm:block">
             {pessoas.length} pessoa{pessoas.length === 1 ? "" : "s"} · {totalParticipacoes} participaç{totalParticipacoes === 1 ? "ão" : "ões"} em expedições
           </p>
-          <Button size="sm" onClick={() => setNovoOpen(true)}>
+          <div className="flex items-center rounded-lg border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("clube")}
+              title="Clube de viajantes"
+              className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                view === "clube" ? "bg-[var(--brand-dark)] text-[var(--brand-lime)]" : "text-muted-foreground hover:text-foreground")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("lista")}
+              title="Lista"
+              className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                view === "lista" ? "bg-[var(--brand-dark)] text-[var(--brand-lime)]" : "text-muted-foreground hover:text-foreground")}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+          <Button variant="brand" size="sm" onClick={() => setNovoOpen(true)}>
             <UserPlus className="h-3 w-3" /> Novo passageiro
           </Button>
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
@@ -147,8 +172,40 @@ export function PassageirosGlobalTabela({
         </div>
       </div>
 
+      {pessoas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <StatPill label="pessoas na base" value={pessoas.length} variant="editavel" />
+          <StatPill label="já viajaram" value={pessoas.filter((p) => p.totalExpedicoes > 0).length} variant="vinculado" />
+          <StatPill label="participações" value={totalParticipacoes} variant="lista" />
+          <StatPill label="sem CPF" value={pessoas.filter((p) => !p.cpf).length} variant="atencao" />
+        </div>
+      )}
+
+      {/* Clube de viajantes (cards) */}
+      {view === "clube" &&
+        (pessoas.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Seu clube de viajantes começa aqui"
+            description="Toda pessoa que viaja com a agência entra no clube, com perfil, saúde e nível de fidelidade. Cadastre a primeira."
+            actionLabel="Novo passageiro"
+            onAction={() => setNovoOpen(true)}
+          />
+        ) : ordenadas.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border py-12 text-center text-[13px] text-muted-foreground">
+            Nenhum resultado para a busca.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {ordenadas.map((p) => (
+              <ViajanteCard key={p.chave} pessoa={p} onOpen={() => setAberta(p)} />
+            ))}
+          </div>
+        ))}
+
       {/* Tabela */}
-      <div className="rounded-md border border-border overflow-hidden bg-background">
+      {view === "lista" && (
+      <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full table-dense">
             <thead className="bg-muted/40 border-b border-border">
@@ -170,8 +227,18 @@ export function PassageirosGlobalTabela({
             <tbody>
               {ordenadas.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center text-muted-foreground py-8">
-                    {pessoas.length === 0 ? "Nenhum passageiro cadastrado ainda." : "Nenhum resultado para a busca."}
+                  <td colSpan={8} className="p-0">
+                    {pessoas.length === 0 ? (
+                      <EmptyState
+                        icon={Users}
+                        title="Sua base de pessoas começa aqui"
+                        description="Toda pessoa que viaja com a agência fica aqui, com perfil, saúde e histórico de expedições. Cadastre a primeira."
+                        actionLabel="Novo passageiro"
+                        onAction={() => setNovoOpen(true)}
+                      />
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">Nenhum resultado para a busca.</div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -185,7 +252,10 @@ export function PassageirosGlobalTabela({
                       className="group border-b border-border hover:bg-accent/30 cursor-pointer"
                     >
                       <td className="px-2.5 font-medium whitespace-nowrap">
-                        <span className="text-editavel-700 group-hover:underline">{p.nome_completo}</span>
+                        <span className="inline-flex items-center gap-2">
+                          <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
+                          <span className="text-editavel-700 group-hover:underline">{p.nome_completo}</span>
+                        </span>
                       </td>
                       <td className="px-2.5 tabular-nums font-mono text-[12px] text-muted-foreground">{p.cpf ?? "—"}</td>
                       <td className="px-2.5 tabular-nums">{id != null ? `${id}` : "—"}</td>
@@ -217,6 +287,7 @@ export function PassageirosGlobalTabela({
           </table>
         </div>
       </div>
+      )}
 
       {aberta && (
         <PessoaDrawer

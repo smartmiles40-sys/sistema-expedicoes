@@ -1,11 +1,13 @@
 "use client";
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, Compass, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { EmptyState as EmptyStateUI } from "@/components/ui/EmptyState";
 import { FilterPopover } from "@/components/ui/FilterPopover";
 import { ExpedicoesTable } from "@/components/tables/ExpedicoesTable";
+import { ExpedicaoCard } from "./ExpedicaoCard";
 import { NovaExpedicaoDrawer } from "./NovaExpedicaoDrawer";
 import { EditarExpedicaoDrawer } from "./EditarExpedicaoDrawer";
 import { STATUS_EXPEDICAO } from "@/lib/constants";
@@ -53,6 +55,8 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
     () => Array.from(new Set(expedicoes.map((e) => e.destino))).sort(),
     [expedicoes],
   );
+
+  const [view, setView] = React.useState<"cards" | "tabela">("cards");
 
   const filtradas = React.useMemo(() => {
     return expedicoes.filter((e) => {
@@ -168,7 +172,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">Expedições</h1>
+            <h1 className="page-title">Expedições</h1>
             <LiveBadge status={realtimeStatus} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -187,10 +191,32 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
               className="pl-7 w-64"
             />
           </div>
-          <Button onClick={() => setDrawerOpen(true)} className="gap-1.5">
+          <div className="flex items-center rounded-lg border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("cards")}
+              aria-label="Ver em cards"
+              title="Cards"
+              className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                view === "cards" ? "bg-[var(--brand-dark)] text-[var(--brand-lime)]" : "text-muted-foreground hover:text-foreground")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("tabela")}
+              aria-label="Ver em tabela"
+              title="Tabela"
+              className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                view === "tabela" ? "bg-[var(--brand-dark)] text-[var(--brand-lime)]" : "text-muted-foreground hover:text-foreground")}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+          <Button variant="brand" onClick={() => setDrawerOpen(true)} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
             Nova Expedição
-            <kbd className="ml-1 hidden sm:inline-flex h-4 items-center rounded border border-primary-foreground/30 bg-primary-foreground/10 px-1 text-[10px] font-mono">
+            <kbd className="ml-1 hidden sm:inline-flex h-4 items-center rounded border border-[var(--brand-dark)]/30 bg-[var(--brand-dark)]/10 px-1 text-[10px] font-mono">
               n
             </kbd>
           </Button>
@@ -399,28 +425,42 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
                       ))}
                     </div>
                   </header>
-                  <ExpedicoesTable
-                    expedicoes={lista}
-                    destaqueId={proximaId}
-                    selecionada={
-                      selecionada >= offsetGrupo && selecionada < offsetGrupo + lista.length
-                        ? selecionada - offsetGrupo
-                        : -1
-                    }
-                    onRowClick={(e) => router.push(`/expedicoes/${e.id}`)}
-                    onEdit={(e) => setEditandoId(e.id)}
-                    onReorder={async (novaOrdemDoAno) => {
-                      const ordemGlobal = agrupadoPorAno.flatMap(([anoG, listaG]) =>
-                        anoG === ano ? novaOrdemDoAno : listaG.map((x) => x.id),
-                      );
-                      const r = await reordenarExpedicoes(ordemGlobal);
-                      if (!r.ok) {
-                        toast.error("Erro ao salvar nova ordem", { description: r.error });
-                      } else {
-                        router.refresh();
+                  {view === "cards" ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {lista.map((e) => (
+                        <ExpedicaoCard
+                          key={e.id}
+                          expedicao={e}
+                          destaque={e.id === proximaId}
+                          onOpen={() => router.push(`/expedicoes/${e.id}`)}
+                          onEdit={() => setEditandoId(e.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <ExpedicoesTable
+                      expedicoes={lista}
+                      destaqueId={proximaId}
+                      selecionada={
+                        selecionada >= offsetGrupo && selecionada < offsetGrupo + lista.length
+                          ? selecionada - offsetGrupo
+                          : -1
                       }
-                    }}
-                  />
+                      onRowClick={(e) => router.push(`/expedicoes/${e.id}`)}
+                      onEdit={(e) => setEditandoId(e.id)}
+                      onReorder={async (novaOrdemDoAno) => {
+                        const ordemGlobal = agrupadoPorAno.flatMap(([anoG, listaG]) =>
+                          anoG === ano ? novaOrdemDoAno : listaG.map((x) => x.id),
+                        );
+                        const r = await reordenarExpedicoes(ordemGlobal);
+                        if (!r.ok) {
+                          toast.error("Erro ao salvar nova ordem", { description: r.error });
+                        } else {
+                          router.refresh();
+                        }
+                      }}
+                    />
+                  )}
                 </section>
               );
             });
@@ -445,15 +485,14 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-lg bg-muted/20">
-      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
-        <Plus className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <p className="text-sm font-medium">Nenhuma expedição ainda</p>
-      <p className="text-xs text-muted-foreground mt-0.5">Crie a primeira pra começar.</p>
-      <Button onClick={onCreate} className="mt-4">
-        Criar primeira expedição
-      </Button>
+    <div className="rounded-2xl border border-dashed border-border bg-muted/20">
+      <EmptyStateUI
+        icon={Compass}
+        title="Nenhuma expedição ainda"
+        description="Crie sua primeira viagem em grupo para começar a organizar passageiros, prazos, rooming e prontidão — tudo num lugar só."
+        actionLabel="Criar primeira expedição"
+        onAction={onCreate}
+      />
     </div>
   );
 }

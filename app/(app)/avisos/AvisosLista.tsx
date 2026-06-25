@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Search, BellOff, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { cn, formatDate } from "@/lib/utils";
 import type { AlertaOperacional } from "@/lib/data/expedicoes";
 
@@ -52,10 +53,10 @@ export function AvisosLista({ alertas }: { alertas: AlertaOperacional[] }) {
               key={f}
               onClick={() => setFiltro(f)}
               className={cn(
-                "px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors",
+                "px-2.5 py-1 rounded-lg text-[12px] font-medium border transition-colors",
                 filtro === f
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:text-foreground",
+                  ? "border-[var(--brand-dark)] bg-[var(--brand-dark)] text-[var(--brand-lime)]"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-accent",
               )}
             >
               {f === "todos" ? `Todos (${alertas.length})` : f === "critico" ? `Críticos (${criticos})` : `Atenção (${atencoes})`}
@@ -69,15 +70,23 @@ export function AvisosLista({ alertas }: { alertas: AlertaOperacional[] }) {
       </div>
 
       {grupos.length === 0 ? (
-        <div className="rounded-md border border-border bg-background p-10 text-center text-muted-foreground">
-          <BellOff className="mx-auto mb-2 h-6 w-6 opacity-60" />
-          {alertas.length === 0
-            ? "Nenhum aviso no momento — tudo dentro do prazo. 🎉"
-            : "Nenhum aviso para o filtro/busca atual."}
-        </div>
+        alertas.length === 0 ? (
+          <div className="rounded-2xl border border-vinculado-600/30 bg-vinculado-50 dark:bg-vinculado-600/10">
+            <EmptyState
+              icon={BellOff}
+              title="Tudo dentro do prazo"
+              description="Nenhum aviso no momento — passaportes, vistos, documentos e prazos das expedições estão em dia. 🎉"
+            />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border bg-background p-10 text-center text-muted-foreground">
+            <BellOff className="mx-auto mb-2 h-6 w-6 opacity-60" />
+            Nenhum aviso para o filtro/busca atual.
+          </div>
+        )
       ) : (
         grupos.map((g) => (
-          <div key={g.expedicao_id} className="rounded-md border border-border bg-background overflow-hidden">
+          <div key={g.expedicao_id} className="rounded-2xl border border-border bg-background overflow-hidden shadow-sm">
             <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
               <div className="min-w-0">
                 <Link href={`/expedicoes/${g.expedicao_id}/passageiros`} className="text-[13px] font-semibold hover:underline truncate">

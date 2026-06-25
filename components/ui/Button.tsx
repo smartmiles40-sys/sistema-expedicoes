@@ -4,22 +4,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-all active:translate-y-px disabled:pointer-events-none disabled:opacity-50 disabled:active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline: "border border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        brand: "bg-[var(--brand-dark)] text-[var(--brand-lime)] hover:bg-[var(--brand-dark)]/90",
+        brand: "bg-[var(--brand-lime)] text-[var(--brand-dark)] font-semibold shadow-sm hover:brightness-105 hover:shadow",
       },
       size: {
-        default: "h-8 px-3 py-1",
-        sm: "h-7 px-2 text-xs",
-        lg: "h-10 px-5",
+        default: "h-8 px-3.5 py-1 rounded-lg",
+        sm: "h-7 px-2.5 text-xs rounded-md",
+        lg: "h-10 px-5 rounded-xl",
         icon: "h-8 w-8",
       },
     },

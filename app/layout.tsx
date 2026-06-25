@@ -1,7 +1,18 @@
 import type { Metadata } from "next";
+import { Inter, Fraunces } from "next/font/google";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "./globals.css";
+
+// Corpo: Inter (mesma do site). Títulos: Fraunces (serifa elegante de alto
+// contraste, no espírito da IvyPresto/Moret usadas no site da agência).
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+  axes: ["opsz", "SOFT", "WONK"],
+});
 
 export const metadata: Metadata = {
   title: "Sistema Operacional de Expedições",
@@ -14,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider>
           {children}

@@ -14,7 +14,8 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
 
-  --primary: #0f172a;
+  /* CTA primário = verde-petróleo da marca (site setuforeuvouviagens.com.br) */
+  --primary: #09282b;
   --primary-foreground: #f8fafc;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
@@ -23,9 +24,10 @@
   --destructive: #dc2626;
   --destructive-foreground: #f8fafc;
 
-  /* Brand "Se Tu For, Eu Vou" */
-  --brand-dark: #0d2b22;
-  --brand-lime: #c8f135;
+  /* Brand "Se Tu For, Eu Vou" — cores extraídas do site oficial */
+  --brand-dark: #09282b;   /* verde-petróleo */
+  --brand-lime: #d7f264;   /* lime de acento */
+  --brand-lime-deep: #c0e046;
 
   /* Semantic palette (UX da planilha) */
   --editavel-50: #eff6ff;
@@ -111,6 +113,7 @@
 
   --color-brand-dark: var(--brand-dark);
   --color-brand-lime: var(--brand-lime);
+  --color-brand-lime-deep: var(--brand-lime-deep);
 
   --color-editavel-50: var(--editavel-50);
   --color-editavel-100: var(--editavel-100);
@@ -131,7 +134,8 @@
   --color-lista-100: var(--lista-100);
   --color-lista-600: var(--lista-600);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
 }
 
@@ -150,6 +154,35 @@ body {
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Gradiente da marca (vibe jovem / rede social) */
+.bg-brand-gradient {
+  background-image: linear-gradient(135deg, #0d3a3f 0%, var(--brand-dark) 55%, #07201f 100%);
+}
+.text-gradient-brand {
+  background: linear-gradient(90deg, var(--brand-lime) 0%, var(--brand-lime-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Tipografia de marca: serifa elegante (estilo IvyPresto/Moret do site) */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+/* Título de página — usado nos cabeçalhos das telas */
+.page-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--muted-foreground);
 }
 
 /* Tabela densa */

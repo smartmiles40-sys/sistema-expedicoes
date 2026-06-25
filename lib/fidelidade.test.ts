@@ -3,6 +3,7 @@ import {
   construirPosicoesFidelidade,
   ehMarco,
   ordinalFem,
+  nivelFidelidade,
   MARCOS_FIDELIDADE,
 } from "./fidelidade";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
@@ -50,6 +51,33 @@ describe("ordinalFem", () => {
   it("formata ordinal feminino", () => {
     expect(ordinalFem(1)).toBe("1ª");
     expect(ordinalFem(10)).toBe("10ª");
+  });
+});
+
+describe("nivelFidelidade", () => {
+  it("tiers por total de viagens", () => {
+    expect(nivelFidelidade(0).tier).toBe("Estreante");
+    expect(nivelFidelidade(1).tier).toBe("Viajante");
+    expect(nivelFidelidade(3).tier).toBe("Explorador");
+    expect(nivelFidelidade(5).tier).toBe("Aventureiro");
+    expect(nivelFidelidade(12).tier).toBe("Lenda");
+  });
+  it("próximo marco e quanto falta", () => {
+    expect(nivelFidelidade(0).proximo).toBe(3);
+    expect(nivelFidelidade(0).faltam).toBe(3);
+    expect(nivelFidelidade(4).proximo).toBe(5);
+    expect(nivelFidelidade(4).faltam).toBe(1);
+    expect(nivelFidelidade(10).proximo).toBeNull();
+    expect(nivelFidelidade(10).progresso).toBe(1);
+  });
+  it("conquistados acumulam", () => {
+    expect(nivelFidelidade(2).conquistados).toEqual([]);
+    expect(nivelFidelidade(5).conquistados).toEqual([3, 5]);
+    expect(nivelFidelidade(10).conquistados).toEqual([3, 5, 10]);
+  });
+  it("progresso dentro da faixa (0..1)", () => {
+    // 4 viagens: faixa 3→5, progresso (4-3)/(5-3)=0.5
+    expect(nivelFidelidade(4).progresso).toBeCloseTo(0.5);
   });
 });
 

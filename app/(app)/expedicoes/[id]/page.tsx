@@ -44,8 +44,10 @@ export default async function VisaoGeralPage({
     <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-atencao-100 text-atencao-600">
+              <Calendar className="h-3.5 w-3.5" />
+            </span>
             Próximos prazos (7 dias)
           </CardTitle>
         </CardHeader>
@@ -78,8 +80,10 @@ export default async function VisaoGeralPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5" />
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-vinculado-100 text-vinculado-600">
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </span>
             Prontidão de embarque
           </CardTitle>
         </CardHeader>

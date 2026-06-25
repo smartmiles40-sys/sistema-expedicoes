@@ -1,8 +1,9 @@
 "use client";
 import * as React from "react";
-import { Pencil, Plus, Search } from "lucide-react";
+import { Pencil, Plus, Search, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { TIPO_FORNECEDOR } from "@/lib/constants";
@@ -77,7 +78,7 @@ export function FornecedoresTabela({ fornecedores, historico }: Props) {
               className="pl-7 w-56"
             />
           </div>
-          <Button onClick={abrirNovo}>
+          <Button variant="brand" onClick={abrirNovo}>
             <Plus className="h-3.5 w-3.5" /> Novo Fornecedor
           </Button>
         </div>
@@ -112,8 +113,18 @@ export function FornecedoresTabela({ fornecedores, historico }: Props) {
             <tbody>
               {filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center text-muted-foreground py-8">
-                    Nenhum fornecedor.
+                  <td colSpan={9} className="p-0">
+                    {fornecedores.length === 0 ? (
+                      <EmptyState
+                        icon={Building2}
+                        title="Nenhum fornecedor ainda"
+                        description="Hotéis, DMCs, transportes e guias dos destinos. Cadastre os parceiros para usar nos custos e pagamentos das expedições."
+                        actionLabel="Novo fornecedor"
+                        onAction={abrirNovo}
+                      />
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">Nenhum resultado.</div>
+                    )}
                   </td>
                 </tr>
               ) : (

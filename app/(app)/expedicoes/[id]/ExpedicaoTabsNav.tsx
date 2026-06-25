@@ -27,10 +27,10 @@ export function ExpedicaoTabsNav({ expedicaoId }: { expedicaoId: string }) {
               <Link
                 href={href}
                 className={cn(
-                  "inline-flex items-center px-3 py-2 text-[13px] font-medium whitespace-nowrap border-b-2 transition-colors",
+                  "inline-flex items-center px-3.5 py-2.5 text-[13px] whitespace-nowrap border-b-2 transition-colors",
                   isActive
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    ? "border-[var(--brand-lime-deep)] text-foreground font-semibold"
+                    : "border-transparent font-medium text-muted-foreground hover:text-foreground hover:border-border",
                 )}
               >
                 {tab.label}

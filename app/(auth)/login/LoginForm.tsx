@@ -51,7 +51,7 @@ export function LoginForm() {
           onChange={(e) => setSenha(e.target.value)}
         />
       </div>
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
         {loading ? "Entrando..." : "Entrar"}
       </Button>
       <p className="text-[11px] text-muted-foreground text-center">

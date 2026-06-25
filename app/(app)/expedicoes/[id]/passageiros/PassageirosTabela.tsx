@@ -1,8 +1,11 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload, UserPlus } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
+import { StatPill } from "@/components/ui/StatPill";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EditableCell } from "@/components/tables/EditableCell";
@@ -180,13 +183,26 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
           <Button variant="outline" size="sm" onClick={() => setExistenteOpen(true)}>
             <UserPlus className="h-3 w-3" /> Adicionar existente
           </Button>
-          <Button size="sm" onClick={() => setDrawerOpen(true)}>
+          <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
             <Plus className="h-3 w-3" /> Adicionar
           </Button>
         </div>
       </div>
 
-      <div className="rounded-md border border-border overflow-hidden bg-background">
+      {passageiros.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <StatPill label="Total" value={passageiros.length} />
+          <StatPill label="Confirmados" value={passageiros.filter((p) => p.status_reserva === "Confirmado").length} variant="vinculado" />
+          <StatPill label="Pré-reserva" value={passageiros.filter((p) => p.status_reserva === "Pré-reserva").length} variant="atencao" />
+          <StatPill label="Leads" value={passageiros.filter((p) => p.status_reserva === "Lead").length} variant="lista" />
+          <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+          <StatPill label="Aptos" value={prontidao.filter((p) => p.resultado.prontidao === "Apto").length} variant="vinculado" />
+          <StatPill label="Atenção" value={prontidao.filter((p) => p.resultado.prontidao === "Atenção").length} variant="atencao" />
+          <StatPill label="Bloqueados" value={prontidao.filter((p) => p.resultado.prontidao === "Bloqueado").length} variant="critico" />
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full table-dense">
             <thead className="bg-muted/40 border-b border-border">
@@ -207,8 +223,18 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             <tbody>
               {ordenados.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center text-muted-foreground py-8">
-                    Nenhum passageiro encontrado.
+                  <td colSpan={11} className="p-0">
+                    {passageiros.length === 0 ? (
+                      <EmptyState
+                        icon={Users}
+                        title="Nenhum passageiro ainda"
+                        description="Adicione manualmente, importe de uma planilha (CSV) ou puxe alguém que já está na base da agência."
+                        actionLabel="Adicionar passageiro"
+                        onAction={() => setDrawerOpen(true)}
+                      />
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">Nenhum passageiro encontrado.</div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -225,7 +251,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                         #{String(indiceById.get(p.id) ?? "").padStart(3, "0")}
                       </td>
                       <td className="font-medium px-2.5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
                           <button
                             type="button"
                             onClick={() => setEditandoId(p.id)}

@@ -33,21 +33,21 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col border-r border-border bg-card">
+    <aside className="bg-brand-gradient flex w-[244px] shrink-0 flex-col border-r border-white/10 text-white">
       {/* Logo */}
-      <div className="flex h-12 items-center gap-2 border-b border-border px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--brand-dark)] text-[var(--brand-lime)]">
-          <CompassIcon className="h-4 w-4" />
+      <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)] shadow-sm">
+          <CompassIcon className="h-5 w-5" />
         </div>
         <div className="flex flex-col leading-none">
-          <span className="text-[12px] font-semibold tracking-tight">Se Tu For, Eu Vou</span>
-          <span className="text-[10px] text-muted-foreground">Sistema Operacional</span>
+          <span className="font-display text-[16px] font-semibold leading-none text-white">Se Tu For, Eu Vou</span>
+          <span className="mt-1 text-[10px] uppercase tracking-wider text-[var(--brand-lime)]/70">Sistema Operacional</span>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-0.5">
+      <nav className="flex-1 overflow-y-auto p-2.5">
+        <ul className="space-y-1">
           {NAV.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
@@ -56,10 +56,10 @@ export function Sidebar({
                 <Link
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                    "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] transition-colors",
                     isActive
-                      ? "bg-accent text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                      ? "bg-[var(--brand-lime)] font-semibold text-[var(--brand-dark)] shadow-sm"
+                      : "text-white/70 hover:bg-white/10 hover:text-white",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -77,8 +77,8 @@ export function Sidebar({
       </nav>
 
       {/* User menu rodapé */}
-      <div className="border-t border-border p-2">
-        <UserMenu user={user} />
+      <div className="border-t border-white/10 p-2.5">
+        <UserMenu user={user} onDark />
       </div>
     </aside>
   );
