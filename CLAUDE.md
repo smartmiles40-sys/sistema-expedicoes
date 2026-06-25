@@ -283,7 +283,11 @@ conexão) — migration **`0019_conexao_viagem.sql`**. Actions em `expedicoes/ac
 mesmo quarto; valida `CAPACIDADE_QUARTO` de `lib/constants.ts`). UI no `RoomingBoard`:
 painel "Viajam juntas" (criar/editar via `ConexaoViagemDrawer`/desfazer), dot colorido
 por conexão nos cards, e por hotel um status "juntos/separados" com botão **"Juntar no
-Quarto X"**. Enforcement é **sugestivo** (avisa, não bloqueia o export).
+Quarto X"**. Enforcement é **rígido** (não pode ficar separado): o drag aloca/remove a
+conexão como **bloco** (`alocar`/`desalocarConexao` usam `membrosConexaoByPax`; rejeita
+se não couberem juntos no quarto), e o **export fica bloqueado** (faixa vermelha) se
+`conexoesSeparadas` (membros em quartos diferentes no mesmo hotel) > 0. A separação só
+surge ao criar conexão sobre gente já em quartos distintos → resolve no botão "Juntar".
 
 ## 🧪 Como rodar
 

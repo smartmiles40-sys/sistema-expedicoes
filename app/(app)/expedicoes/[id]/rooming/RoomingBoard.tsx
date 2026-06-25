@@ -115,6 +115,17 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     return m;
   }, [conexoes]);
 
+  // paxId -> ids de TODOS os membros da conexão (inclui ele). Vazio se sem conexão.
+  // Usado para mover/remover a conexão como um bloco (não pode ficar separada).
+  const membrosConexaoByPax = React.useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const c of conexoes) {
+      const ids = c.membros.map((x) => x.id);
+      for (const id of ids) m.set(id, ids);
+    }
+    return m;
+  }, [conexoes]);
+
   // Trechos (hotéis) ordenados por check-in.
   const trechos: Trecho[] = React.useMemo(() => {
     const map = new Map<string, Trecho>();
@@ -179,11 +190,16 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   async function alocar(paxId: string, quartoId: string) {
     const quarto = quartos.find((q) => q.id === quartoId);
     if (!quarto) return;
+    // Quem viaja junto vai junto: aloca a conexão inteira (ou só o pax, se sozinho).
+    const membros = membrosConexaoByPax.get(paxId) ?? [paxId];
     const cap = CAPACIDADE[quarto.tipo] ?? 1;
-    const ocupAtuais = (ocupantesPorQuarto.get(quartoId) ?? []).filter((id) => id !== paxId).length;
-    if (ocupAtuais >= cap) {
-      toast.error("Quarto cheio", {
-        description: `${quarto.tipo} comporta no máximo ${cap} ${cap === 1 ? "pessoa" : "pessoas"}.`,
+    const ocupFixos = (ocupantesPorQuarto.get(quartoId) ?? []).filter((id) => !membros.includes(id)).length;
+    if (ocupFixos + membros.length > cap) {
+      toast.error(membros.length > 1 ? "A conexão não cabe junta" : "Quarto cheio", {
+        description:
+          membros.length > 1
+            ? `São ${membros.length} pessoas que viajam juntas e o quarto (${quarto.tipo}) comporta ${cap}. Use um quarto maior ou desfaça a conexão.`
+            : `${quarto.tipo} comporta no máximo ${cap} ${cap === 1 ? "pessoa" : "pessoas"}.`,
       });
       return;
     }
@@ -191,10 +207,13 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     const idsTrecho = new Set(trecho ? trecho.quartos.map((q) => q.id) : [quartoId]);
     const anterior = localAloc;
     setLocalAloc((prev) => [
-      ...prev.filter((a) => !(a.passageiro_id === paxId && idsTrecho.has(a.quarto_id))),
-      { id: `tmp-${paxId}-${quartoId}`, passageiro_id: paxId, quarto_id: quartoId, created_at: "" },
+      ...prev.filter((a) => !(membros.includes(a.passageiro_id) && idsTrecho.has(a.quarto_id))),
+      ...membros.map((pid) => ({ id: `tmp-${pid}-${quartoId}`, passageiro_id: pid, quarto_id: quartoId, created_at: "" })),
     ]);
-    const r = await alocarPassageiro(paxId, quartoId, expedicaoId);
+    const r =
+      membros.length > 1
+        ? await alocarConexaoNoQuarto(membros, quartoId, expedicaoId)
+        : await alocarPassageiro(paxId, quartoId, expedicaoId);
     if (!r.ok) {
       setLocalAloc(anterior);
       toast.error("Erro ao alocar", { description: r.error });
@@ -215,6 +234,26 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     router.refresh();
   }
 
+  /** Tira a conexão inteira do quarto num trecho (juntos saem juntos). */
+  async function desalocarConexao(membros: string[], trecho: Trecho) {
+    const idsTrecho = new Set(trecho.quartos.map((q) => q.id));
+    const anterior = localAloc;
+    const aRemover = membros
+      .map((m) => ({ m, q: anterior.find((a) => a.passageiro_id === m && idsTrecho.has(a.quarto_id))?.quarto_id }))
+      .filter((x): x is { m: string; q: string } => Boolean(x.q));
+    if (!aRemover.length) return;
+    setLocalAloc((prev) => prev.filter((a) => !(membros.includes(a.passageiro_id) && idsTrecho.has(a.quarto_id))));
+    for (const { m, q } of aRemover) {
+      const r = await desalocarPassageiro(m, q, expedicaoId);
+      if (!r.ok) {
+        setLocalAloc(anterior);
+        toast.error("Erro ao remover do quarto", { description: r.error });
+        return;
+      }
+    }
+    router.refresh();
+  }
+
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     if (!over) return;
@@ -222,8 +261,14 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     const overId = String(over.id);
     if (overId.startsWith("sem::")) {
       const trecho = trechos.find((t) => t.key === overId.slice(5));
-      const atual = trecho ? quartoDoPaxNoTrecho(paxId, trecho) : null;
-      if (atual) desalocar(paxId, atual);
+      if (!trecho) return;
+      const membros = membrosConexaoByPax.get(paxId);
+      if (membros && membros.length > 1) {
+        desalocarConexao(membros, trecho);
+      } else {
+        const atual = quartoDoPaxNoTrecho(paxId, trecho);
+        if (atual) desalocar(paxId, atual);
+      }
     } else {
       alocar(paxId, overId);
     }
@@ -236,12 +281,29 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     [trechos, localAloc, paxAtivos],
   );
   const totalFaltam = pendencias.reduce((s, p) => s + p.faltam, 0);
-  const completo = trechos.length > 0 && totalFaltam === 0 && paxAtivos.length > 0;
+
+  // Conexões que ficaram em quartos DIFERENTES dentro de um hotel (proibido).
+  const conexoesSeparadas = React.useMemo(() => {
+    const out: { trecho: Trecho; conexao: (typeof conexoes)[number]; quartoAncora: string | null }[] = [];
+    for (const t of trechos) {
+      for (const c of conexoes) {
+        const st = conexaoNoTrecho(c.membros, t);
+        if (st.porQuarto.size > 1) out.push({ trecho: t, conexao: c, quartoAncora: st.quartoAncora });
+      }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trechos, conexoes, localAloc]);
+
+  const completo =
+    trechos.length > 0 && totalFaltam === 0 && paxAtivos.length > 0 && conexoesSeparadas.length === 0;
 
   async function exportarExcel() {
     if (!completo) {
       toast.error("Rooming incompleto", {
-        description: "Aloque todos os passageiros em todos os hotéis antes de exportar.",
+        description: conexoesSeparadas.length
+          ? "Há pessoas que viajam juntas em quartos diferentes. Junte-as antes de exportar."
+          : "Aloque todos os passageiros em todos os hotéis antes de exportar.",
       });
       return;
     }
@@ -365,20 +427,38 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
               "flex items-start gap-2 rounded-md border p-2.5 text-[12px]",
               completo
                 ? "border-vinculado-600/40 bg-vinculado-100/40 text-vinculado-700"
-                : "border-atencao-600/40 bg-atencao-100/40 text-atencao-700",
+                : conexoesSeparadas.length
+                  ? "border-critico-600/40 bg-critico-100/40 text-critico-700"
+                  : "border-atencao-600/40 bg-atencao-100/40 text-atencao-700",
             )}
           >
             {completo ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
             {completo ? (
               <span>Todos os passageiros estão alocados em todos os hotéis. Exportação liberada. ✅</span>
             ) : (
-              <div>
-                <strong>Faltam alocar {totalFaltam} no total.</strong> A exportação fica bloqueada até todos terem quarto em cada hotel:
-                <ul className="mt-1 list-disc list-inside">
-                  {pendencias.filter((p) => p.faltam > 0).map((p) => (
-                    <li key={p.trecho.key}>{p.trecho.hotel_cidade ?? "—"}: {p.faltam} sem quarto</li>
-                  ))}
-                </ul>
+              <div className="space-y-1.5">
+                {conexoesSeparadas.length > 0 && (
+                  <div>
+                    <strong>Quem viaja junto não pode ficar em quartos separados.</strong> Junte antes de exportar:
+                    <ul className="mt-1 list-disc list-inside">
+                      {conexoesSeparadas.map(({ trecho, conexao }) => (
+                        <li key={`${trecho.key}-${conexao.id}`}>
+                          {trecho.hotel_cidade ?? "—"}: {conexao.membros.map((m) => m.nome_completo.split(" ")[0]).join(" + ")} em quartos diferentes
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {totalFaltam > 0 && (
+                  <div>
+                    <strong>Faltam alocar {totalFaltam} no total.</strong> A exportação fica bloqueada até todos terem quarto em cada hotel:
+                    <ul className="mt-1 list-disc list-inside">
+                      {pendencias.filter((p) => p.faltam > 0).map((p) => (
+                        <li key={p.trecho.key}>{p.trecho.hotel_cidade ?? "—"}: {p.faltam} sem quarto</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -399,8 +479,9 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
           <div className="p-3">
             {conexoes.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
-                Marque pessoas que viajam juntas (casal, família) para alocá-las no mesmo quarto e ser
-                avisado se ficarem separadas em algum hotel.
+                Marque pessoas que viajam juntas (casal, família). Elas são tratadas como bloco: ao
+                alocar uma, todas vão para o mesmo quarto — e o sistema <strong>impede</strong> deixá-las
+                em quartos separados.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -472,7 +553,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                             <span className="text-muted-foreground">a alocar</span>
                           ) : (
                             <>
-                              <Badge variant="atencao">separados</Badge>
+                              <Badge variant="critico">separados</Badge>
                               {st.quartoAncora && (
                                 <button
                                   type="button"
