@@ -3,7 +3,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
-  CompassIcon, MapPin, Calendar, ChevronRight, FileText, ArrowLeft,
+  CompassIcon, MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -31,6 +31,31 @@ export default function LiderPage() {
   const [loading, setLoading] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
   const [lightbox, setLightbox] = React.useState<string | null>(null);
+  const [atualizando, setAtualizando] = React.useState(false);
+
+  // Recarrega os dados em silêncio (reflete o que a operação atualizou).
+  const recarregar = React.useCallback(async () => {
+    if (!cpf) return;
+    setAtualizando(true);
+    const r = await buscarDadosLider(cpf);
+    setAtualizando(false);
+    if (r.ok) setDados(r.dados);
+  }, [cpf]);
+
+  // Enquanto a área está aberta: atualiza a cada 25s e ao voltar pra aba.
+  const logado = dados !== null;
+  React.useEffect(() => {
+    if (!logado) return;
+    const id = setInterval(recarregar, 25000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") recarregar();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [logado, recarregar]);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -121,13 +146,25 @@ export default function LiderPage() {
             <div className="mt-0.5 truncate text-[13px] text-white/70">Olá, {dados.nome.split(" ")[0]} 👋</div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => { setDados(null); setCpf(""); setErro(null); }}
-          className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
-        >
-          Sair
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={recarregar}
+            disabled={atualizando}
+            title="Atualizar"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20 disabled:opacity-60"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", atualizando && "animate-spin")} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setDados(null); setCpf(""); setErro(null); }}
+            className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
+          >
+            Sair
+          </button>
+        </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-4 p-4">
