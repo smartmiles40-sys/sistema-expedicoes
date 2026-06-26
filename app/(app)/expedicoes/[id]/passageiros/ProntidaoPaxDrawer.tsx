@@ -58,6 +58,11 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
     label: "Anexar voucher / bilhete (trecho doméstico)",
     dica: "Anexar o voucher já deixa o trecho doméstico aprovado.",
   },
+  "Voo Interno": {
+    categoria: "Aéreos",
+    label: "Anexar voucher / bilhete (voo interno)",
+    dica: "Anexar o voucher já deixa o voo interno aprovado.",
+  },
   Seguro: {
     categoria: "Seguros",
     label: "Anexar apólice do seguro",
@@ -383,12 +388,14 @@ function RequisitoDrawer({
   const [lightbox, setLightbox] = React.useState<string | null>(null);
   const exigeAnexo = REQUISITOS_COM_ANEXO_OBRIGATORIO.has(req.tipo);
   const anexoCfg = ANEXO_CONFIG[req.tipo];
-  const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico";
+  const ehVooInterno = req.tipo === "Voo Interno";
+  // Voo Interno segue o mesmo racional do Aéreo Doméstico (necessário? + voucher).
+  const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico" || ehVooInterno;
   const ehDomestico = req.tipo === "Aéreo Doméstico";
   const ehVacina = req.tipo === "Vacina";
   const ehSeguro = req.tipo === "Seguro";
-  // Pergunta "necessário/contratado?" (Não = dispensa): Aéreo Doméstico, Vacina, Seguro.
-  const temNecessario = ehDomestico || ehVacina || ehSeguro;
+  // Pergunta "necessário/contratado?" (Não = dispensa): Aéreo Doméstico, Voo Interno, Vacina, Seguro.
+  const temNecessario = ehDomestico || ehVooInterno || ehVacina || ehSeguro;
   // Pergunta "Comprado com a gente?": só os aéreos.
   const mostraComprado = ehAereo;
   // Questionário (perguntas Sim/Não + anexo): aéreos, vacina e seguro.
@@ -528,7 +535,7 @@ function RequisitoDrawer({
     if (ehQuestionario) {
       if (temNecessario && !necessario) {
         statusFinal = "Dispensado";
-        obsFinal = ehVacina ? "Vacina não necessária" : ehSeguro ? "Seguro não contratado" : "Trecho doméstico não necessário";
+        obsFinal = ehVacina ? "Vacina não necessária" : ehSeguro ? "Seguro não contratado" : ehVooInterno ? "Voo interno não necessário" : "Trecho doméstico não necessário";
       } else {
         statusFinal = arquivoId ? "Aprovado" : "Pendente";
         if (mostraComprado) {
@@ -681,7 +688,7 @@ function RequisitoDrawer({
             <>
               {temNecessario && (
                 <div className="space-y-1.5 rounded-xl border border-editavel-600/30 bg-editavel-50/50 p-3">
-                  <Label className="text-editavel-600">{ehVacina ? "É necessária a vacina?" : ehSeguro ? "Seguro contratado?" : "É necessário aéreo doméstico?"}</Label>
+                  <Label className="text-editavel-600">{ehVacina ? "É necessária a vacina?" : ehSeguro ? "Seguro contratado?" : ehVooInterno ? "É necessário o voo interno?" : "É necessário aéreo doméstico?"}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     <OpcaoBtn ativo={necessario} cor="sim" onClick={() => setNecessario(true)}>Sim</OpcaoBtn>
                     <OpcaoBtn ativo={!necessario} cor="nao" onClick={() => setNecessario(false)}>Não — dispensar</OpcaoBtn>

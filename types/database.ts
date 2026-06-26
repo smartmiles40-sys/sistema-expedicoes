@@ -41,6 +41,7 @@ export type TipoRequisito =
   | "Seguro"
   | "Aéreo Internacional"
   | "Aéreo Doméstico"
+  | "Voo Interno"
   | "Contrato"
   | "Autorização de Menor"
   | "Pagamento"

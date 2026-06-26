@@ -52,6 +52,7 @@ export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new 
   "Documento Pessoal",
   "Aéreo Internacional",
   "Aéreo Doméstico",
+  "Voo Interno",
   "Seguro",
   "Vacina",
 ]);

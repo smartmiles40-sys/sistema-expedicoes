@@ -16,6 +16,7 @@ const CATEGORIA_REQUISITO: Record<string, string> = {
   "Documento Pessoal": "Documentos pessoais",
   "Aéreo Internacional": "Aéreos",
   "Aéreo Doméstico": "Aéreos",
+  "Voo Interno": "Aéreos",
   Seguro: "Seguros",
   Vacina: "Documentos pessoais",
 };
@@ -118,7 +119,7 @@ export async function buscarDadosLider(
         const arquivosPax = arqsPorPax.get(p.id) ?? [];
         const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
         const checagens: LiderChecagem[] = res.checagens.map((c) => {
-          const ehAereoCheck = c.tipo === "Aéreo Internacional" || c.tipo === "Aéreo Doméstico";
+          const ehAereoCheck = c.tipo === "Aéreo Internacional" || c.tipo === "Aéreo Doméstico" || c.tipo === "Voo Interno";
           const arqsDaChecagem = arquivosPax.filter(
             (a) =>
               a.categoria === CATEGORIA_REQUISITO[c.tipo] &&

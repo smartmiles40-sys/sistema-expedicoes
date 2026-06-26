@@ -168,6 +168,7 @@ export const TIPO_REQUISITO = [
   "Seguro",
   "Aéreo Internacional",
   "Aéreo Doméstico",
+  "Voo Interno",
   "Contrato",
   "Autorização de Menor",
   "Pagamento",

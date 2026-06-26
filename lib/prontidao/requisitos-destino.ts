@@ -58,6 +58,14 @@ const VOO_DOMESTICO: RequisitoDestinoTemplate = {
   papel_responsavel: "operacional",
 };
 
+const VOO_INTERNO: RequisitoDestinoTemplate = {
+  tipo: "Voo Interno",
+  descricao: "Voo interno (trecho aéreo) emitido",
+  obrigatoriedade: "Condicional",
+  bloqueia_embarque: false,
+  papel_responsavel: "operacional",
+};
+
 /**
  * Templates por destino. A chave casa com `expedicoes.destino`.
  * Destinos não listados caem em BASE_INTERNACIONAL (ver `requisitosDoDestino`).
@@ -68,24 +76,28 @@ export const REQUISITOS_POR_DESTINO: Record<string, RequisitoDestinoTemplate[]> 
     ...BASE_INTERNACIONAL,
     { ...VACINA_FEBRE_AMARELA, observacoes: "Recomendada para selva/Machu Picchu; conferir exigência." },
     VOO_DOMESTICO,
+    VOO_INTERNO,
   ],
   // Argentina — Mercosul: RG ou passaporte; sem visto; sem vacina obrigatória.
   Argentina: [
     ...BASE_INTERNACIONAL,
     { tipo: "RG", descricao: "RG válido (≤ 10 anos) — alternativa ao passaporte no Mercosul", obrigatoriedade: "Recomendado", bloqueia_embarque: false, papel_responsavel: "operacional" },
     VOO_DOMESTICO,
+    VOO_INTERNO,
   ],
   // Chile — Mercosul, mesmas regras da Argentina.
   Chile: [
     ...BASE_INTERNACIONAL,
     { tipo: "RG", descricao: "RG válido (≤ 10 anos) — alternativa ao passaporte no Mercosul", obrigatoriedade: "Recomendado", bloqueia_embarque: false, papel_responsavel: "operacional" },
     VOO_DOMESTICO,
+    VOO_INTERNO,
   ],
   // Japão — confirmar regra de isenção de visto vigente para BR.
   Japão: [
     ...BASE_INTERNACIONAL,
     { tipo: "Visto", descricao: "Visto de turismo (confirmar isenção vigente para BR)", obrigatoriedade: "Condicional", bloqueia_embarque: true, papel_responsavel: "operacional", observacoes: "Verificar regra de isenção atual antes de instanciar como obrigatório." },
     VOO_DOMESTICO,
+    VOO_INTERNO,
   ],
   // Egito — visto obrigatório (e-visa / on arrival); febre amarela condicional.
   Egito: [
@@ -93,6 +105,7 @@ export const REQUISITOS_POR_DESTINO: Record<string, RequisitoDestinoTemplate[]> 
     { tipo: "Visto", descricao: "Visto do Egito (e-visa ou on arrival)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
     VACINA_FEBRE_AMARELA,
     VOO_DOMESTICO,
+    VOO_INTERNO,
   ],
   // Itália / Schengen — sem visto p/ turismo até 90 dias; ETIAS a caminho.
   Itália: [
