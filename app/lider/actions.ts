@@ -119,13 +119,13 @@ export async function buscarDadosLider(
         const arquivosPax = arqsPorPax.get(p.id) ?? [];
         const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
         const checagens: LiderChecagem[] = res.checagens.map((c) => {
-          const ehAereoCheck = c.tipo === "Aéreo Internacional" || c.tipo === "Aéreo Doméstico" || c.tipo === "Voo Interno";
-          const arqsDaChecagem = arquivosPax.filter(
-            (a) =>
-              a.categoria === CATEGORIA_REQUISITO[c.tipo] &&
-              // separa internacional/doméstico pela descrição "<tipo> — prontidão".
-              (!ehAereoCheck || (a.descricao ?? "").startsWith(c.tipo)),
-          );
+          const cat = CATEGORIA_REQUISITO[c.tipo];
+          // Vários tipos dividem a mesma categoria (Doc Pessoal/Vacina → "Documentos
+          // pessoais"; os 3 aéreos → "Aéreos"). Separa pela descrição "<tipo> — prontidão"
+          // que o upload grava, pra cada exigência mostrar só o SEU anexo.
+          const arqsDaChecagem = cat
+            ? arquivosPax.filter((a) => a.categoria === cat && (a.descricao ?? "").startsWith(c.tipo))
+            : [];
           return { ...c, arquivos: arqsDaChecagem.map(semDescricao) };
         });
         return {
