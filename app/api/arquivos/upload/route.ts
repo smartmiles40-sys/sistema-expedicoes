@@ -92,9 +92,12 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceRoleClient();
   const filename = safeName(file.name);
+  // A categoria vira pasta no Storage; o Supabase rejeita acento/não-ASCII na
+  // chave (ex.: "Aéreos"). Sanitiza só o caminho — o banco guarda a label original.
+  const catPasta = safeName(categoria);
   const storage_path = passageiro_id
-    ? `${expedicao_id}/passageiros/${passageiro_id}/${categoria}/${randomUUID()}-${filename}`
-    : `${expedicao_id}/${categoria}/${randomUUID()}-${filename}`;
+    ? `${expedicao_id}/passageiros/${passageiro_id}/${catPasta}/${randomUUID()}-${filename}`
+    : `${expedicao_id}/${catPasta}/${randomUUID()}-${filename}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const up = await supabase.storage.from(BUCKET).upload(storage_path, buffer, {
