@@ -180,8 +180,8 @@ export default function LiderPage() {
             Nenhuma expedição atribuída a você no momento.
           </p>
         ) : (
-          dados.expedicoes.map((exp, i) => (
-            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} defaultAberta={i === 0 || dados.expedicoes.length <= 3} />
+          dados.expedicoes.map((exp) => (
+            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
           ))
         )}
         <p className="pb-6 text-center text-[11px] text-muted-foreground">
@@ -216,8 +216,9 @@ export default function LiderPage() {
   );
 }
 
-function ExpedicaoLiderCard({ exp, onVerDoc, defaultAberta = true }: { exp: LiderExpedicao; onVerDoc: VerDoc; defaultAberta?: boolean }) {
-  const [aberta, setAberta] = React.useState(defaultAberta);
+function ExpedicaoLiderCard({ exp, onVerDoc }: { exp: LiderExpedicao; onVerDoc: VerDoc }) {
+  // Sempre recolhida — o usuário abre a expedição que quiser.
+  const [aberta, setAberta] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
   const lideres = exp.passageiros.filter((p) => p.tipo === "Líder");
   const amigos = exp.passageiros.filter((p) => p.tipo !== "Líder");

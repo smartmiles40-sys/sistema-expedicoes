@@ -105,12 +105,15 @@ export async function buscarDadosLider(
     nome = MASTERS[cpf];
     expIds = exps.map((e) => e.id);
   } else {
-    const liderRows = pax.filter((p) => p.tipo === "Líder" && soDigitosCpf(p.cpf ?? "") === cpf);
-    if (!liderRows.length) {
+    const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+    const ehLider = minhasRows.some((p) => p.tipo === "Líder");
+    if (!ehLider) {
       return { ok: false, error: "Não encontramos expedições para este CPF. Confira com a equipe." };
     }
-    nome = liderRows[0].nome_completo;
-    expIds = [...new Set(liderRows.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
+    // Foi líder ao menos 1 vez → enxerga TODAS as expedições que participa (mesmo
+    // onde entra como passageiro comum), sempre só leitura.
+    nome = (minhasRows.find((p) => p.tipo === "Líder") ?? minhasRows[0]).nome_completo;
+    expIds = [...new Set(minhasRows.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
   }
 
   const reqsPorPax = new Map<string, PassageiroRequisitoRow[]>();
