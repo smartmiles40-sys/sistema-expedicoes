@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronRight, ShieldCheck, Paperclip } from "lucide-react";
+import { ChevronRight, ShieldCheck, Paperclip, Trash2 } from "lucide-react";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
@@ -266,6 +266,7 @@ export function ProntidaoConteudo({
           req={editando}
           usuarios={usuarios}
           usuariosById={usuariosById}
+          arquivos={arquivos}
           onClose={() => setEditando(null)}
         />
       )}
@@ -358,13 +359,14 @@ function ContratoDrawer({
 // Drawer de edição de um requisito (movido da antiga aba Prontidão)
 // =============================================================================
 function RequisitoDrawer({
-  expedicaoId, paxNome, req, usuarios, usuariosById, onClose,
+  expedicaoId, paxNome, req, usuarios, usuariosById, arquivos, onClose,
 }: {
   expedicaoId: string;
   paxNome: string;
   req: PassageiroRequisitoRow;
   usuarios: Tables<"usuarios">[];
   usuariosById: Map<string, string>;
+  arquivos: ArquivoRow[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -441,6 +443,60 @@ function RequisitoDrawer({
     }
     setArquivoId(null);
     toast.success("Anexo removido");
+    router.refresh();
+  }
+
+  // --- Anexo MÚLTIPLO (aéreos): vários arquivos na categoria do requisito ------
+  const arquivosDaCategoria = arquivos.filter(
+    (a) => a.passageiro_id === req.passageiro_id && a.categoria === (anexoCfg?.categoria ?? "Outros"),
+  );
+
+  async function anexarMultiplos(files: FileList) {
+    setAnexando(true);
+    let primeiroId: string | null = null;
+    for (const f of Array.from(files)) {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("expedicao_id", expedicaoId);
+      fd.append("passageiro_id", req.passageiro_id);
+      fd.append("categoria", anexoCfg?.categoria ?? "Aéreos");
+      fd.append("descricao", `${req.tipo} — prontidão`);
+      try {
+        const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+        const json = await res.json();
+        if (json.ok && json.id) {
+          if (!primeiroId) primeiroId = json.id;
+        } else {
+          toast.error(`Falhou: ${f.name}`, { description: json.error });
+        }
+      } catch {
+        toast.error(`Falha de rede: ${f.name}`);
+      }
+    }
+    // arquivo_id (= "tem comprovante") aponta pra qualquer um dos anexos.
+    if (!arquivoId && primeiroId) {
+      await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", primeiroId);
+      setArquivoId(primeiroId);
+    }
+    setAnexando(false);
+    toast.success("Anexo(s) enviado(s)");
+    router.refresh();
+  }
+
+  async function apagarArquivo(arq: ArquivoRow) {
+    const res = await fetch(`/api/arquivos/${arq.id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({ ok: false, error: "resposta inválida" }));
+    if (!res.ok || !json.ok) {
+      toast.error("Erro ao apagar", { description: json.error });
+      return;
+    }
+    // Se apaguei o que marcava o comprovante, aponta pra outro (ou nenhum).
+    if (arq.id === arquivoId) {
+      const novo = arquivosDaCategoria.find((a) => a.id !== arq.id)?.id ?? null;
+      await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", novo);
+      setArquivoId(novo);
+    }
+    toast.success("Arquivo apagado");
     router.refresh();
   }
 
@@ -525,6 +581,62 @@ function RequisitoDrawer({
     </div>
   ) : null;
 
+  const anexoMultiplo = (
+    <div className="space-y-1.5 rounded-xl border border-border bg-muted/20 p-3">
+      <Label>{anexoCfg?.label ?? "Anexos"}</Label>
+      {arquivosDaCategoria.length > 0 && (
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-background">
+          {arquivosDaCategoria.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
+              <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+              <a
+                href={`/api/arquivos/${a.id}/download?inline=1`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-editavel-700 hover:underline"
+              >
+                Ver
+              </a>
+              <button
+                type="button"
+                aria-label="Apagar"
+                onClick={() => apagarArquivo(a)}
+                className="text-muted-foreground hover:text-critico-600"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label
+        className={cn(
+          "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-4 text-[13px] cursor-pointer hover:bg-accent/40",
+          anexando && "opacity-60 pointer-events-none",
+        )}
+      >
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          multiple
+          className="hidden"
+          disabled={anexando}
+          onChange={(e) => {
+            if (e.target.files?.length) anexarMultiplos(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <Paperclip className="h-5 w-5 text-muted-foreground" />
+        <span className="font-medium">
+          {anexando ? "Anexando..." : arquivosDaCategoria.length ? "Anexar mais" : (anexoCfg?.label ?? "Anexar arquivo")}
+        </span>
+        <span className="text-[11px] text-muted-foreground">pode selecionar vários · imagem ou PDF</span>
+      </label>
+      <p className="text-[11px] text-muted-foreground">{anexoCfg?.dica ?? "Anexar o voucher já deixa aprovado."}</p>
+    </div>
+  );
+
   return (
     <>
     <Drawer open onOpenChange={(v) => !v && onClose()}>
@@ -560,7 +672,7 @@ function RequisitoDrawer({
                       <p className="text-[11px] text-muted-foreground">Em qualquer caso, o voucher é obrigatório.</p>
                     </div>
                   )}
-                  {anexoBlock}
+                  {ehAereo ? anexoMultiplo : anexoBlock}
                   {ehAereo && (
                     <div className="space-y-1">
                       <Label htmlFor="req-loc">Localizador (opcional)</Label>
