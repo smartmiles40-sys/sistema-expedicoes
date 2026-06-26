@@ -1,5 +1,5 @@
 "use client";
-import { Bell, Search, Menu } from "lucide-react";
+import { Bell, Search, Menu, LogOut } from "lucide-react";
 import { Breadcrumb } from "./Breadcrumb";
 
 export function Header({ onMenu }: { onMenu?: () => void }) {
@@ -37,6 +37,19 @@ export function Header({ onMenu }: { onMenu?: () => void }) {
         >
           <Bell className="h-3.5 w-3.5" />
           <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-critico-600" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            fetch("/api/logout", { method: "POST" }).finally(() => {
+              window.location.href = "/login";
+            });
+          }}
+          title="Sair"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Sair</span>
         </button>
       </div>
     </header>

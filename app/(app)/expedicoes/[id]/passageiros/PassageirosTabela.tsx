@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
@@ -116,6 +116,120 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
 
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
 
+  // Duas caixas: Líderes (equipe) em cima e ExpedAmigos (passageiros) embaixo.
+  const lideres = ordenados.filter((p) => p.tipo === "Líder");
+  const expedAmigos = ordenados.filter((p) => p.tipo !== "Líder");
+  const temLideres = passageiros.some((p) => p.tipo === "Líder");
+
+  function renderLinha(p: PassageiroRow) {
+    const validadeDias = daysUntil(p.validade_passaporte);
+    const embarqueDias = daysUntil(dataEmbarque);
+    const validadeAlerta = validadeDias != null && embarqueDias != null ? validadeDias - embarqueDias < 180 : false;
+    const quarto = p.quarto_id ? quartosById.get(p.quarto_id) : null;
+    return (
+      <tr key={p.id} className="border-b border-border hover:bg-accent/30">
+        <td className="px-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+          #{String(indiceById.get(p.id) ?? "").padStart(3, "0")}
+        </td>
+        <td className="font-medium px-2.5">
+          <div className="flex items-center gap-2">
+            <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
+            <button
+              type="button"
+              onClick={() => setEditandoId(p.id)}
+              title="Abrir perfil do passageiro"
+              className="text-left text-editavel-700 hover:underline"
+            >
+              {p.nome_completo}
+            </button>
+            <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
+          </div>
+        </td>
+        <td className="px-2.5">
+          <Badge variant={p.tipo === "Líder" ? "lista" : p.tipo === "Cortesia" ? "auto" : "vinculado"}>
+            {p.tipo}
+          </Badge>
+        </td>
+        <td>
+          <EditableCell value={p.cpf} onSave={(v) => atualizarPassageiroCampo(p.id, "cpf", v)} />
+        </td>
+        <td>
+          <EditableCell value={p.passaporte} onSave={(v) => atualizarPassageiroCampo(p.id, "passaporte", v)} />
+        </td>
+        <td>
+          <div className={cn("px-1.5", validadeAlerta && "text-critico-600 font-medium")}>
+            {p.validade_passaporte ? formatDate(p.validade_passaporte) : "—"}
+            {validadeAlerta && <span className="text-[10px] block">⚠ &lt; 6m do embarque</span>}
+          </div>
+        </td>
+        <td className="px-2.5 text-muted-foreground">
+          {quarto ? `${quarto.numero} (${quarto.tipo})` : "—"}
+        </td>
+        <td className="px-2.5 text-muted-foreground tabular-nums">
+          {p.companhia_aerea ? `${p.companhia_aerea} ${p.localizador ?? ""}` : p.voo_nacional_necessario ? "Voo nac. pendente" : "—"}
+        </td>
+        <td className="px-2.5">
+          <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
+        </td>
+        <td className="px-2.5">
+          {(() => {
+            const pr = prontidaoByPax.get(p.id);
+            if (!pr) return <span className="text-muted-foreground">—</span>;
+            return (
+              <button
+                type="button"
+                onClick={() => setProntidaoPaxId(p.id)}
+                title="Ver requisitos de embarque"
+                className="rounded-sm focus:outline-none focus:ring-2 focus:ring-editavel-600"
+              >
+                <Badge variant={COR_PRONTIDAO[pr.resultado.prontidao]}>{pr.resultado.prontidao}</Badge>
+              </button>
+            );
+          })()}
+        </td>
+        <td>
+          <EditableCell value={p.observacoes} onSave={(v) => atualizarPassageiroCampo(p.id, "observacoes", v)} placeholder="—" />
+        </td>
+      </tr>
+    );
+  }
+
+  function SecaoPax({ titulo, linhas, vazio }: { titulo: React.ReactNode; linhas: PassageiroRow[]; vazio: string }) {
+    return (
+      <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-sm">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">{titulo}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full table-dense">
+            <thead className="bg-muted/40 border-b border-border">
+              <tr>
+                <Th>ID</Th>
+                <Th>Nome</Th>
+                <Th>Tipo</Th>
+                <Th>CPF</Th>
+                <Th>Passaporte</Th>
+                <Th>Validade</Th>
+                <Th>Quarto</Th>
+                <Th>Voo</Th>
+                <Th>Status</Th>
+                <Th>Prontidão</Th>
+                <Th>Observações</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
+                </tr>
+              ) : (
+                linhas.map(renderLinha)
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   function exportarCSV() {
     const header = ["Nome", "Tipo", "CPF", "Passaporte", "Validade", "Email", "Telefone", "Status", "Quarto"];
     const linhas = ordenados.map((p) => [
@@ -202,133 +316,46 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         </div>
       )}
 
-      <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full table-dense">
-            <thead className="bg-muted/40 border-b border-border">
-              <tr>
-                <Th>ID</Th>
-                <Th>Nome</Th>
-                <Th>Tipo</Th>
-                <Th>CPF</Th>
-                <Th>Passaporte</Th>
-                <Th>Validade</Th>
-                <Th>Quarto</Th>
-                <Th>Voo</Th>
-                <Th>Status</Th>
-                <Th>Prontidão</Th>
-                <Th>Observações</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {ordenados.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="p-0">
-                    {passageiros.length === 0 ? (
-                      <EmptyState
-                        icon={Users}
-                        title="Nenhum passageiro ainda"
-                        description="Adicione manualmente, importe de uma planilha (CSV) ou puxe alguém que já está na base da agência."
-                        actionLabel="Adicionar passageiro"
-                        onAction={() => setDrawerOpen(true)}
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground py-8">Nenhum passageiro encontrado.</div>
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                ordenados.map((p) => {
-                  const validadeDias = daysUntil(p.validade_passaporte);
-                  const embarqueDias = daysUntil(dataEmbarque);
-                  const validadeAlerta = validadeDias != null && embarqueDias != null
-                    ? validadeDias - embarqueDias < 180
-                    : false;
-                  const quarto = p.quarto_id ? quartosById.get(p.quarto_id) : null;
-                  return (
-                    <tr key={p.id} className="border-b border-border hover:bg-accent/30">
-                      <td className="px-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
-                        #{String(indiceById.get(p.id) ?? "").padStart(3, "0")}
-                      </td>
-                      <td className="font-medium px-2.5">
-                        <div className="flex items-center gap-2">
-                          <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
-                          <button
-                            type="button"
-                            onClick={() => setEditandoId(p.id)}
-                            title="Abrir perfil do passageiro"
-                            className="text-left text-editavel-700 hover:underline"
-                          >
-                            {p.nome_completo}
-                          </button>
-                          <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
-                        </div>
-                      </td>
-                      <td className="px-2.5">
-                        <Badge variant={p.tipo === "Líder" ? "lista" : p.tipo === "Cortesia" ? "auto" : "vinculado"}>
-                          {p.tipo}
-                        </Badge>
-                      </td>
-                      <td>
-                        <EditableCell
-                          value={p.cpf}
-                          onSave={(v) => atualizarPassageiroCampo(p.id, "cpf", v)}
-                        />
-                      </td>
-                      <td>
-                        <EditableCell
-                          value={p.passaporte}
-                          onSave={(v) => atualizarPassageiroCampo(p.id, "passaporte", v)}
-                        />
-                      </td>
-                      <td>
-                        <div className={cn("px-1.5", validadeAlerta && "text-critico-600 font-medium")}>
-                          {p.validade_passaporte ? formatDate(p.validade_passaporte) : "—"}
-                          {validadeAlerta && <span className="text-[10px] block">⚠ &lt; 6m do embarque</span>}
-                        </div>
-                      </td>
-                      <td className="px-2.5 text-muted-foreground">
-                        {quarto ? `${quarto.numero} (${quarto.tipo})` : "—"}
-                      </td>
-                      <td className="px-2.5 text-muted-foreground tabular-nums">
-                        {p.companhia_aerea ? `${p.companhia_aerea} ${p.localizador ?? ""}` : p.voo_nacional_necessario ? "Voo nac. pendente" : "—"}
-                      </td>
-                      <td className="px-2.5">
-                        <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
-                      </td>
-                      <td className="px-2.5">
-                        {(() => {
-                          const pr = prontidaoByPax.get(p.id);
-                          if (!pr) return <span className="text-muted-foreground">—</span>;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => setProntidaoPaxId(p.id)}
-                              title="Ver requisitos de embarque"
-                              className="rounded-sm focus:outline-none focus:ring-2 focus:ring-editavel-600"
-                            >
-                              <Badge variant={COR_PRONTIDAO[pr.resultado.prontidao]}>
-                                {pr.resultado.prontidao}
-                              </Badge>
-                            </button>
-                          );
-                        })()}
-                      </td>
-                      <td>
-                        <EditableCell
-                          value={p.observacoes}
-                          onSave={(v) => atualizarPassageiroCampo(p.id, "observacoes", v)}
-                          placeholder="—"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {passageiros.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20">
+          <EmptyState
+            icon={Users}
+            title="Nenhum passageiro ainda"
+            description="Adicione manualmente, importe de uma planilha (CSV) ou puxe alguém que já está na base da agência."
+            actionLabel="Adicionar passageiro"
+            onAction={() => setDrawerOpen(true)}
+          />
         </div>
-      </div>
+      ) : (
+        <>
+          {temLideres && (
+            <SecaoPax
+              titulo={
+                <>
+                  <Crown className="h-4 w-4 text-[var(--brand-dark)]" />
+                  <span className="text-[13px] font-semibold">Líderes</span>
+                  <Badge variant="lista">{lideres.length}</Badge>
+                  <span className="text-[11px] text-muted-foreground">não contam na ocupação</span>
+                </>
+              }
+              linhas={lideres}
+              vazio="Nenhum líder no filtro atual."
+            />
+          )}
+          <SecaoPax
+            titulo={
+              <>
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-[13px] font-semibold">ExpedAmigos</span>
+                <Badge variant="auto">{expedAmigos.length}</Badge>
+                <span className="text-[11px] text-muted-foreground">passageiros</span>
+              </>
+            }
+            linhas={expedAmigos}
+            vazio="Nenhum passageiro no filtro atual."
+          />
+        </>
+      )}
 
       <p className="text-[11px] text-muted-foreground">
         Clique numa célula azul pra editar. Enter salva, Esc cancela, Tab vai pra próxima.

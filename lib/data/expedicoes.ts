@@ -88,7 +88,8 @@ async function agregarExpedicoes(
 
   return rows.map((e) => {
     const paxDaExp = pax.filter((p) => p.expedicao_id === e.id && p.status_reserva !== "Cancelado");
-    const pax_confirmados = paxDaExp.filter((p) => p.status_reserva === "Confirmado").length;
+    // Ocupação conta só passageiros pagantes/cortesia — líderes (equipe) ficam fora.
+    const pax_confirmados = paxDaExp.filter((p) => p.status_reserva === "Confirmado" && p.tipo !== "Líder").length;
     const docs_pendentes = paxDaExp.filter((p) => !p.passaporte).length;
 
     const prontidao_total = paxDaExp.length;
