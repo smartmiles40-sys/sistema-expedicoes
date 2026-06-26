@@ -181,11 +181,17 @@ export async function buscarDadosLider(
       passageiros,
     });
   }
-  expedicoes.sort((a, b) =>
-    ehMaster
-      ? (b.data_embarque ?? "").localeCompare(a.data_embarque ?? "") // Master: mais recentes primeiro
-      : (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""),
-  );
+  // Mesmo racional da lista de expedições: as PRÓXIMAS (futuras/hoje) primeiro,
+  // da mais perto pra mais longe; as PASSADAS no fim, da mais recente pra mais antiga.
+  const hoje = new Date().toISOString().slice(0, 10);
+  expedicoes.sort((a, b) => {
+    const da = (a.data_embarque ?? "").slice(0, 10);
+    const db = (b.data_embarque ?? "").slice(0, 10);
+    const fa = da !== "" && da >= hoje;
+    const fb = db !== "" && db >= hoje;
+    if (fa !== fb) return fa ? -1 : 1; // futuras antes das passadas
+    return fa ? da.localeCompare(db) : db.localeCompare(da);
+  });
 
   return { ok: true, dados: { nome, master: ehMaster, expedicoes } };
 }

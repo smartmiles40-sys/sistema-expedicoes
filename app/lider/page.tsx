@@ -180,8 +180,8 @@ export default function LiderPage() {
             Nenhuma expedição atribuída a você no momento.
           </p>
         ) : (
-          dados.expedicoes.map((exp) => (
-            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} defaultAberta={dados.expedicoes.length <= 3} />
+          dados.expedicoes.map((exp, i) => (
+            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} defaultAberta={i === 0 || dados.expedicoes.length <= 3} />
           ))
         )}
         <p className="pb-6 text-center text-[11px] text-muted-foreground">
