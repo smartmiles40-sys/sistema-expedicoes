@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronRight, ShieldCheck, Paperclip, Trash2 } from "lucide-react";
@@ -379,7 +380,7 @@ function RequisitoDrawer({
   const [arquivoId, setArquivoId] = React.useState(req.arquivo_id);
   const [anexando, setAnexando] = React.useState(false);
   const [previewErro, setPreviewErro] = React.useState(false);
-  const [lightboxOpen, setLightboxOpen] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState<string | null>(null);
   const exigeAnexo = REQUISITOS_COM_ANEXO_OBRIGATORIO.has(req.tipo);
   const anexoCfg = ANEXO_CONFIG[req.tipo];
   const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico";
@@ -500,6 +501,19 @@ function RequisitoDrawer({
     router.refresh();
   }
 
+  /** Imagem abre no lightbox (pop-up); PDF/outros abrem em nova aba. */
+  function verArquivo(arq: ArquivoRow) {
+    const url = `/api/arquivos/${arq.id}/download?inline=1`;
+    if (arq.mime?.startsWith("image/")) {
+      setPreviewErro(false);
+      setLightbox(url);
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+  }
+
+  const arquivoDoReq = arquivos.find((a) => a.id === arquivoId) ?? null;
+
   async function salvar() {
     setSalvando(true);
 
@@ -551,7 +565,17 @@ function RequisitoDrawer({
       {arquivoId && previewUrl ? (
         <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
           <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Anexado</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => setLightboxOpen(true)}>Ver</Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (arquivoDoReq) verArquivo(arquivoDoReq);
+              else if (previewUrl) { setPreviewErro(false); setLightbox(previewUrl); }
+            }}
+          >
+            Ver
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={removerAnexo}>Remover</Button>
         </div>
       ) : (
@@ -590,14 +614,13 @@ function RequisitoDrawer({
             <li key={a.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{a.nome}</span>
-              <a
-                href={`/api/arquivos/${a.id}/download?inline=1`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => verArquivo(a)}
                 className="font-medium text-editavel-700 hover:underline"
               >
                 Ver
-              </a>
+              </button>
               <button
                 type="button"
                 aria-label="Apagar"
@@ -760,40 +783,42 @@ function RequisitoDrawer({
       </DrawerContent>
     </Drawer>
 
-    {lightboxOpen && previewUrl && (
-      <div
-        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4"
-        onClick={() => setLightboxOpen(false)}
-      >
-        {previewErro ? (
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-md bg-background px-4 py-3 text-[13px] text-editavel-700 hover:underline"
-          >
-            Abrir documento (PDF) em nova aba
-          </a>
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={previewUrl}
-            alt="Documento anexado"
-            onError={() => setPreviewErro(true)}
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-xl"
-          />
-        )}
-        <button
-          type="button"
-          onClick={() => setLightboxOpen(false)}
-          className="absolute top-4 right-4 rounded-full bg-background/90 px-3 py-1 text-[13px] font-medium hover:bg-background"
+    {lightbox && typeof document !== "undefined" &&
+      createPortal(
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
         >
-          Fechar
-        </button>
-      </div>
-    )}
+          {previewErro ? (
+            <a
+              href={lightbox}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-md bg-background px-4 py-3 text-[13px] text-editavel-700 hover:underline"
+            >
+              Abrir arquivo em nova aba
+            </a>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={lightbox}
+              alt="Anexo"
+              onError={() => setPreviewErro(true)}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-xl"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 rounded-full bg-background/90 px-3 py-1 text-[13px] font-medium hover:bg-background"
+          >
+            Fechar
+          </button>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
