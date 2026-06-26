@@ -142,8 +142,15 @@ export default function LiderPage() {
             <CompassIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <div className="font-display text-[16px] font-semibold leading-none">Área do Líder</div>
-            <div className="mt-0.5 truncate text-[13px] text-white/70">Olá, {dados.nome.split(" ")[0]} 👋</div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-display text-[16px] font-semibold leading-none">Área do Líder</span>
+              {dados.master && (
+                <span className="rounded-full bg-[var(--brand-lime)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand-dark)]">MASTER</span>
+              )}
+            </div>
+            <div className="mt-0.5 truncate text-[13px] text-white/70">
+              Olá, {dados.nome.split(" ")[0]} 👋{dados.master ? ` · ${dados.expedicoes.length} expedições` : ""}
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -173,7 +180,9 @@ export default function LiderPage() {
             Nenhuma expedição atribuída a você no momento.
           </p>
         ) : (
-          dados.expedicoes.map((exp) => <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />)
+          dados.expedicoes.map((exp) => (
+            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} defaultAberta={dados.expedicoes.length <= 3} />
+          ))
         )}
         <p className="pb-6 text-center text-[11px] text-muted-foreground">
           Visualização apenas. Para qualquer alteração, fale com a equipe da agência.
@@ -207,8 +216,8 @@ export default function LiderPage() {
   );
 }
 
-function ExpedicaoLiderCard({ exp, onVerDoc }: { exp: LiderExpedicao; onVerDoc: VerDoc }) {
-  const [aberta, setAberta] = React.useState(true);
+function ExpedicaoLiderCard({ exp, onVerDoc, defaultAberta = true }: { exp: LiderExpedicao; onVerDoc: VerDoc; defaultAberta?: boolean }) {
+  const [aberta, setAberta] = React.useState(defaultAberta);
   const dias = daysUntil(exp.data_embarque);
   const lideres = exp.passageiros.filter((p) => p.tipo === "Líder");
   const amigos = exp.passageiros.filter((p) => p.tipo !== "Líder");

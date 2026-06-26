@@ -22,6 +22,15 @@ const CATEGORIA_REQUISITO: Record<string, string> = {
   Vacina: "Documentos pessoais",
 };
 
+/**
+ * Acesso Master: CPFs que enxergam TODAS as expedições na Área do Líder
+ * (não só as que lideram). Chave = só os 11 dígitos do CPF.
+ */
+const MASTERS: Record<string, string> = {
+  "47146666816": "Beatriz Rodrigues Galvão",
+  "01997549344": "Luis Antonio de Negreiros Caetano",
+};
+
 export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string };
 export type LiderChecagem = ChecagemProntidao & { arquivos: LiderArquivo[] };
 export type LiderPax = {
@@ -53,7 +62,7 @@ export type LiderExpedicao = {
   status: string;
   passageiros: LiderPax[];
 };
-export type LiderDados = { nome: string; expedicoes: LiderExpedicao[] };
+export type LiderDados = { nome: string; master: boolean; expedicoes: LiderExpedicao[] };
 
 /** Acesso do LÍDER por CPF (sem login). Só leitura. Valida pelo cadastro tipo "Líder". */
 export async function buscarDadosLider(
@@ -88,12 +97,21 @@ export async function buscarDadosLider(
     arqs = arqAll;
   }
 
-  const liderRows = pax.filter((p) => p.tipo === "Líder" && soDigitosCpf(p.cpf ?? "") === cpf);
-  if (!liderRows.length) {
-    return { ok: false, error: "Não encontramos expedições para este CPF. Confira com a equipe." };
+  const ehMaster = MASTERS[cpf] !== undefined;
+  let nome: string;
+  let expIds: string[];
+  if (ehMaster) {
+    // Acesso Master: enxerga TODAS as expedições.
+    nome = MASTERS[cpf];
+    expIds = exps.map((e) => e.id);
+  } else {
+    const liderRows = pax.filter((p) => p.tipo === "Líder" && soDigitosCpf(p.cpf ?? "") === cpf);
+    if (!liderRows.length) {
+      return { ok: false, error: "Não encontramos expedições para este CPF. Confira com a equipe." };
+    }
+    nome = liderRows[0].nome_completo;
+    expIds = [...new Set(liderRows.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
   }
-  const nome = liderRows[0].nome_completo;
-  const expIds = [...new Set(liderRows.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
 
   const reqsPorPax = new Map<string, PassageiroRequisitoRow[]>();
   for (const r of reqs) {
@@ -163,9 +181,13 @@ export async function buscarDadosLider(
       passageiros,
     });
   }
-  expedicoes.sort((a, b) => (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""));
+  expedicoes.sort((a, b) =>
+    ehMaster
+      ? (b.data_embarque ?? "").localeCompare(a.data_embarque ?? "") // Master: mais recentes primeiro
+      : (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""),
+  );
 
-  return { ok: true, dados: { nome, expedicoes } };
+  return { ok: true, dados: { nome, master: ehMaster, expedicoes } };
 }
 
 /** Gera um link de visualização do documento para o líder (sem login). */
