@@ -449,7 +449,12 @@ function RequisitoDrawer({
 
   // --- Anexo MÚLTIPLO (aéreos): vários arquivos na categoria do requisito ------
   const arquivosDaCategoria = arquivos.filter(
-    (a) => a.passageiro_id === req.passageiro_id && a.categoria === (anexoCfg?.categoria ?? "Outros"),
+    (a) =>
+      a.passageiro_id === req.passageiro_id &&
+      a.categoria === (anexoCfg?.categoria ?? "Outros") &&
+      // Internacional e doméstico dividem a categoria "Aéreos"; separa pela
+      // descrição (gravada como "<tipo> — prontidão" no upload).
+      (!ehAereo || (a.descricao ?? "").startsWith(req.tipo)),
   );
 
   async function anexarMultiplos(files: FileList) {

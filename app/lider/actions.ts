@@ -63,20 +63,20 @@ export async function buscarDadosLider(
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
   let reqs: PassageiroRequisitoRow[];
-  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string }[];
+  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string; descricao: string | null }[];
 
   if (DEV_USE_MOCK_DATA) {
     pax = mockPassageiros;
     exps = mockExpedicoes;
     reqs = mockPassageiroRequisitos;
-    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria }));
+    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria, descricao: a.descricao }));
   } else {
     const sb = createServiceRoleClient();
     const [pr, er, rr, ar] = await Promise.all([
       sb.from("passageiros").select("*"),
       sb.from("expedicoes").select("*"),
       sb.from("passageiro_requisitos").select("*"),
-      sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria"),
+      sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao"),
     ]);
     pax = (pr.data ?? []) as PassageiroRow[];
     exps = (er.data ?? []) as ExpedicaoRow[];
@@ -97,11 +97,12 @@ export async function buscarDadosLider(
     arr.push(r);
     reqsPorPax.set(r.passageiro_id, arr);
   }
-  const arqsPorPax = new Map<string, LiderArquivo[]>();
+  type ArqTrab = LiderArquivo & { descricao: string | null };
+  const arqsPorPax = new Map<string, ArqTrab[]>();
   for (const a of arqs) {
     if (!a.passageiro_id) continue;
     const arr = arqsPorPax.get(a.passageiro_id) ?? [];
-    arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
+    arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, descricao: a.descricao });
     arqsPorPax.set(a.passageiro_id, arr);
   }
 
@@ -115,10 +116,17 @@ export async function buscarDadosLider(
       .map((p) => {
         const res = avaliarProntidao({ passageiro: p, expedicao: e, destino: e.destino, requisitos: reqsPorPax.get(p.id) ?? [] });
         const arquivosPax = arqsPorPax.get(p.id) ?? [];
-        const checagens: LiderChecagem[] = res.checagens.map((c) => ({
-          ...c,
-          arquivos: arquivosPax.filter((a) => a.categoria === CATEGORIA_REQUISITO[c.tipo]),
-        }));
+        const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
+        const checagens: LiderChecagem[] = res.checagens.map((c) => {
+          const ehAereoCheck = c.tipo === "Aéreo Internacional" || c.tipo === "Aéreo Doméstico";
+          const arqsDaChecagem = arquivosPax.filter(
+            (a) =>
+              a.categoria === CATEGORIA_REQUISITO[c.tipo] &&
+              // separa internacional/doméstico pela descrição "<tipo> — prontidão".
+              (!ehAereoCheck || (a.descricao ?? "").startsWith(c.tipo)),
+          );
+          return { ...c, arquivos: arqsDaChecagem.map(semDescricao) };
+        });
         return {
           id: p.id,
           nome_completo: p.nome_completo,
@@ -136,7 +144,7 @@ export async function buscarDadosLider(
           condicoes_medicas: p.condicoes_medicas,
           prontidao: res.prontidao,
           checagens,
-          arquivos: arquivosPax,
+          arquivos: arquivosPax.map(semDescricao),
         };
       })
       .sort((a, b) => (a.tipo === "Líder" ? 0 : 1) - (b.tipo === "Líder" ? 0 : 1) || a.nome_completo.localeCompare(b.nome_completo, "pt-BR"));
