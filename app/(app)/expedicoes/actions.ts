@@ -16,11 +16,12 @@ import {
 } from "@/lib/mock-data";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
+import { requisitosDoDestino } from "@/lib/prontidao/requisitos-destino";
 import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
 import { chaveIdentidade } from "@/lib/data/pessoas";
-import type { PapelUsuario, PassageiroRow } from "@/types/database";
+import type { PapelUsuario, PassageiroRow, TipoRequisito, PassageiroRequisitoRow } from "@/types/database";
 import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
 function genId(prefix = "") {
@@ -2076,6 +2077,76 @@ export async function atualizarRequisitoCampo(
   revalidatePath(`/expedicoes/${expedicaoId}`);
   revalidatePath("/avisos");
   return { ok: true };
+}
+
+/**
+ * Garante a INSTÂNCIA de um requisito (em `passageiro_requisitos`) para um
+ * passageiro, criando-a a partir do template do destino se ainda não existir.
+ * Idempotente. Resolve o caso de pax que não receberam um requisito porque ele
+ * foi adicionado ao catálogo depois (a UI ficava sem como editar a exigência).
+ */
+export async function criarRequisitoInstancia(
+  passageiroId: string,
+  expedicaoId: string,
+  destino: string,
+  tipo: TipoRequisito,
+): Promise<{ ok: true; requisito: PassageiroRequisitoRow } | { ok: false; error: string }> {
+  const template = requisitosDoDestino(destino).find((t) => t.tipo === tipo);
+  if (!template) {
+    return { ok: false, error: `Requisito "${tipo}" não previsto para ${destino}.` };
+  }
+
+  if (DEV_USE_MOCK_DATA) {
+    const existente = mockPassageiroRequisitos.find((r) => r.passageiro_id === passageiroId && r.tipo === tipo);
+    if (existente) return { ok: true, requisito: existente };
+    const novo: PassageiroRequisitoRow = {
+      id: genId("preq"),
+      passageiro_id: passageiroId,
+      tipo: template.tipo,
+      descricao: template.descricao,
+      status: "Pendente",
+      obrigatoriedade: template.obrigatoriedade,
+      bloqueia_embarque: template.bloqueia_embarque,
+      validade: null,
+      numero: null,
+      arquivo_id: null,
+      responsavel_id: null,
+      verificado_em: null,
+      verificado_por: null,
+      observacoes: template.observacoes ?? null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    mockPassageiroRequisitos.push(novo);
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+    revalidatePath(`/expedicoes/${expedicaoId}`);
+    return { ok: true, requisito: novo };
+  }
+
+  const supabase = await getServerClient();
+  const { data: existente } = await supabase
+    .from("passageiro_requisitos").select("*")
+    .eq("passageiro_id", passageiroId).eq("tipo", tipo).maybeSingle();
+  if (existente) return { ok: true, requisito: existente as PassageiroRequisitoRow };
+
+  const { data, error } = await supabase
+    .from("passageiro_requisitos")
+    .insert({
+      passageiro_id: passageiroId,
+      tipo: template.tipo,
+      descricao: template.descricao,
+      status: "Pendente",
+      obrigatoriedade: template.obrigatoriedade,
+      bloqueia_embarque: template.bloqueia_embarque,
+      observacoes: template.observacoes ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  revalidatePath(`/expedicoes/${expedicaoId}`);
+  revalidatePath("/avisos");
+  return { ok: true, requisito: data as PassageiroRequisitoRow };
 }
 
 // =============================================================================

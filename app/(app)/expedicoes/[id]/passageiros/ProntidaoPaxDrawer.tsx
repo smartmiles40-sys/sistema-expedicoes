@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Drive } from "@/components/arquivos/Drive";
 import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
-import { REQUISITOS_COM_ANEXO_OBRIGATORIO, type Semaforo } from "@/lib/prontidao/regras";
+import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia } from "@/app/(app)/expedicoes/actions";
+import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, type Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type { PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables } from "@/types/database";
 
@@ -97,6 +97,7 @@ export function ProntidaoConteudo({
   const [editando, setEditando] = React.useState<PassageiroRequisitoRow | null>(null);
   const [contratoOpen, setContratoOpen] = React.useState(false);
   const [gerando, startGerar] = React.useTransition();
+  const [criando, startCriar] = React.useTransition();
 
   const usuariosById = React.useMemo(
     () => new Map(usuarios.map((u) => [u.id, u.nome])),
@@ -131,15 +132,29 @@ export function ProntidaoConteudo({
         {resultado.checagens.map((c) => {
           const req = c.requisito_id ? reqById.get(c.requisito_id) : null;
           const ehContrato = c.tipo === "Contrato";
-          const clicavel = Boolean(req) || ehContrato;
+          const ehColuna = REQUISITOS_DE_COLUNA.has(c.tipo);
+          // Requisito de instância que ainda não foi criado (e não é coluna nem
+          // dispensado/N-A): clicar cria a instância e abre pra editar.
+          const podeCriar = !req && !ehContrato && !ehColuna && c.semaforo !== "na";
+          const clicavel = Boolean(req) || ehContrato || podeCriar;
           return (
             <li key={c.tipo}>
               <button
                 type="button"
-                disabled={!clicavel}
+                disabled={!clicavel || criando}
                 onClick={() => {
-                  if (req) setEditando(req);
-                  else if (ehContrato) setContratoOpen(true);
+                  if (req) {
+                    setEditando(req);
+                  } else if (ehContrato) {
+                    setContratoOpen(true);
+                  } else if (podeCriar) {
+                    startCriar(async () => {
+                      const r = await criarRequisitoInstancia(passageiro.id, expedicaoId, destino, c.tipo);
+                      if (r.ok) setEditando(r.requisito);
+                      else toast.error("Não foi possível abrir o requisito", { description: r.error });
+                      router.refresh();
+                    });
+                  }
                 }}
                 className={cn(
                   "w-full flex items-center gap-2.5 px-3 py-2 text-left",
