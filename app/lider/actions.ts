@@ -3,6 +3,7 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockPassageiros, mockExpedicoes, mockPassageiroRequisitos } from "@/lib/mock-data";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
+import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
 import type {
@@ -73,16 +74,18 @@ export async function buscarDadosLider(
     arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria, descricao: a.descricao }));
   } else {
     const sb = createServiceRoleClient();
-    const [pr, er, rr, ar] = await Promise.all([
-      sb.from("passageiros").select("*"),
+    // Pagina (PostgREST corta em 1000) — senão o líder veria prontidão errada
+    // quando a base passa de 1000 requisitos/arquivos.
+    const [er, paxAll, reqAll, arqAll] = await Promise.all([
       sb.from("expedicoes").select("*"),
-      sb.from("passageiro_requisitos").select("*"),
-      sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao"),
+      fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
+      fetchAllRows<PassageiroRequisitoRow>((from, to) => sb.from("passageiro_requisitos").select("*").order("id").range(from, to)),
+      fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao").order("id").range(from, to)),
     ]);
-    pax = (pr.data ?? []) as PassageiroRow[];
     exps = (er.data ?? []) as ExpedicaoRow[];
-    reqs = (rr.data ?? []) as PassageiroRequisitoRow[];
-    arqs = (ar.data ?? []) as typeof arqs;
+    pax = paxAll;
+    reqs = reqAll;
+    arqs = arqAll;
   }
 
   const liderRows = pax.filter((p) => p.tipo === "Líder" && soDigitosCpf(p.cpf ?? "") === cpf);

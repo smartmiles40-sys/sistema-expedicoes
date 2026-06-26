@@ -52,6 +52,26 @@ export async function listExpedicoesComAgregados(): Promise<ExpedicaoComAgregado
 }
 
 /**
+ * Busca TODAS as linhas paginando de 1000 em 1000. O PostgREST (Supabase) corta
+ * em 1000 linhas por padrão, o que truncava SILENCIOSAMENTE os fetches globais
+ * (ex.: `passageiro_requisitos`) e bagunçava os agregados de prontidão quando a
+ * base passou de 1000 requisitos. Ordena por `id` pra paginação ser consistente.
+ */
+export async function fetchAllRows<T>(
+  pagina: (from: number, to: number) => PromiseLike<{ data: unknown }>,
+): Promise<T[]> {
+  const TAM = 1000;
+  const todas: T[] = [];
+  for (let from = 0; ; from += TAM) {
+    const { data } = await pagina(from, from + TAM - 1);
+    const linhas = (data ?? []) as T[];
+    todas.push(...linhas);
+    if (linhas.length < TAM) break;
+  }
+  return todas;
+}
+
+/**
  * Calcula os agregados (pax confirmados, custo, margem, pagamentos vencidos,
  * docs pendentes, responsáveis) de um conjunto de expedições com poucas queries
  * em lote. Usado no modo Supabase por listExpedicoesComAgregados e
@@ -64,17 +84,15 @@ async function agregarExpedicoes(
   if (rows.length === 0) return [];
   const ids = rows.map((e) => e.id);
 
-  const [paxRes, reqRes, checklistRes, usuariosRes] = await Promise.all([
-    supabase.from("passageiros").select("*").in("expedicao_id", ids),
-    supabase.from("passageiro_requisitos").select("*"),
-    supabase.from("checklist_itens").select("expedicao_id, parent_id, status").in("expedicao_id", ids),
+  const [pax, requisitos, checklist, usuariosRes] = await Promise.all([
+    fetchAllRows<PassageiroRow>((from, to) =>
+      supabase.from("passageiros").select("*").in("expedicao_id", ids).order("id").range(from, to)),
+    fetchAllRows<PassageiroRequisitoRow>((from, to) =>
+      supabase.from("passageiro_requisitos").select("*").order("id").range(from, to)),
+    fetchAllRows<{ expedicao_id: string; parent_id: string | null; status: string }>((from, to) =>
+      supabase.from("checklist_itens").select("expedicao_id, parent_id, status").in("expedicao_id", ids).order("id").range(from, to)),
     supabase.from("usuarios").select("id, nome"),
   ]);
-  const pax = (paxRes.data ?? []) as PassageiroRow[];
-  const requisitos = (reqRes.data ?? []) as PassageiroRequisitoRow[];
-  const checklist = (checklistRes.data ?? []) as {
-    expedicao_id: string; parent_id: string | null; status: string;
-  }[];
   const usuariosById = new Map(
     ((usuariosRes.data ?? []) as { id: string; nome: string }[]).map((u) => [u.id, u.nome]),
   );
@@ -422,14 +440,16 @@ async function getProntidaoTodas(): Promise<{
     requisitos = mockPassageiroRequisitos;
   } else {
     const supabase = await getServerClient();
-    const [expRes, paxRes, reqRes] = await Promise.all([
+    const [expRes, paxAll, reqAll] = await Promise.all([
       supabase.from("expedicoes").select("*"),
-      supabase.from("passageiros").select("*"),
-      supabase.from("passageiro_requisitos").select("*"),
+      fetchAllRows<PassageiroRow>((from, to) =>
+        supabase.from("passageiros").select("*").order("id").range(from, to)),
+      fetchAllRows<PassageiroRequisitoRow>((from, to) =>
+        supabase.from("passageiro_requisitos").select("*").order("id").range(from, to)),
     ]);
     expedicoes = (expRes.data ?? []) as ExpedicaoRow[];
-    passageiros = (paxRes.data ?? []) as PassageiroRow[];
-    requisitos = (reqRes.data ?? []) as PassageiroRequisitoRow[];
+    passageiros = paxAll;
+    requisitos = reqAll;
   }
 
   const expById = new Map(expedicoes.map((e) => [e.id, e]));
