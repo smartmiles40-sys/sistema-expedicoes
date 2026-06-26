@@ -383,14 +383,15 @@ function RequisitoDrawer({
   const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico";
   const ehDomestico = req.tipo === "Aéreo Doméstico";
   const ehVacina = req.tipo === "Vacina";
-  // Pergunta "É necessário?": Aéreo Doméstico e Vacina.
-  const temNecessario = ehDomestico || ehVacina;
+  const ehSeguro = req.tipo === "Seguro";
+  // Pergunta "necessário/contratado?" (Não = dispensa): Aéreo Doméstico, Vacina, Seguro.
+  const temNecessario = ehDomestico || ehVacina || ehSeguro;
   // Pergunta "Comprado com a gente?": só os aéreos.
   const mostraComprado = ehAereo;
-  // Questionário (perguntas Sim/Não + anexo): aéreos e vacina.
-  const ehQuestionario = ehAereo || ehVacina;
-  // "Só anexo" = sem opções nem perguntas, só o arquivo: Documento Pessoal e Seguro.
-  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Seguro";
+  // Questionário (perguntas Sim/Não + anexo): aéreos, vacina e seguro.
+  const ehQuestionario = ehAereo || ehVacina || ehSeguro;
+  // "Só anexo" = sem perguntas, só o arquivo: Documento Pessoal.
+  const soAnexo = req.tipo === "Documento Pessoal";
   // Perguntas Sim/Não.
   const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
   const [comprado, setComprado] = React.useState<boolean | null>(
@@ -452,7 +453,7 @@ function RequisitoDrawer({
     if (ehQuestionario) {
       if (temNecessario && !necessario) {
         statusFinal = "Dispensado";
-        obsFinal = ehVacina ? "Vacina não necessária" : "Trecho doméstico não necessário";
+        obsFinal = ehVacina ? "Vacina não necessária" : ehSeguro ? "Seguro não contratado" : "Trecho doméstico não necessário";
       } else {
         statusFinal = arquivoId ? "Aprovado" : "Pendente";
         if (mostraComprado) {
@@ -540,7 +541,7 @@ function RequisitoDrawer({
             <>
               {temNecessario && (
                 <div className="space-y-1.5 rounded-xl border border-editavel-600/30 bg-editavel-50/50 p-3">
-                  <Label className="text-editavel-600">{ehVacina ? "É necessária a vacina?" : "É necessário aéreo doméstico?"}</Label>
+                  <Label className="text-editavel-600">{ehVacina ? "É necessária a vacina?" : ehSeguro ? "Seguro contratado?" : "É necessário aéreo doméstico?"}</Label>
                   <div className="flex flex-wrap gap-1.5">
                     <OpcaoBtn ativo={necessario} cor="sim" onClick={() => setNecessario(true)}>Sim</OpcaoBtn>
                     <OpcaoBtn ativo={!necessario} cor="nao" onClick={() => setNecessario(false)}>Não — dispensar</OpcaoBtn>
