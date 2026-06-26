@@ -44,11 +44,16 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
 
 /**
  * Requisitos que só são "ok" com o ARQUIVO de evidência anexado — não basta
- * mudar o status. Hoje: a foto do documento pessoal (RG/CNH/passaporte).
- * A prontidão lê `arquivo_id` da instância em passageiro_requisitos.
+ * mudar o status. Hoje: a foto do documento pessoal (RG/CNH/passaporte) e o
+ * voucher/bilhete do aéreo internacional. A prontidão lê `arquivo_id` da
+ * instância em passageiro_requisitos.
  */
 export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
   "Documento Pessoal",
+  "Aéreo Internacional",
+  "Aéreo Doméstico",
+  "Seguro",
+  "Vacina",
 ]);
 
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
@@ -114,9 +119,10 @@ function checarPassaporte(
   return "ok";
 }
 
-function checarContrato(p: PassageiroRow, bloqueia: boolean): Semaforo {
-  if (p.contrato_assinado) return "ok";
-  return bloqueia ? "bloqueio" : "atencao";
+function checarContrato(p: PassageiroRow): Semaforo {
+  // Contrato NÃO é obrigatório p/ prontidão: assinado = ok; senão neutro ("na"),
+  // sem gerar atenção/bloqueio. A aba serve só pra anexar o contrato.
+  return p.contrato_assinado ? "ok" : "na";
 }
 
 function checarDadosPessoais(p: PassageiroRow, bloqueia: boolean): Semaforo {
@@ -238,7 +244,7 @@ export function avaliarProntidao(params: {
           semaforo = checarPassaporte(passageiro, expedicao, t.bloqueia_embarque);
           break;
         case "Contrato":
-          semaforo = checarContrato(passageiro, t.bloqueia_embarque);
+          semaforo = checarContrato(passageiro);
           break;
         case "Dados Pessoais":
           semaforo = checarDadosPessoais(passageiro, t.bloqueia_embarque);

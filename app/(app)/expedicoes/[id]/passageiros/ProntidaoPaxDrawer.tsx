@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronRight, ShieldCheck } from "lucide-react";
+import { ChevronRight, ShieldCheck, Paperclip } from "lucide-react";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
@@ -17,7 +17,10 @@ import { cn } from "@/lib/utils";
 import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia } from "@/app/(app)/expedicoes/actions";
 import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, type Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
-import type { PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables } from "@/types/database";
+import type {
+  PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables,
+  StatusRequisito, TipoRequisito, CategoriaArquivo,
+} from "@/types/database";
 
 const DOT: Record<Semaforo, string> = {
   ok: "bg-vinculado-600",
@@ -25,6 +28,78 @@ const DOT: Record<Semaforo, string> = {
   bloqueio: "bg-critico-600",
   na: "bg-auto-600",
 };
+
+/** Cores da pílula de status: `off` (clarinho, clicável) e `on` (selecionado, sólido). */
+const STATUS_COR: Record<StatusRequisito, { off: string; on: string }> = {
+  Aprovado:    { off: "border-vinculado-600/40 bg-vinculado-50 text-vinculado-600 hover:bg-vinculado-100", on: "border-vinculado-600 bg-vinculado-600 text-white shadow-sm" },
+  Dispensado:  { off: "border-vinculado-600/40 bg-vinculado-50 text-vinculado-600 hover:bg-vinculado-100", on: "border-vinculado-600 bg-vinculado-600 text-white shadow-sm" },
+  Enviado:     { off: "border-editavel-600/40 bg-editavel-50 text-editavel-600 hover:bg-editavel-100", on: "border-editavel-600 bg-editavel-600 text-white shadow-sm" },
+  "Em análise":{ off: "border-lista-600/40 bg-lista-50 text-lista-600 hover:bg-lista-100", on: "border-lista-600 bg-lista-600 text-white shadow-sm" },
+  Pendente:    { off: "border-atencao-600/40 bg-atencao-50 text-atencao-600 hover:bg-atencao-100", on: "border-atencao-600 bg-atencao-600 text-white shadow-sm" },
+  Vencido:     { off: "border-critico-600/40 bg-critico-50 text-critico-600 hover:bg-critico-100", on: "border-critico-600 bg-critico-600 text-white shadow-sm" },
+  Reprovado:   { off: "border-critico-600/40 bg-critico-50 text-critico-600 hover:bg-critico-100", on: "border-critico-600 bg-critico-600 text-white shadow-sm" },
+};
+
+/** Requisitos com anexo: para onde vai o arquivo + textos amigáveis. */
+const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo; label: string; dica: string }>> = {
+  "Documento Pessoal": {
+    categoria: "Documentos pessoais",
+    label: "Anexar foto do documento",
+    dica: "RG, CNH ou passaporte. Anexar já deixa a exigência aprovada.",
+  },
+  "Aéreo Internacional": {
+    categoria: "Aéreos",
+    label: "Anexar voucher / bilhete aéreo",
+    dica: "Anexar o voucher já deixa o aéreo internacional aprovado.",
+  },
+  "Aéreo Doméstico": {
+    categoria: "Aéreos",
+    label: "Anexar voucher / bilhete (trecho doméstico)",
+    dica: "Anexar o voucher já deixa o trecho doméstico aprovado.",
+  },
+  Seguro: {
+    categoria: "Seguros",
+    label: "Anexar apólice do seguro",
+    dica: "Anexar a apólice já deixa o seguro aprovado.",
+  },
+  Vacina: {
+    categoria: "Documentos pessoais",
+    label: "Anexar certificado de vacinação",
+    dica: "Anexar o certificado já deixa a vacina aprovada.",
+  },
+};
+
+/** Botão de opção Sim/Não (verde = sim, cinza = não), estilo pílula. */
+function OpcaoBtn({
+  ativo,
+  cor,
+  onClick,
+  children,
+}: {
+  ativo: boolean;
+  cor: "sim" | "nao";
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const on =
+    cor === "sim"
+      ? "border-vinculado-600 bg-vinculado-600 text-white shadow-sm"
+      : "border-auto-600 bg-auto-600 text-white shadow-sm";
+  const off =
+    cor === "sim"
+      ? "border-vinculado-600/40 bg-vinculado-50 text-vinculado-600 hover:bg-vinculado-100"
+      : "border-auto-600/40 bg-auto-50 text-auto-600 hover:bg-auto-100";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn("rounded-full border px-4 py-1.5 text-[13px] font-semibold transition-colors", ativo ? on : off)}
+    >
+      {ativo ? "✓ " : ""}
+      {children}
+    </button>
+  );
+}
 
 interface Props {
   expedicaoId: string;
@@ -304,6 +379,25 @@ function RequisitoDrawer({
   const [previewErro, setPreviewErro] = React.useState(false);
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const exigeAnexo = REQUISITOS_COM_ANEXO_OBRIGATORIO.has(req.tipo);
+  const anexoCfg = ANEXO_CONFIG[req.tipo];
+  const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico";
+  const ehDomestico = req.tipo === "Aéreo Doméstico";
+  const ehVacina = req.tipo === "Vacina";
+  // Pergunta "É necessário?": Aéreo Doméstico e Vacina.
+  const temNecessario = ehDomestico || ehVacina;
+  // Pergunta "Comprado com a gente?": só os aéreos.
+  const mostraComprado = ehAereo;
+  // Questionário (perguntas Sim/Não + anexo): aéreos e vacina.
+  const ehQuestionario = ehAereo || ehVacina;
+  // "Só anexo" = sem opções nem perguntas, só o arquivo: Documento Pessoal e Seguro.
+  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Seguro";
+  // Perguntas Sim/Não.
+  const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
+  const [comprado, setComprado] = React.useState<boolean | null>(
+    req.observacoes?.includes("Comprado com a gente: Sim") ? true
+      : req.observacoes?.includes("Comprado com a gente: Não") ? false
+        : null,
+  );
   const previewUrl = arquivoId ? `/api/arquivos/${arquivoId}/download?inline=1` : null;
 
   async function anexarDocumento(file: File) {
@@ -312,7 +406,7 @@ function RequisitoDrawer({
     fd.append("file", file);
     fd.append("expedicao_id", expedicaoId);
     fd.append("passageiro_id", req.passageiro_id);
-    fd.append("categoria", "Documentos pessoais");
+    fd.append("categoria", anexoCfg?.categoria ?? "Documentos pessoais");
     fd.append("descricao", `${req.tipo} — prontidão`);
     let json: { ok: boolean; id?: string; error?: string };
     try {
@@ -351,13 +445,29 @@ function RequisitoDrawer({
 
   async function salvar() {
     setSalvando(true);
+
+    // Status/observações efetivos conforme o modo do requisito.
+    let statusFinal: typeof status = status;
+    let obsFinal: string | null = observacoes || null;
+    if (ehQuestionario) {
+      if (temNecessario && !necessario) {
+        statusFinal = "Dispensado";
+        obsFinal = ehVacina ? "Vacina não necessária" : "Trecho doméstico não necessário";
+      } else {
+        statusFinal = arquivoId ? "Aprovado" : "Pendente";
+        if (mostraComprado) {
+          obsFinal = comprado == null ? obsFinal : `Comprado com a gente: ${comprado ? "Sim" : "Não"}`;
+        }
+      }
+    }
+
     const mudancas: [string, unknown][] = [];
-    if (status !== req.status) mudancas.push(["status", status]);
-    if ((validade || null) !== (req.validade?.slice(0, 10) ?? null)) mudancas.push(["validade", validade || null]);
-    if ((numero || null) !== (req.numero ?? null)) mudancas.push(["numero", numero || null]);
+    if (statusFinal !== req.status) mudancas.push(["status", statusFinal]);
+    if (!soAnexo && (validade || null) !== (req.validade?.slice(0, 10) ?? null)) mudancas.push(["validade", validade || null]);
+    if (!soAnexo && (numero || null) !== (req.numero ?? null)) mudancas.push(["numero", numero || null]);
     const respValor = responsavel === "_none" ? null : responsavel;
     if (respValor !== req.responsavel_id) mudancas.push(["responsavel_id", respValor]);
-    if ((observacoes || null) !== (req.observacoes ?? null)) mudancas.push(["observacoes", observacoes || null]);
+    if ((obsFinal ?? null) !== (req.observacoes ?? null)) mudancas.push(["observacoes", obsFinal]);
 
     if (mudancas.length === 0) {
       onClose();
@@ -378,6 +488,42 @@ function RequisitoDrawer({
     router.refresh();
   }
 
+  const anexoBlock = exigeAnexo ? (
+    <div className="space-y-1.5 rounded-xl border border-border bg-muted/20 p-3">
+      <Label>{anexoCfg?.label ?? "Documento anexado"}</Label>
+      {arquivoId && previewUrl ? (
+        <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
+          <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Anexado</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => setLightboxOpen(true)}>Ver</Button>
+          <Button type="button" variant="outline" size="sm" onClick={removerAnexo}>Remover</Button>
+        </div>
+      ) : (
+        <label
+          className={cn(
+            "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-5 text-[13px] cursor-pointer hover:bg-accent/40",
+            anexando && "opacity-60 pointer-events-none",
+          )}
+        >
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            disabled={anexando}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) anexarDocumento(f);
+              e.target.value = "";
+            }}
+          />
+          <Paperclip className="h-5 w-5 text-muted-foreground" />
+          <span className="font-medium">{anexando ? "Anexando..." : (anexoCfg?.label ?? "Anexar arquivo")}</span>
+          <span className="text-[11px] text-muted-foreground">imagem ou PDF</span>
+        </label>
+      )}
+      <p className="text-[11px] text-muted-foreground">{anexoCfg?.dica ?? "Obrigatório para a prontidão."}</p>
+    </div>
+  ) : null;
+
   return (
     <>
     <Drawer open onOpenChange={(v) => !v && onClose()}>
@@ -389,69 +535,89 @@ function RequisitoDrawer({
           </DrawerDescription>
         </DrawerHeader>
         <DrawerBody>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STATUS_REQUISITO.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {exigeAnexo && (
-            <div className="space-y-1">
-              <Label>Documento anexado</Label>
-              {arquivoId && previewUrl ? (
-                <div className="flex items-center gap-2 rounded-md border border-border p-2">
-                  <span className="flex-1 text-[13px] text-vinculado-700">Documento anexado</span>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setLightboxOpen(true)}>
-                    Ver documento
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={removerAnexo}>
-                    Remover
-                  </Button>
+          {/* QUESTIONÁRIO (aéreos + vacina): perguntas Sim/Não + anexo obrigatório */}
+          {ehQuestionario ? (
+            <>
+              {temNecessario && (
+                <div className="space-y-1.5 rounded-xl border border-editavel-600/30 bg-editavel-50/50 p-3">
+                  <Label className="text-editavel-600">{ehVacina ? "É necessária a vacina?" : "É necessário aéreo doméstico?"}</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <OpcaoBtn ativo={necessario} cor="sim" onClick={() => setNecessario(true)}>Sim</OpcaoBtn>
+                    <OpcaoBtn ativo={!necessario} cor="nao" onClick={() => setNecessario(false)}>Não — dispensar</OpcaoBtn>
+                  </div>
                 </div>
-              ) : (
-                <label
-                  className={cn(
-                    "flex items-center justify-center rounded-md border border-dashed border-border px-3 py-2 text-[13px] cursor-pointer hover:bg-accent/40",
-                    anexando && "opacity-60 pointer-events-none",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    disabled={anexando}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) anexarDocumento(f);
-                      e.target.value = "";
-                    }}
-                  />
-                  {anexando ? "Anexando..." : "Anexar foto do documento"}
-                </label>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                Obrigatório para a prontidão. Fica na pasta &quot;Documentos pessoais&quot; do passageiro.
-              </p>
-            </div>
-          )}
-
-          {!exigeAnexo && (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="req-validade">Validade</Label>
-                <Input id="req-validade" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+              {(!temNecessario || necessario) && (
+                <>
+                  {mostraComprado && (
+                    <div className="space-y-1.5 rounded-xl border border-editavel-600/30 bg-editavel-50/50 p-3">
+                      <Label className="text-editavel-600">Aéreo comprado com a gente?</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        <OpcaoBtn ativo={comprado === true} cor="sim" onClick={() => setComprado(true)}>Sim</OpcaoBtn>
+                        <OpcaoBtn ativo={comprado === false} cor="nao" onClick={() => setComprado(false)}>Não</OpcaoBtn>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Em qualquer caso, o voucher é obrigatório.</p>
+                    </div>
+                  )}
+                  {anexoBlock}
+                  {ehAereo && (
+                    <div className="space-y-1">
+                      <Label htmlFor="req-loc">Localizador (opcional)</Label>
+                      <Input id="req-loc" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="ex.: ABC123" />
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          ) : soAnexo ? (
+            anexoBlock
+          ) : (
+            <>
+              <div className="space-y-1.5 rounded-xl border border-editavel-600/30 bg-editavel-50/50 p-3">
+                <Label className="text-editavel-600">Status — toque numa opção 👇</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {STATUS_REQUISITO.map((s) => {
+                    const sel = status === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setStatus(s)}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+                          sel ? STATUS_COR[s].on : STATUS_COR[s].off,
+                        )}
+                      >
+                        {sel ? "✓ " : ""}{s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="req-validade">Validade</Label>
+                  <Input id="req-validade" type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="req-numero">Número / Localizador</Label>
+                  <Input id="req-numero" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="nº apólice, visto…" />
+                </div>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="req-numero">Número / Localizador</Label>
-                <Input id="req-numero" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="nº apólice, visto…" />
+                <Label htmlFor="req-obs">Observações</Label>
+                <textarea
+                  id="req-obs"
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+                />
               </div>
-            </div>
+            </>
           )}
 
+          {/* Responsável (todos os modos) */}
           <div className="space-y-1">
             <Label>Responsável</Label>
             <Select value={responsavel} onValueChange={setResponsavel}>
@@ -462,19 +628,6 @@ function RequisitoDrawer({
               </SelectContent>
             </Select>
           </div>
-
-          {!exigeAnexo && (
-            <div className="space-y-1">
-              <Label htmlFor="req-obs">Observações</Label>
-              <textarea
-                id="req-obs"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                rows={2}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
-              />
-            </div>
-          )}
 
           {req.verificado_em && (
             <p className="text-[11px] text-muted-foreground">

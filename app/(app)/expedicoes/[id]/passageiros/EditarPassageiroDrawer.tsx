@@ -135,21 +135,19 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent width="w-[600px]">
         <DrawerHeader>
-          <div className="flex items-center justify-between gap-2">
-            <DrawerTitle className="truncate flex items-center gap-2">
-              <span className="truncate">{passageiro?.nome_completo ?? "Passageiro"}</span>
-              <FidelidadeBadge posicao={posicaoFidelidade} />
-            </DrawerTitle>
-            {passageiro && (
-              <Link
-                href={`/expedicoes/${expedicaoId}/passageiros/${passageiro.id}`}
-                className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-              >
-                <ExternalLink className="h-3 w-3" /> Abrir página completa
-              </Link>
-            )}
-          </div>
+          <DrawerTitle className="flex items-center gap-2">
+            <span className="truncate">{passageiro?.nome_completo ?? "Passageiro"}</span>
+            <FidelidadeBadge posicao={posicaoFidelidade} />
+          </DrawerTitle>
           <DrawerDescription>Dados pessoais, prontidão e saúde do passageiro.</DrawerDescription>
+          {passageiro && (
+            <Link
+              href={`/expedicoes/${expedicaoId}/passageiros/${passageiro.id}`}
+              className="mt-1.5 inline-flex w-fit items-center gap-1 text-[12px] font-medium text-editavel-700 hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Abrir página completa
+            </Link>
+          )}
         </DrawerHeader>
 
         <DrawerBody>

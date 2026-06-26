@@ -55,8 +55,11 @@ export const DrawerContent = React.forwardRef<
       {...props}
     >
       {children}
-      <Dialog.Close className="absolute right-3 top-3 rounded-sm p-1 opacity-70 hover:opacity-100 hover:bg-accent">
-        <X className="h-4 w-4" />
+      <Dialog.Close
+        aria-label="Fechar"
+        className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="h-5 w-5" />
         <span className="sr-only">Fechar</span>
       </Dialog.Close>
     </Dialog.Content>
@@ -66,7 +69,8 @@ export const DrawerContent = React.forwardRef<
 DrawerContent.displayName = "DrawerContent";
 
 export function DrawerHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4 border-b border-border", className)} {...props} />;
+  // pr-14 reserva espaço pro botão X (canto superior direito) — sem sobreposição.
+  return <div className={cn("p-4 pr-14 border-b border-border", className)} {...props} />;
 }
 
 export const DrawerTitle = React.forwardRef<
