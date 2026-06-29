@@ -1,13 +1,17 @@
 "use client";
 import * as React from "react";
 import {
-  CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, Sparkles, ArrowLeft, ExternalLink,
+  CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
+  CalendarDays, Ticket, Info, ChevronRight, Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
-import { entrarExpedAmigo, type AmigoDados, type AmigoExpedicao } from "./actions";
+import {
+  entrarExpedAmigo,
+  type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
+} from "./actions";
 
 export default function AmigoPage() {
   const [cpf, setCpf] = React.useState("");
@@ -131,34 +135,72 @@ export default function AmigoPage() {
 }
 
 function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
+  // Sempre recolhida ao logar — o viajante abre a viagem que quiser.
+  const [aberta, setAberta] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      {/* Hero */}
-      <div className="bg-brand-gradient px-5 py-5 text-white">
+      {/* Hero (clicável para recolher/expandir) */}
+      <button
+        type="button"
+        onClick={() => setAberta((v) => !v)}
+        className="bg-brand-gradient block w-full px-5 py-5 text-left text-white"
+      >
         <div className="flex items-center gap-2">
           {dias != null && dias >= 0 && (
             <span className="rounded-full bg-[var(--brand-lime)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--brand-dark)]">
               {dias === 0 ? "É hoje! 🎉" : `Faltam ${dias} dia${dias === 1 ? "" : "s"}`}
             </span>
           )}
+          <ChevronRight className={cn("ml-auto h-5 w-5 shrink-0 transition-transform", aberta && "rotate-90")} />
         </div>
         <h2 className="font-display mt-2 text-2xl font-semibold leading-tight">{exp.nome}</h2>
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-white/75">
           <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[var(--brand-lime)]" /> {exp.destino}</span>
           <span className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-[var(--brand-lime)]" /> {formatDate(exp.data_embarque)} → {formatDate(exp.data_retorno)}</span>
         </div>
-      </div>
+      </button>
 
+      {aberta && (
       <div className="space-y-4 p-4">
+        {/* Roteiro dia a dia */}
+        {exp.roteiro.length > 0 && (
+          <Bloco icone={<CalendarDays className="h-4 w-4" />} titulo="Roteiro dia a dia (previsto)">
+            <ol className="space-y-1.5">
+              {exp.roteiro.map((d, i) => (
+                <DiaRoteiro key={i} d={d} />
+              ))}
+            </ol>
+          </Bloco>
+        )}
+
         {/* Voos */}
-        <Bloco icone={<Plane className="h-4 w-4" />} titulo="Seus voos">
-          {exp.voo.companhia || exp.voo.localizador ? (
-            <div className="grid grid-cols-2 gap-3">
-              <Campo label="Companhia aérea" valor={exp.voo.companhia} />
-              <Campo label="Localizador" valor={exp.voo.localizador} mono />
+        <Bloco icone={<Plane className="h-4 w-4" />} titulo="Voos">
+          {exp.voos_grupo.length > 0 && (
+            <ul className="space-y-1.5">
+              {exp.voos_grupo.map((v, i) => (
+                <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                  <div className="text-[13px] font-medium">
+                    <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px]">{v.trecho}</span>
+                    {v.origem ?? "—"} → {v.destino ?? "—"}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {[v.companhia, v.numero_voo].filter(Boolean).join(" ")}
+                    {v.partida ? ` · Partida: ${v.partida}` : ""}
+                    {v.chegada ? ` · Chegada: ${v.chegada}` : ""}
+                  </div>
+                  {v.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{v.observacoes}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(exp.voo.companhia || exp.voo.localizador) && (
+            <div className="mt-2 grid grid-cols-2 gap-3 rounded-lg bg-editavel-50 px-3 py-2">
+              <Campo label="Sua companhia" valor={exp.voo.companhia} />
+              <Campo label="Seu localizador" valor={exp.voo.localizador} mono />
             </div>
-          ) : (
+          )}
+          {exp.voos_grupo.length === 0 && !exp.voo.companhia && !exp.voo.localizador && (
             <p className="text-[12px] text-muted-foreground">
               As informações dos seus voos serão disponibilizadas aqui em breve.
             </p>
@@ -169,6 +211,28 @@ function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
             </p>
           )}
         </Bloco>
+
+        {/* Passeios e ingressos */}
+        {exp.passeios.length > 0 && (
+          <Bloco icone={<Ticket className="h-4 w-4" />} titulo="Passeios e ingressos">
+            <ul className="space-y-1.5">
+              {exp.passeios.map((p, i) => (
+                <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                  <div className="text-[13px] font-medium">
+                    {p.nome}
+                    <span className={p.incluso ? "text-vinculado-600" : "text-atencao-600"}>
+                      {" "}· {p.incluso ? "incluso" : "opcional"}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {[p.data ? formatDate(p.data) : null, p.horario, p.local].filter(Boolean).join(" · ")}
+                  </div>
+                  {p.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{p.observacoes}</div>}
+                </li>
+              ))}
+            </ul>
+          </Bloco>
+        )}
 
         {/* Hospedagem / quarto */}
         <Bloco icone={<BedDouble className="h-4 w-4" />} titulo="Sua hospedagem">
@@ -214,16 +278,100 @@ function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
           </Bloco>
         )}
 
-        {/* Teaser do que vem por aí (Fase 2) */}
-        <div className="flex items-start gap-2.5 rounded-xl border border-dashed border-border bg-muted/20 px-3 py-3">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-lime-deep,#c0e046)]" />
-          <p className="text-[12px] text-muted-foreground">
-            <span className="font-medium text-foreground">Em breve por aqui:</span> roteiro dia a dia,
-            passeios e ingressos, e as informações importantes do destino.
-          </p>
-        </div>
+        {/* Informações do destino */}
+        {exp.info.length > 0 && (
+          <Bloco icone={<Info className="h-4 w-4" />} titulo="Informações do destino">
+            <div className="space-y-2">
+              {exp.info.map((b, i) => (
+                <div key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                  <div className="text-[12px] font-semibold">{b.titulo}</div>
+                  <p className="mt-0.5 whitespace-pre-line text-[12px] text-muted-foreground">{b.conteudo}</p>
+                </div>
+              ))}
+            </div>
+          </Bloco>
+        )}
+
+        {/* Avisos e boas práticas */}
+        {exp.avisos.length > 0 && (
+          <Bloco icone={<Megaphone className="h-4 w-4" />} titulo="Avisos e boas práticas">
+            <div className="space-y-2">
+              {exp.avisos.map((a, i) => {
+                const cfg = AVISO_CFG[a.tipo] ?? AVISO_CFG.Aviso;
+                return (
+                  <div key={i} className={cn("rounded-lg border-l-4 bg-background px-3 py-2", cfg.border)}>
+                    <div className="inline-flex flex-wrap items-center gap-1.5 text-[12px] font-semibold">
+                      <span>{cfg.emoji}</span> {a.titulo}
+                      <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", cfg.badge)}>{a.tipo}</span>
+                    </div>
+                    <p className="mt-0.5 whitespace-pre-line text-[12px] text-muted-foreground">{a.conteudo}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </Bloco>
+        )}
       </div>
+      )}
     </section>
+  );
+}
+
+const AVISO_CFG: Record<string, { emoji: string; border: string; badge: string }> = {
+  "Aviso": { emoji: "⚠️", border: "border-atencao-600", badge: "bg-atencao-100 text-atencao-600" },
+  "Boa prática": { emoji: "✅", border: "border-vinculado-600", badge: "bg-vinculado-100 text-vinculado-600" },
+  "Dica": { emoji: "💡", border: "border-editavel-600", badge: "bg-editavel-100 text-editavel-600" },
+};
+
+/** Um dia do roteiro — recolhível (abre detalhes + fotos ao tocar). */
+function DiaRoteiro({ d }: { d: AmigoRoteiroDia }) {
+  const [aberto, setAberto] = React.useState(false);
+  const temDetalhe = Boolean(d.descricao || d.refeicoes || d.hospedagem || d.fotos.length);
+  return (
+    <li className="overflow-hidden rounded-lg border border-border bg-background">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold">
+            Dia {d.dia}{d.titulo ? ` · ${d.titulo}` : ""}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}
+            {d.fotos.length ? ` · ${d.fotos.length} foto${d.fotos.length === 1 ? "" : "s"}` : ""}
+          </div>
+        </div>
+        {temDetalhe && (
+          <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", aberto && "rotate-90")} />
+        )}
+      </button>
+      {aberto && temDetalhe && (
+        <div className="space-y-2 border-t border-border px-3 py-2.5">
+          {d.descricao && <p className="text-[12px] text-muted-foreground">{d.descricao}</p>}
+          {(d.refeicoes || d.hospedagem) && (
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              {d.refeicoes && <span className="rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">🍽 {d.refeicoes}</span>}
+              {d.hospedagem && <span className="rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">🛏 {d.hospedagem}</span>}
+            </div>
+          )}
+          {d.fotos.length > 0 && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {d.fotos.map((f, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={f.url}
+                  alt={f.legenda ?? "Foto da viagem"}
+                  className="aspect-square w-full rounded-lg object-cover"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 

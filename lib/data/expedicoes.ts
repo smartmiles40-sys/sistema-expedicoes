@@ -14,6 +14,12 @@ import {
   mockAlocacoes,
   mockUsuarios,
   mockLinksExpedicao,
+  mockRoteiroDias,
+  mockExpedicaoVoos,
+  mockExpedicaoPasseios,
+  mockExpedicaoInfo,
+  mockRoteiroDiaFotos,
+  mockExpedicaoAvisos,
   mockPassageiroRequisitos,
   getExpedicoesComAgregados,
 } from "@/lib/mock-data";
@@ -34,6 +40,12 @@ import type {
   AlocacaoQuartoRow,
   UsuarioRow,
   LinkExpedicaoRow,
+  RoteiroDiaRow,
+  ExpedicaoVooRow,
+  ExpedicaoPasseioRow,
+  ExpedicaoInfoRow,
+  RoteiroDiaFotoRow,
+  ExpedicaoAvisoRow,
   EtapaChecklist,
   Prontidao,
 } from "@/types/database";
@@ -266,6 +278,70 @@ export async function listLinks(expedicaoId: string): Promise<LinkExpedicaoRow[]
     return [];
   }
   return (data ?? []) as LinkExpedicaoRow[];
+}
+
+// =============================================================================
+// Portal do ExpedAmigo (conteúdo da viagem, migration 0021)
+// =============================================================================
+
+/** Helper genérico: lista linhas de uma tabela do portal por expedição, por ordem. */
+async function listPortal<T>(
+  tabela: string,
+  expedicaoId: string,
+  mock: { expedicao_id: string; ordem: number; created_at: string }[],
+): Promise<T[]> {
+  if (DEV_USE_MOCK_DATA) {
+    return mock
+      .filter((r) => r.expedicao_id === expedicaoId)
+      .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at)) as T[];
+  }
+  const supabase = await getServerClient();
+  const { data, error } = await supabase
+    .from(tabela)
+    .select("*")
+    .eq("expedicao_id", expedicaoId)
+    .order("ordem", { ascending: true })
+    .order("created_at", { ascending: true });
+  // Se a migration 0021 ainda não rodou, a tabela não existe → não quebra a página.
+  if (error) {
+    if (error.code === "42P01") return [];
+    console.error(`[list ${tabela}] erro:`, error);
+    return [];
+  }
+  return (data ?? []) as T[];
+}
+
+export const listRoteiro = (expedicaoId: string) =>
+  listPortal<RoteiroDiaRow>("roteiro_dias", expedicaoId, mockRoteiroDias);
+export const listVoosExpedicao = (expedicaoId: string) =>
+  listPortal<ExpedicaoVooRow>("expedicao_voos", expedicaoId, mockExpedicaoVoos);
+export const listPasseios = (expedicaoId: string) =>
+  listPortal<ExpedicaoPasseioRow>("expedicao_passeios", expedicaoId, mockExpedicaoPasseios);
+export const listInfoDestino = (expedicaoId: string) =>
+  listPortal<ExpedicaoInfoRow>("expedicao_info", expedicaoId, mockExpedicaoInfo);
+export const listAvisos = (expedicaoId: string) =>
+  listPortal<ExpedicaoAvisoRow>("expedicao_avisos", expedicaoId, mockExpedicaoAvisos);
+
+/** Fotos do roteiro de uma expedição (todas as fotos, de todos os dias). */
+export async function listRoteiroFotos(expedicaoId: string): Promise<RoteiroDiaFotoRow[]> {
+  if (DEV_USE_MOCK_DATA) {
+    return mockRoteiroDiaFotos
+      .filter((f) => f.expedicao_id === expedicaoId)
+      .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at));
+  }
+  const supabase = await getServerClient();
+  const { data, error } = await supabase
+    .from("roteiro_dia_fotos")
+    .select("*")
+    .eq("expedicao_id", expedicaoId)
+    .order("ordem", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) {
+    if (error.code === "42P01") return [];
+    console.error("[listRoteiroFotos] erro:", error);
+    return [];
+  }
+  return (data ?? []) as RoteiroDiaFotoRow[];
 }
 
 // =============================================================================

@@ -356,6 +356,86 @@ export type LinkExpedicaoRow = {
   updated_at: string;
 }
 
+// ===== Portal do ExpedAmigo (conteúdo da viagem, migration 0021) =====
+
+export type RoteiroDiaRow = {
+  id: string;
+  expedicao_id: string;
+  dia: number;
+  data: string | null;
+  titulo: string;
+  descricao: string | null;
+  cidade: string | null;
+  refeicoes: string | null;
+  hospedagem: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExpedicaoVooRow = {
+  id: string;
+  expedicao_id: string;
+  trecho: string;
+  companhia: string | null;
+  numero_voo: string | null;
+  origem: string | null;
+  destino: string | null;
+  partida: string | null;
+  chegada: string | null;
+  localizador: string | null;
+  observacoes: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExpedicaoPasseioRow = {
+  id: string;
+  expedicao_id: string;
+  nome: string;
+  data: string | null;
+  horario: string | null;
+  local: string | null;
+  incluso: boolean;
+  observacoes: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExpedicaoInfoRow = {
+  id: string;
+  expedicao_id: string;
+  titulo: string;
+  conteudo: string;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoteiroDiaFotoRow = {
+  id: string;
+  expedicao_id: string;
+  roteiro_dia_id: string;
+  arquivo_id: string;
+  legenda: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExpedicaoAvisoRow = {
+  id: string;
+  expedicao_id: string;
+  tipo: string; // Aviso | Boa prática | Dica
+  titulo: string;
+  conteudo: string;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DocumentoRow = {
   id: string;
   passageiro_id: string;
@@ -399,6 +479,12 @@ export type Database = {
       checklist_itens: { Row: ChecklistItemRow; Insert: Partial<ChecklistItemRow> & Pick<ChecklistItemRow, "expedicao_id" | "etapa" | "tarefa">; Update: Partial<ChecklistItemRow> };
       documentos: { Row: DocumentoRow; Insert: Partial<DocumentoRow> & Pick<DocumentoRow, "passageiro_id">; Update: Partial<DocumentoRow> };
       links_expedicao: { Row: LinkExpedicaoRow; Insert: Partial<LinkExpedicaoRow> & Pick<LinkExpedicaoRow, "expedicao_id" | "label" | "url">; Update: Partial<LinkExpedicaoRow> };
+      roteiro_dias: { Row: RoteiroDiaRow; Insert: Partial<RoteiroDiaRow> & Pick<RoteiroDiaRow, "expedicao_id" | "titulo">; Update: Partial<RoteiroDiaRow> };
+      expedicao_voos: { Row: ExpedicaoVooRow; Insert: Partial<ExpedicaoVooRow> & Pick<ExpedicaoVooRow, "expedicao_id" | "trecho">; Update: Partial<ExpedicaoVooRow> };
+      expedicao_passeios: { Row: ExpedicaoPasseioRow; Insert: Partial<ExpedicaoPasseioRow> & Pick<ExpedicaoPasseioRow, "expedicao_id" | "nome">; Update: Partial<ExpedicaoPasseioRow> };
+      expedicao_info: { Row: ExpedicaoInfoRow; Insert: Partial<ExpedicaoInfoRow> & Pick<ExpedicaoInfoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoInfoRow> };
+      roteiro_dia_fotos: { Row: RoteiroDiaFotoRow; Insert: Partial<RoteiroDiaFotoRow> & Pick<RoteiroDiaFotoRow, "expedicao_id" | "roteiro_dia_id" | "arquivo_id">; Update: Partial<RoteiroDiaFotoRow> };
+      expedicao_avisos: { Row: ExpedicaoAvisoRow; Insert: Partial<ExpedicaoAvisoRow> & Pick<ExpedicaoAvisoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoAvisoRow> };
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };
       passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };

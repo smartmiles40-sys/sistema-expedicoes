@@ -511,6 +511,39 @@ export const mockDocumentos: Tables<"documentos">[] = persist("mockDocumentos", 
 
 export const mockLinksExpedicao: Tables<"links_expedicao">[] = persist("mockLinksExpedicao", () => []);
 
+// ===== Portal do ExpedAmigo (0021) — conteúdo de exemplo no Peru (e...001) =====
+const PERU = "e0000000-0000-0000-0000-000000000001";
+
+export const mockRoteiroDias: Tables<"roteiro_dias">[] = persist("mockRoteiroDias", () => [
+  { id: "rt001", expedicao_id: PERU, dia: 1, data: futureDate(95), titulo: "Chegada a Cusco", descricao: "Recepção no aeroporto e traslado ao hotel. Tarde livre para aclimatação à altitude.", cidade: "Cusco", refeicoes: "—", hospedagem: "Hotel Cusco", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "rt002", expedicao_id: PERU, dia: 2, data: futureDate(96), titulo: "City tour Cusco + Vale Sagrado", descricao: "Visita guiada pelos principais pontos de Cusco e do Vale Sagrado dos Incas.", cidade: "Cusco", refeicoes: "Café, Almoço", hospedagem: "Hotel Cusco", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "rt003", expedicao_id: PERU, dia: 3, data: futureDate(97), titulo: "Machu Picchu", descricao: "Trem panorâmico até Aguas Calientes e visita guiada à cidadela de Machu Picchu.", cidade: "Aguas Calientes", refeicoes: "Café, Almoço, Jantar", hospedagem: "Hotel Cusco", ordem: 2, created_at: pastDate(20), updated_at: pastDate(2) },
+]);
+
+export const mockExpedicaoVoos: Tables<"expedicao_voos">[] = persist("mockExpedicaoVoos", () => [
+  { id: "vo001", expedicao_id: PERU, trecho: "Ida", companhia: "LATAM", numero_voo: "LA1234", origem: "São Paulo (GRU)", destino: "Lima (LIM)", partida: "Dia do embarque · 23:50", chegada: "+1 dia · 03:10", localizador: null, observacoes: "Conexão de grupo — chegar 3h antes.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "vo002", expedicao_id: PERU, trecho: "Volta", companhia: "LATAM", numero_voo: "LA4321", origem: "Lima (LIM)", destino: "São Paulo (GRU)", partida: "Último dia · 08:30", chegada: "mesmo dia · 15:40", localizador: null, observacoes: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+]);
+
+export const mockExpedicaoPasseios: Tables<"expedicao_passeios">[] = persist("mockExpedicaoPasseios", () => [
+  { id: "ps001", expedicao_id: PERU, nome: "Trilha + entrada Machu Picchu", data: futureDate(97), horario: "06:00", local: "Aguas Calientes", incluso: true, observacoes: "Levar passaporte original.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "ps002", expedicao_id: PERU, nome: "Passeio de quadriciclo (opcional)", data: futureDate(96), horario: "15:00", local: "Vale Sagrado", incluso: false, observacoes: "Custo à parte, pago no local.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+]);
+
+export const mockExpedicaoInfo: Tables<"expedicao_info">[] = persist("mockExpedicaoInfo", () => [
+  { id: "in001", expedicao_id: PERU, titulo: "Moeda e câmbio", conteudo: "A moeda local é o Sol peruano (PEN). Leve dólares para trocar; cartões são aceitos nos centros urbanos.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "in002", expedicao_id: PERU, titulo: "Altitude", conteudo: "Cusco fica a ~3.400m. Beba bastante água, evite álcool nos primeiros dias e considere o chá de coca para o soroche.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+]);
+
+// Fotos por dia do roteiro — vazio no mock (envie pelo editor para testar o fluxo).
+export const mockRoteiroDiaFotos: Tables<"roteiro_dia_fotos">[] = persist("mockRoteiroDiaFotos", () => []);
+
+export const mockExpedicaoAvisos: Tables<"expedicao_avisos">[] = persist("mockExpedicaoAvisos", () => [
+  { id: "av001", expedicao_id: PERU, tipo: "Aviso", titulo: "Passaporte e documentos", conteudo: "Leve o passaporte ORIGINAL no dia de Machu Picchu — é exigido na entrada. Tenha cópias digitais salvas no celular.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "av002", expedicao_id: PERU, tipo: "Boa prática", titulo: "Bagagem de mão", conteudo: "Monte uma mochila de ataque com água, protetor solar, capa de chuva e um agasalho — a temperatura varia muito no mesmo dia.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "av003", expedicao_id: PERU, tipo: "Dica", titulo: "Dinheiro em espécie", conteudo: "Tenha trocado em Soles para gorjetas, mercados e pequenos comércios que não aceitam cartão.", ordem: 2, created_at: pastDate(20), updated_at: pastDate(2) },
+]);
+
 // Catálogo de requisitos (0010) para os destinos das expedições de demo.
 export const mockRequisitosDestino: Tables<"requisitos_destino">[] = persist("mockRequisitosDestino", () => {
   const destinos = [...new Set(mockExpedicoes.map((e) => e.destino))];

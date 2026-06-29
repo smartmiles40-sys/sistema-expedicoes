@@ -10,6 +10,7 @@ const TABS = [
   { slug: "checklist", label: "Checklist" },
   { slug: "documentos", label: "Documentos" },
   { slug: "links", label: "Links" },
+  { slug: "portal", label: "ExpedAmigo" },
 ];
 
 export function ExpedicaoTabsNav({ expedicaoId }: { expedicaoId: string }) {

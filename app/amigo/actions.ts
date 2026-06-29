@@ -3,12 +3,18 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   mockPassageiros, mockExpedicoes, mockLinksExpedicao, mockQuartos, mockAlocacoes,
+  mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
+  mockRoteiroDiaFotos, mockExpedicaoAvisos,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
+  RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
+  RoteiroDiaFotoRow, ExpedicaoAvisoRow,
 } from "@/types/database";
+
+const BUCKET = "arquivos-expedicoes";
 
 /**
  * Portal do ExpedAmigo (passageiro). Acesso público por CPF + data de
@@ -29,6 +35,40 @@ export type AmigoQuarto = {
   check_in: string | null;
   check_out: string | null;
 };
+export type AmigoFoto = { url: string; legenda: string | null };
+export type AmigoRoteiroDia = {
+  id: string;
+  dia: number;
+  data: string | null;
+  titulo: string;
+  descricao: string | null;
+  cidade: string | null;
+  refeicoes: string | null;
+  hospedagem: string | null;
+  fotos: AmigoFoto[];
+};
+export type AmigoAviso = { tipo: string; titulo: string; conteudo: string };
+export type AmigoVooGrupo = {
+  trecho: string;
+  companhia: string | null;
+  numero_voo: string | null;
+  origem: string | null;
+  destino: string | null;
+  partida: string | null;
+  chegada: string | null;
+  localizador: string | null;
+  observacoes: string | null;
+};
+export type AmigoPasseio = {
+  nome: string;
+  data: string | null;
+  horario: string | null;
+  local: string | null;
+  incluso: boolean;
+  observacoes: string | null;
+};
+export type AmigoInfo = { titulo: string; conteudo: string };
+
 export type AmigoExpedicao = {
   id: string;
   nome: string;
@@ -39,6 +79,11 @@ export type AmigoExpedicao = {
   voo: AmigoVoo;
   links: AmigoLink[];
   quartos: AmigoQuarto[];
+  roteiro: AmigoRoteiroDia[];
+  voos_grupo: AmigoVooGrupo[];
+  passeios: AmigoPasseio[];
+  info: AmigoInfo[];
+  avisos: AmigoAviso[];
 };
 export type AmigoDados = {
   nome: string;
@@ -60,6 +105,14 @@ export async function entrarExpedAmigo(
   let links: LinkExpedicaoRow[];
   let quartos: QuartoRow[];
   let alocacoes: AlocacaoQuartoRow[];
+  let roteiro: RoteiroDiaRow[];
+  let voosGrupo: ExpedicaoVooRow[];
+  let passeios: ExpedicaoPasseioRow[];
+  let infos: ExpedicaoInfoRow[];
+  let avisosAll: ExpedicaoAvisoRow[];
+  let rtFotos: RoteiroDiaFotoRow[];
+
+  const sb = DEV_USE_MOCK_DATA ? null : createServiceRoleClient();
 
   if (DEV_USE_MOCK_DATA) {
     pax = mockPassageiros;
@@ -67,20 +120,38 @@ export async function entrarExpedAmigo(
     links = mockLinksExpedicao;
     quartos = mockQuartos;
     alocacoes = mockAlocacoes;
+    roteiro = mockRoteiroDias;
+    voosGrupo = mockExpedicaoVoos;
+    passeios = mockExpedicaoPasseios;
+    infos = mockExpedicaoInfo;
+    avisosAll = mockExpedicaoAvisos;
+    rtFotos = mockRoteiroDiaFotos;
   } else {
-    const sb = createServiceRoleClient();
-    const [paxAll, er, linkAll, qAll, alocAll] = await Promise.all([
-      fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
-      sb.from("expedicoes").select("*"),
-      fetchAllRows<LinkExpedicaoRow>((from, to) => sb.from("links_expedicao").select("*").order("id").range(from, to)),
-      fetchAllRows<QuartoRow>((from, to) => sb.from("quartos").select("*").order("id").range(from, to)),
-      fetchAllRows<AlocacaoQuartoRow>((from, to) => sb.from("passageiro_quarto").select("*").order("id").range(from, to)),
+    const cli = sb!;
+    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll] = await Promise.all([
+      fetchAllRows<PassageiroRow>((from, to) => cli.from("passageiros").select("*").order("id").range(from, to)),
+      cli.from("expedicoes").select("*"),
+      fetchAllRows<LinkExpedicaoRow>((from, to) => cli.from("links_expedicao").select("*").order("id").range(from, to)),
+      fetchAllRows<QuartoRow>((from, to) => cli.from("quartos").select("*").order("id").range(from, to)),
+      fetchAllRows<AlocacaoQuartoRow>((from, to) => cli.from("passageiro_quarto").select("*").order("id").range(from, to)),
+      fetchAllRows<RoteiroDiaRow>((from, to) => cli.from("roteiro_dias").select("*").order("id").range(from, to)),
+      fetchAllRows<ExpedicaoVooRow>((from, to) => cli.from("expedicao_voos").select("*").order("id").range(from, to)),
+      fetchAllRows<ExpedicaoPasseioRow>((from, to) => cli.from("expedicao_passeios").select("*").order("id").range(from, to)),
+      fetchAllRows<ExpedicaoInfoRow>((from, to) => cli.from("expedicao_info").select("*").order("id").range(from, to)),
+      fetchAllRows<ExpedicaoAvisoRow>((from, to) => cli.from("expedicao_avisos").select("*").order("id").range(from, to)),
+      fetchAllRows<RoteiroDiaFotoRow>((from, to) => cli.from("roteiro_dia_fotos").select("*").order("id").range(from, to)),
     ]);
     pax = paxAll;
     exps = (er.data ?? []) as ExpedicaoRow[];
     links = linkAll;
     quartos = qAll;
     alocacoes = alocAll;
+    roteiro = rtAll;
+    voosGrupo = voAll;
+    passeios = psAll;
+    infos = inAll;
+    avisosAll = avAll;
+    rtFotos = ftAll;
   }
 
   // 1) Acha as linhas da pessoa pelo CPF.
@@ -105,6 +176,34 @@ export async function entrarExpedAmigo(
   const hoje = new Date().toISOString().slice(0, 10);
   const expById = new Map(exps.map((e) => [e.id, e]));
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
+
+  // Resolve as URLs das fotos do roteiro das expedições futuras da pessoa:
+  // signed URL (prod) ou rota de download do mock (dev).
+  const fotoUrl = new Map<string, string>(); // arquivo_id -> url
+  {
+    const idsRelevantes = new Set<string>();
+    for (const row of minhasRows) {
+      if (!row.expedicao_id || row.status_reserva === "Cancelado") continue;
+      const e = expById.get(row.expedicao_id);
+      if (!e || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
+      for (const f of rtFotos) if (f.expedicao_id === row.expedicao_id) idsRelevantes.add(f.arquivo_id);
+    }
+    if (DEV_USE_MOCK_DATA) {
+      for (const id of idsRelevantes) fotoUrl.set(id, `/api/arquivos/${id}/download?inline=1`);
+    } else if (sb && idsRelevantes.size > 0) {
+      const ids = [...idsRelevantes];
+      const { data: arqs } = await sb.from("arquivos").select("id,storage_path").in("id", ids);
+      const pathById = new Map(
+        ((arqs ?? []) as { id: string; storage_path: string }[]).map((a) => [a.id, a.storage_path]),
+      );
+      for (const id of ids) {
+        const sp = pathById.get(id);
+        if (!sp) continue;
+        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 3600);
+        if (data?.signedUrl) fotoUrl.set(id, data.signedUrl);
+      }
+    }
+  }
 
   const expedicoes: AmigoExpedicao[] = [];
   for (const row of minhasRows) {
@@ -142,6 +241,41 @@ export async function entrarExpedAmigo(
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((l) => ({ label: l.label, url: l.url })),
       quartos: meusQuartos,
+      roteiro: roteiro
+        .filter((r) => r.expedicao_id === e.id)
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((r) => ({
+          id: r.id, dia: r.dia, data: r.data, titulo: r.titulo, descricao: r.descricao,
+          cidade: r.cidade, refeicoes: r.refeicoes, hospedagem: r.hospedagem,
+          fotos: rtFotos
+            .filter((f) => f.roteiro_dia_id === r.id)
+            .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+            .map((f) => ({ url: fotoUrl.get(f.arquivo_id) ?? "", legenda: f.legenda }))
+            .filter((x) => x.url),
+        })),
+      voos_grupo: voosGrupo
+        .filter((v) => v.expedicao_id === e.id)
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((v) => ({
+          trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,
+          origem: v.origem, destino: v.destino, partida: v.partida, chegada: v.chegada,
+          localizador: v.localizador, observacoes: v.observacoes,
+        })),
+      passeios: passeios
+        .filter((p) => p.expedicao_id === e.id)
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((p) => ({
+          nome: p.nome, data: p.data, horario: p.horario, local: p.local,
+          incluso: p.incluso, observacoes: p.observacoes,
+        })),
+      info: infos
+        .filter((i) => i.expedicao_id === e.id)
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((i) => ({ titulo: i.titulo, conteudo: i.conteudo })),
+      avisos: avisosAll
+        .filter((a) => a.expedicao_id === e.id)
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((a) => ({ tipo: a.tipo, titulo: a.titulo, conteudo: a.conteudo })),
     });
   }
 

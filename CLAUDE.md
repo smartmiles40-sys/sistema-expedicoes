@@ -289,6 +289,42 @@ se não couberem juntos no quarto), e o **export fica bloqueado** (faixa vermelh
 `conexoesSeparadas` (membros em quartos diferentes no mesmo hotel) > 0. A separação só
 surge ao criar conexão sobre gente já em quartos distintos → resolve no botão "Juntar".
 
+## 🧭 Portal do ExpedAmigo (passageiro)
+
+Portal público do viajante, **separado do sistema operacional** (sem sidebar/abas
+internas, identidade de marca "Se Tu For, Eu Vou", cara de produto do viajante).
+Espelha tecnicamente a Área do Líder: rota pública, server actions com **service
+role**, **só leitura**.
+
+- **Acesso (`/amigo`):** login por **CPF + data de nascimento**
+  (`entrarExpedAmigo` em `app/amigo/actions.ts`). Casa na `passageiros` por CPF e
+  confere o nascimento; **bloqueia com aviso** quem não tiver CPF *ou* nascimento.
+  Mostra **apenas expedições futuras** (embarque ≥ hoje) e não-canceladas.
+- **Card recolhível:** cada viagem abre **recolhida** (igual à Área do Líder);
+  clica no hero pra expandir. Dentro: **Roteiro dia a dia (previsto)** — cada dia
+  também é recolhível, com fotos; **Voos** (de grupo + "seu localizador"
+  destacado do passageiro); **Passeios e ingressos**; **Sua hospedagem** (rooming);
+  **Informações do destino**; **Avisos e boas práticas** (com tipo/cor); **Links úteis**.
+  Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro.
+- **Conteúdo é autorado no operacional:** aba **"ExpedAmigo"** no detalhe da
+  expedição (`/expedicoes/[id]/portal`, `PortalEditor.tsx`). Editor genérico
+  (allowlist de tabelas) com CRUD por seção; ordem por campo numérico.
+  Actions em `app/(app)/expedicoes/[id]/portal/actions.ts`
+  (`criar/atualizar/excluirItemPortal` + `adicionar/excluirFotoRoteiro`).
+- **Tabelas (migrations 0021 + 0022):**
+  - `roteiro_dias` (day-by-day), `expedicao_voos` (voos de grupo),
+    `expedicao_passeios` (passeios/ingressos), `expedicao_info` (blocos de info do destino),
+    `expedicao_avisos` (avisos/boas práticas/dicas — coluna `tipo`).
+  - `roteiro_dia_fotos`: fotos por dia. O **blob reaproveita a tabela `arquivos`**
+    (upload via `/api/arquivos/upload`, categoria "Outros"); a linha guarda
+    `arquivo_id` + `legenda` + `ordem`. No portal público as imagens usam
+    **signed URLs** (1h) geradas por service role; no operacional/mock usam
+    `/api/arquivos/[id]/download?inline=1`.
+- Fetchers em `lib/data/expedicoes.ts`: `listRoteiro`, `listVoosExpedicao`,
+  `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`.
+- **Acesso Master da Área do Líder foi desativado** (mapa `MASTERS` vazio em
+  `app/lider/actions.ts`).
+
 ## 🧪 Como rodar
 
 ```bash
