@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Search, User, Users, Plane, ArrowRight, Upload, UserPlus, LayoutGrid, List } from "lucide-react";
+import { Search, User, Users, Plane, ArrowRight, Upload, UserPlus, LayoutGrid, List, Download } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
@@ -114,6 +114,100 @@ export function PassageirosGlobalTabela({
   }, [pessoas, termo, colFiltros, sortCol, sortDir]);
 
   const totalParticipacoes = pessoas.reduce((s, p) => s + p.totalExpedicoes, 0);
+  const [exportando, setExportando] = React.useState(false);
+
+  // Exporta os passageiros atualmente filtrados (.xlsx): dados pessoais +
+  // expedições que a pessoa já fez e as que ainda vai fazer.
+  async function exportarExcel() {
+    if (ordenadas.length === 0) {
+      toast.error("Nada para exportar", { description: "Nenhum passageiro com os filtros atuais." });
+      return;
+    }
+    setExportando(true);
+    try {
+      const ExcelJS = await import("exceljs");
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Sistema de Expedições";
+      const ws = wb.addWorksheet("Passageiros");
+
+      const VERDE = "FF09282B"; // brand dark
+      ws.columns = [
+        { header: "Nome completo", key: "nome", width: 30 },
+        { header: "CPF", key: "cpf", width: 16 },
+        { header: "Nascimento", key: "nasc", width: 12 },
+        { header: "Idade", key: "idade", width: 7 },
+        { header: "Passaporte", key: "passaporte", width: 14 },
+        { header: "Validade passaporte", key: "validade", width: 16 },
+        { header: "E-mail", key: "email", width: 28 },
+        { header: "Telefone", key: "telefone", width: 16 },
+        { header: "Contato emergência", key: "emnome", width: 22 },
+        { header: "Fone emergência", key: "emfone", width: 16 },
+        { header: "Restrições alimentares", key: "rest", width: 24 },
+        { header: "Condições médicas", key: "med", width: 24 },
+        { header: "Nº expedições", key: "qtd", width: 12 },
+        { header: "Já participou", key: "passadas", width: 44 },
+        { header: "Vai participar", key: "futuras", width: 44 },
+      ];
+
+      const head = ws.getRow(1);
+      head.height = 18;
+      head.eachCell((c) => {
+        c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VERDE } };
+        c.alignment = { vertical: "middle" };
+      });
+
+      const hojeIso = new Date().toISOString().slice(0, 10);
+      const fmtExp = (e: PessoaAgregada["expedicoes"][number]) =>
+        `${e.nome} — ${e.data_embarque ? formatDate(e.data_embarque) : "sem data"} (${e.status_reserva})`;
+
+      for (const p of ordenadas) {
+        const ativos = p.expedicoes.filter((e) => e.status_reserva !== "Cancelado");
+        const passadas = ativos.filter((e) => (e.data_embarque ?? "").slice(0, 10) < hojeIso);
+        const futuras = ativos.filter((e) => (e.data_embarque ?? "").slice(0, 10) >= hojeIso);
+        const i = idade(p.data_nascimento);
+        ws.addRow({
+          nome: p.nome_completo,
+          cpf: p.cpf ?? "",
+          nasc: p.data_nascimento ? formatDate(p.data_nascimento) : "",
+          idade: i ?? "",
+          passaporte: p.passaporte ?? "",
+          validade: p.validade_passaporte ? formatDate(p.validade_passaporte) : "",
+          email: p.email ?? "",
+          telefone: p.telefone ?? "",
+          emnome: p.contato_emergencia_nome ?? "",
+          emfone: p.contato_emergencia_fone ?? "",
+          rest: p.restricoes_alimentares ?? "",
+          med: p.condicoes_medicas ?? "",
+          qtd: p.totalExpedicoes,
+          passadas: passadas.map(fmtExp).join("\n"),
+          futuras: futuras.map(fmtExp).join("\n"),
+        });
+      }
+
+      // Quebra de linha nas colunas que listam expedições e textos longos.
+      for (const key of ["passadas", "futuras", "rest", "med"]) {
+        ws.getColumn(key).alignment = { wrapText: true, vertical: "top" };
+      }
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `passageiros-${hojeIso}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${ordenadas.length} passageiro${ordenadas.length === 1 ? "" : "s"} exportado${ordenadas.length === 1 ? "" : "s"} (.xlsx)`);
+    } catch {
+      toast.error("Falha ao gerar o arquivo");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -169,6 +263,15 @@ export function PassageirosGlobalTabela({
           <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="h-3 w-3" /> Importar CSV
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportarExcel}
+            disabled={exportando || pessoas.length === 0}
+            title="Exporta os passageiros filtrados (.xlsx) com dados pessoais e expedições"
+          >
+            <Download className="h-3 w-3" /> {exportando ? "Exportando…" : "Exportar"}
+          </Button>
         </div>
       </div>
 
@@ -178,6 +281,26 @@ export function PassageirosGlobalTabela({
           <StatPill label="já viajaram" value={pessoas.filter((p) => p.totalExpedicoes > 0).length} variant="vinculado" />
           <StatPill label="participações" value={totalParticipacoes} variant="lista" />
           <StatPill label="sem CPF" value={pessoas.filter((p) => !p.cpf).length} variant="atencao" />
+        </div>
+      )}
+
+      {/* Barra de filtros na visão Clube (mesma lógica dos cabeçalhos da tabela) */}
+      {view === "clube" && pessoas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Filtrar / ordenar:
+          </span>
+          {COLUNAS.map((c) => (
+            <ColunaFiltro
+              key={c.key}
+              col={c}
+              sortCol={sortCol}
+              sortDir={sortDir}
+              onSort={(dir) => { setSortCol(c.key); setSortDir(dir); }}
+              filtro={colFiltros[c.key] ?? ""}
+              onFiltro={(v) => setColFiltros((s) => ({ ...s, [c.key]: v }))}
+            />
+          ))}
         </div>
       )}
 
