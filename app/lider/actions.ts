@@ -27,8 +27,8 @@ const CATEGORIA_REQUISITO: Record<string, string> = {
  * (não só as que lideram). Chave = só os 11 dígitos do CPF.
  */
 const MASTERS: Record<string, string> = {
-  "47146666816": "Beatriz Rodrigues Galvão",
-  "01997549344": "Luis Antonio de Negreiros Caetano",
+  // Acesso master desativado (a pedido) — o recurso não foi tão útil quanto o esperado.
+  // Para reativar, adicione "<11 dígitos do CPF>": "Nome Completo".
 };
 
 export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string };
