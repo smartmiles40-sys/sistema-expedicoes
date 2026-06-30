@@ -385,6 +385,8 @@ export type ExpedicaoVooRow = {
   chegada: string | null;
   localizador: string | null;
   observacoes: string | null;
+  /** Voucher anexado (arquivos.id), migration 0024. */
+  arquivo_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;
@@ -399,6 +401,8 @@ export type ExpedicaoPasseioRow = {
   local: string | null;
   incluso: boolean;
   observacoes: string | null;
+  /** Voucher/ingresso anexado (arquivos.id), migration 0024. */
+  arquivo_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;

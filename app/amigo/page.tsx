@@ -2,7 +2,7 @@
 import * as React from "react";
 import {
   CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
-  CalendarDays, Ticket, Info, ChevronRight, Megaphone,
+  CalendarDays, Ticket, Info, ChevronRight, Megaphone, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -174,88 +174,93 @@ function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
           </Bloco>
         )}
 
-        {/* Voos */}
-        <Bloco icone={<Plane className="h-4 w-4" />} titulo="Voos">
-          {exp.voos_grupo.length > 0 && (
-            <ul className="space-y-1.5">
-              {exp.voos_grupo.map((v, i) => (
-                <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-[13px] font-medium">
-                    <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px]">{v.trecho}</span>
-                    {v.origem ?? "—"} → {v.destino ?? "—"}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {[v.companhia, v.numero_voo].filter(Boolean).join(" ")}
-                    {v.partida ? ` · Partida: ${v.partida}` : ""}
-                    {v.chegada ? ` · Chegada: ${v.chegada}` : ""}
-                  </div>
-                  {v.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{v.observacoes}</div>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {(exp.voo.companhia || exp.voo.localizador) && (
-            <div className="mt-2 grid grid-cols-2 gap-3 rounded-lg bg-editavel-50 px-3 py-2">
-              <Campo label="Sua companhia" valor={exp.voo.companhia} />
-              <Campo label="Seu localizador" valor={exp.voo.localizador} mono />
+        {/* Vouchers — voos + passeios/ingressos + hospedagem num só item */}
+        <Bloco icone={<Ticket className="h-4 w-4" />} titulo="Vouchers">
+          <div className="space-y-4">
+            {/* Voos */}
+            <div>
+              <SubTitulo icone={<Plane className="h-3.5 w-3.5" />}>Voos</SubTitulo>
+              {exp.voos_grupo.length > 0 && (
+                <ul className="space-y-1.5">
+                  {exp.voos_grupo.map((v, i) => (
+                    <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                      <div className="text-[13px] font-medium">
+                        <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px]">{v.trecho}</span>
+                        {v.origem ?? "—"} → {v.destino ?? "—"}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {[v.companhia, v.numero_voo].filter(Boolean).join(" ")}
+                        {v.partida ? ` · Partida: ${v.partida}` : ""}
+                        {v.chegada ? ` · Chegada: ${v.chegada}` : ""}
+                      </div>
+                      {v.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{v.observacoes}</div>}
+                      {v.voucher_url && <VoucherLink url={v.voucher_url} />}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {(exp.voo.companhia || exp.voo.localizador) && (
+                <div className="mt-2 grid grid-cols-2 gap-3 rounded-lg bg-editavel-50 px-3 py-2">
+                  <Campo label="Sua companhia" valor={exp.voo.companhia} />
+                  <Campo label="Seu localizador" valor={exp.voo.localizador} mono />
+                </div>
+              )}
+              {exp.voos_grupo.length === 0 && !exp.voo.companhia && !exp.voo.localizador && (
+                <p className="text-[12px] text-muted-foreground">
+                  As informações dos seus voos serão disponibilizadas aqui em breve.
+                </p>
+              )}
+              {exp.voo.voo_interno_necessario && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-editavel-50 px-2 py-1 text-[11px] font-medium text-editavel-700">
+                  <Plane className="h-3 w-3" /> Esta viagem inclui voo interno no destino.
+                </p>
+              )}
             </div>
-          )}
-          {exp.voos_grupo.length === 0 && !exp.voo.companhia && !exp.voo.localizador && (
-            <p className="text-[12px] text-muted-foreground">
-              As informações dos seus voos serão disponibilizadas aqui em breve.
-            </p>
-          )}
-          {exp.voo.voo_interno_necessario && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-editavel-50 px-2 py-1 text-[11px] font-medium text-editavel-700">
-              <Plane className="h-3 w-3" /> Esta viagem inclui voo interno no destino.
-            </p>
-          )}
-        </Bloco>
 
-        {/* Passeios e ingressos */}
-        {exp.passeios.length > 0 && (
-          <Bloco icone={<Ticket className="h-4 w-4" />} titulo="Passeios e ingressos">
-            <ul className="space-y-1.5">
-              {exp.passeios.map((p, i) => (
-                <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-[13px] font-medium">
-                    {p.nome}
-                    <span className={p.incluso ? "text-vinculado-600" : "text-atencao-600"}>
-                      {" "}· {p.incluso ? "incluso" : "opcional"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {[p.data ? formatDate(p.data) : null, p.horario, p.local].filter(Boolean).join(" · ")}
-                  </div>
-                  {p.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{p.observacoes}</div>}
-                </li>
-              ))}
-            </ul>
-          </Bloco>
-        )}
+            {/* Passeios e ingressos */}
+            {exp.passeios.length > 0 && (
+              <div>
+                <SubTitulo icone={<Ticket className="h-3.5 w-3.5" />}>Passeios e ingressos</SubTitulo>
+                <ul className="space-y-1.5">
+                  {exp.passeios.map((p, i) => (
+                    <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                      <div className="text-[13px] font-medium">{p.nome}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {[p.data ? formatDate(p.data) : null, p.horario, p.local].filter(Boolean).join(" · ")}
+                      </div>
+                      {p.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{p.observacoes}</div>}
+                      {p.voucher_url && <VoucherLink url={p.voucher_url} />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-        {/* Hospedagem / quarto */}
-        <Bloco icone={<BedDouble className="h-4 w-4" />} titulo="Sua hospedagem">
-          {exp.quartos.length > 0 ? (
-            <ul className="space-y-1.5">
-              {exp.quartos.map((q, i) => (
-                <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
-                  <div className="text-[13px] font-medium">
-                    {q.hotel_cidade ?? "Hospedagem"} · Quarto {q.numero}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {q.tipo}
-                    {(q.check_in || q.check_out) &&
-                      ` · ${q.check_in ? formatDate(q.check_in) : "—"} → ${q.check_out ? formatDate(q.check_out) : "—"}`}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[12px] text-muted-foreground">
-              Sua hospedagem será confirmada aqui antes do embarque.
-            </p>
-          )}
+            {/* Hospedagem / quarto */}
+            <div>
+              <SubTitulo icone={<BedDouble className="h-3.5 w-3.5" />}>Hospedagem</SubTitulo>
+              {exp.quartos.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {exp.quartos.map((q, i) => (
+                    <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
+                      <div className="text-[13px] font-medium">
+                        {q.hotel_cidade ?? "Hospedagem"} · Quarto {q.numero}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {q.tipo}
+                        {(q.check_in || q.check_out) &&
+                          ` · ${q.check_in ? formatDate(q.check_in) : "—"} → ${q.check_out ? formatDate(q.check_out) : "—"}`}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">
+                  Sua hospedagem será confirmada aqui antes do embarque.
+                </p>
+              )}
+            </div>
+          </div>
         </Bloco>
 
         {/* Links úteis */}
@@ -372,6 +377,28 @@ function DiaRoteiro({ d }: { d: AmigoRoteiroDia }) {
         </div>
       )}
     </li>
+  );
+}
+
+function VoucherLink({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-editavel-700 hover:bg-accent"
+    >
+      <Download className="h-3 w-3" /> Baixar voucher
+    </a>
+  );
+}
+
+function SubTitulo({ icone, children }: { icone: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="mb-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {icone}
+      {children}
+    </div>
   );
 }
 

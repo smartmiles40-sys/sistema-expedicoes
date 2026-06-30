@@ -58,6 +58,7 @@ export type AmigoVooGrupo = {
   chegada: string | null;
   localizador: string | null;
   observacoes: string | null;
+  voucher_url: string | null;
 };
 export type AmigoPasseio = {
   nome: string;
@@ -66,6 +67,7 @@ export type AmigoPasseio = {
   local: string | null;
   incluso: boolean;
   observacoes: string | null;
+  voucher_url: string | null;
 };
 export type AmigoInfo = { titulo: string; conteudo: string };
 
@@ -177,17 +179,22 @@ export async function entrarExpedAmigo(
   const expById = new Map(exps.map((e) => [e.id, e]));
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
 
-  // Resolve as URLs das fotos do roteiro das expedições futuras da pessoa:
-  // signed URL (prod) ou rota de download do mock (dev).
+  // Resolve as URLs dos arquivos (fotos do roteiro + vouchers de voo/passeio) das
+  // expedições futuras da pessoa: signed URL (prod) ou rota de download do mock (dev).
   const fotoUrl = new Map<string, string>(); // arquivo_id -> url
   {
-    const idsRelevantes = new Set<string>();
+    const expIdsFuturas = new Set<string>();
     for (const row of minhasRows) {
       if (!row.expedicao_id || row.status_reserva === "Cancelado") continue;
       const e = expById.get(row.expedicao_id);
       if (!e || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
-      for (const f of rtFotos) if (f.expedicao_id === row.expedicao_id) idsRelevantes.add(f.arquivo_id);
+      expIdsFuturas.add(row.expedicao_id);
     }
+    const idsRelevantes = new Set<string>();
+    for (const f of rtFotos) if (expIdsFuturas.has(f.expedicao_id)) idsRelevantes.add(f.arquivo_id);
+    for (const v of voosGrupo) if (v.arquivo_id && expIdsFuturas.has(v.expedicao_id)) idsRelevantes.add(v.arquivo_id);
+    for (const p of passeios) if (p.arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.arquivo_id);
+
     if (DEV_USE_MOCK_DATA) {
       for (const id of idsRelevantes) fotoUrl.set(id, `/api/arquivos/${id}/download?inline=1`);
     } else if (sb && idsRelevantes.size > 0) {
@@ -260,6 +267,7 @@ export async function entrarExpedAmigo(
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,
           origem: v.origem, destino: v.destino, partida: v.partida, chegada: v.chegada,
           localizador: v.localizador, observacoes: v.observacoes,
+          voucher_url: v.arquivo_id ? fotoUrl.get(v.arquivo_id) ?? null : null,
         })),
       passeios: passeios
         .filter((p) => p.expedicao_id === e.id)
@@ -267,6 +275,7 @@ export async function entrarExpedAmigo(
         .map((p) => ({
           nome: p.nome, data: p.data, horario: p.horario, local: p.local,
           incluso: p.incluso, observacoes: p.observacoes,
+          voucher_url: p.arquivo_id ? fotoUrl.get(p.arquivo_id) ?? null : null,
         })),
       info: infos
         .filter((i) => i.expedicao_id === e.id)

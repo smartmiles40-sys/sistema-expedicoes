@@ -127,12 +127,25 @@ export function PortalEditor({
           <>
             <div className="text-[13px] font-medium">
               {String(r.trecho ?? "")}: {String(r.origem ?? "—")} → {String(r.destino ?? "—")}
+              {r.arquivo_id ? <span className="text-vinculado-600"> · voucher ✓</span> : null}
             </div>
             <div className="text-[11px] text-muted-foreground">
               {[r.companhia, r.numero_voo, r.partida].filter(Boolean).join(" · ") || "sem detalhes"}
             </div>
           </>
         )}
+        extra={(item) =>
+          item ? (
+            <VoucherAnexo
+              tabela="expedicao_voos"
+              expedicaoId={expedicaoId}
+              itemId={item.id}
+              arquivoId={voos.find((v) => v.id === item.id)?.arquivo_id ?? null}
+            />
+          ) : (
+            <p className="text-[12px] text-muted-foreground">Salve o voo primeiro para anexar o voucher.</p>
+          )
+        }
       />
 
       <Secao
@@ -147,22 +160,31 @@ export function PortalEditor({
           { key: "data", label: "Data", type: "date" },
           { key: "horario", label: "Horário", type: "text", placeholder: "06:00" },
           { key: "local", label: "Local", type: "text" },
-          { key: "incluso", label: "Incluso no pacote", type: "checkbox" },
           { key: "observacoes", label: "Observações", type: "textarea", full: true },
         ]}
         resumo={(r) => (
           <>
             <div className="text-[13px] font-medium">
               {String(r.nome ?? "")}
-              <span className={r.incluso ? "text-vinculado-600" : "text-atencao-600"}>
-                {" "}· {r.incluso ? "incluso" : "opcional"}
-              </span>
+              {r.arquivo_id ? <span className="text-vinculado-600"> · voucher ✓</span> : null}
             </div>
             <div className="text-[11px] text-muted-foreground">
               {[r.data ? formatDate(String(r.data)) : null, r.horario, r.local].filter(Boolean).join(" · ") || "sem detalhes"}
             </div>
           </>
         )}
+        extra={(item) =>
+          item ? (
+            <VoucherAnexo
+              tabela="expedicao_passeios"
+              expedicaoId={expedicaoId}
+              itemId={item.id}
+              arquivoId={passeios.find((p) => p.id === item.id)?.arquivo_id ?? null}
+            />
+          ) : (
+            <p className="text-[12px] text-muted-foreground">Salve o passeio primeiro para anexar o voucher.</p>
+          )
+        }
       />
 
       <Secao
@@ -502,6 +524,84 @@ function FotosRoteiro({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Anexo de UM voucher (foto/PDF) para um item de voo ou passeio. */
+function VoucherAnexo({
+  tabela, expedicaoId, itemId, arquivoId,
+}: {
+  tabela: string;
+  expedicaoId: string;
+  itemId: string;
+  arquivoId: string | null;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  async function enviar(file: File | null) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("expedicao_id", expedicaoId);
+      fd.append("categoria", "Vouchers");
+      fd.append("descricao", "Voucher");
+      const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.ok) { toast.error("Falha no upload", { description: json.error }); return; }
+      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { arquivo_id: json.id });
+      if (!r.ok) { toast.error("Falha ao salvar", { description: r.error }); return; }
+      toast.success("Voucher anexado");
+      router.refresh();
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function remover() {
+    if (!arquivoId) return;
+    setBusy(true);
+    try {
+      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { arquivo_id: null });
+      if (!r.ok) { toast.error("Falha ao remover", { description: r.error }); return; }
+      await fetch(`/api/arquivos/${arquivoId}`, { method: "DELETE" }).catch(() => {});
+      toast.success("Voucher removido");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[12px] font-semibold">Voucher (1 arquivo)</div>
+      {arquivoId ? (
+        <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
+          <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Anexado</span>
+          <a
+            href={`/api/arquivos/${arquivoId}/download?inline=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12px] font-medium text-editavel-700 hover:underline"
+          >
+            Ver
+          </a>
+          <button type="button" onClick={remover} disabled={busy} className="text-[12px] font-medium text-critico-600 hover:underline">
+            Remover
+          </button>
+        </div>
+      ) : (
+        <Button type="button" size="sm" variant="outline" onClick={() => inputRef.current?.click()} disabled={busy}>
+          <Upload className="h-3 w-3" /> {busy ? "Enviando…" : "Anexar voucher"}
+        </Button>
+      )}
+      <input ref={inputRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => enviar(e.target.files?.[0] ?? null)} />
+      <p className="text-[11px] text-muted-foreground">Imagem ou PDF — fica disponível para o passageiro baixar.</p>
     </div>
   );
 }

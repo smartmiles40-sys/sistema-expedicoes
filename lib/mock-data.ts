@@ -521,13 +521,13 @@ export const mockRoteiroDias: Tables<"roteiro_dias">[] = persist("mockRoteiroDia
 ]);
 
 export const mockExpedicaoVoos: Tables<"expedicao_voos">[] = persist("mockExpedicaoVoos", () => [
-  { id: "vo001", expedicao_id: PERU, trecho: "Ida", companhia: "LATAM", numero_voo: "LA1234", origem: "São Paulo (GRU)", destino: "Lima (LIM)", partida: "Dia do embarque · 23:50", chegada: "+1 dia · 03:10", localizador: null, observacoes: "Conexão de grupo — chegar 3h antes.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "vo002", expedicao_id: PERU, trecho: "Volta", companhia: "LATAM", numero_voo: "LA4321", origem: "Lima (LIM)", destino: "São Paulo (GRU)", partida: "Último dia · 08:30", chegada: "mesmo dia · 15:40", localizador: null, observacoes: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "vo001", expedicao_id: PERU, trecho: "Ida", companhia: "LATAM", numero_voo: "LA1234", origem: "São Paulo (GRU)", destino: "Lima (LIM)", partida: "Dia do embarque · 23:50", chegada: "+1 dia · 03:10", localizador: null, observacoes: "Conexão de grupo — chegar 3h antes.", arquivo_id: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "vo002", expedicao_id: PERU, trecho: "Volta", companhia: "LATAM", numero_voo: "LA4321", origem: "Lima (LIM)", destino: "São Paulo (GRU)", partida: "Último dia · 08:30", chegada: "mesmo dia · 15:40", localizador: null, observacoes: null, arquivo_id: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
 ]);
 
 export const mockExpedicaoPasseios: Tables<"expedicao_passeios">[] = persist("mockExpedicaoPasseios", () => [
-  { id: "ps001", expedicao_id: PERU, nome: "Trilha + entrada Machu Picchu", data: futureDate(97), horario: "06:00", local: "Aguas Calientes", incluso: true, observacoes: "Levar passaporte original.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "ps002", expedicao_id: PERU, nome: "Passeio de quadriciclo (opcional)", data: futureDate(96), horario: "15:00", local: "Vale Sagrado", incluso: false, observacoes: "Custo à parte, pago no local.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "ps001", expedicao_id: PERU, nome: "Trilha + entrada Machu Picchu", data: futureDate(97), horario: "06:00", local: "Aguas Calientes", incluso: true, observacoes: "Levar passaporte original.", arquivo_id: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "ps002", expedicao_id: PERU, nome: "Passeio de quadriciclo", data: futureDate(96), horario: "15:00", local: "Vale Sagrado", incluso: true, observacoes: null, arquivo_id: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
 ]);
 
 export const mockExpedicaoInfo: Tables<"expedicao_info">[] = persist("mockExpedicaoInfo", () => [

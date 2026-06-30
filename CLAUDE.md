@@ -315,10 +315,12 @@ role**, **só leitura**.
   Mostra **apenas expedições futuras** (embarque ≥ hoje) e não-canceladas.
 - **Card recolhível:** cada viagem abre **recolhida** (igual à Área do Líder);
   clica no hero pra expandir. Dentro: **Roteiro dia a dia (previsto)** — cada dia
-  também é recolhível, com fotos; **Voos** (de grupo + "seu localizador"
-  destacado do passageiro); **Passeios e ingressos**; **Sua hospedagem** (rooming);
-  **Informações do destino**; **Avisos e boas práticas** (com tipo/cor); **Links úteis**.
+  também é recolhível, com fotos; **Vouchers** (item único que agrupa Voos de grupo +
+  "seu localizador" + Passeios/ingressos + Hospedagem/rooming; cada voo e passeio pode
+  ter 1 voucher anexado → botão "Baixar voucher"); **Informações do destino**;
+  **Avisos e boas práticas** (com tipo/cor); **Links úteis**.
   Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro.
+  Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
 - **Conteúdo é autorado no operacional:** aba **"ExpedAmigo"** no detalhe da
   expedição (`/expedicoes/[id]/portal`, `PortalEditor.tsx`). Editor genérico
   (allowlist de tabelas) com CRUD por seção; ordem por campo numérico.
@@ -333,6 +335,10 @@ role**, **só leitura**.
     `arquivo_id` + `legenda` + `ordem`. No portal público as imagens usam
     **signed URLs** (1h) geradas por service role; no operacional/mock usam
     `/api/arquivos/[id]/download?inline=1`.
+  - **Voucher por item (migration 0024):** `expedicao_voos.arquivo_id` e
+    `expedicao_passeios.arquivo_id` (1 arquivo, categoria "Vouchers"). Anexo/remoção no
+    editor via `atualizarItemPortal({arquivo_id})` + upload/DELETE de `/api/arquivos`.
+    No portal vira "Baixar voucher" (signed URL). Hospedagem não tem voucher.
 - Fetchers em `lib/data/expedicoes.ts`: `listRoteiro`, `listVoosExpedicao`,
   `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`.
 - **Acesso Master da Área do Líder foi desativado** (mapa `MASTERS` vazio em
