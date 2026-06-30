@@ -33,7 +33,7 @@ const P = MESES_VALIDADE_PASSAPORTE_PADRAO;
 
 /** Exigências comuns a praticamente toda expedição internacional. */
 const BASE_INTERNACIONAL: RequisitoDestinoTemplate[] = [
-  { tipo: "Passaporte", descricao: `Passaporte válido por ao menos ${P} meses após o retorno`, obrigatoriedade: "Obrigatório", bloqueia_embarque: true, meses_validade_minima: P, papel_responsavel: "operacional" },
+  { tipo: "Passaporte", descricao: `Passaporte válido (≥ ${P} meses após o retorno) + foto/PDF anexado`, obrigatoriedade: "Obrigatório", bloqueia_embarque: true, meses_validade_minima: P, papel_responsavel: "operacional" },
   { tipo: "Dados Pessoais", descricao: "Cadastro completo (CPF, nascimento, contato)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
   { tipo: "Documento Pessoal", descricao: "Foto do documento pessoal (RG, CNH ou passaporte)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
   { tipo: "Contrato", descricao: "Contrato assinado", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },

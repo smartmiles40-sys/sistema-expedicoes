@@ -48,6 +48,11 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
     label: "Anexar foto do documento",
     dica: "RG, CNH ou passaporte. Anexar já deixa a exigência aprovada.",
   },
+  "Passaporte": {
+    categoria: "Documentos pessoais",
+    label: "Anexar foto/PDF do passaporte",
+    dica: "Foto ou PDF do passaporte. A validade continua sendo checada pelos dados cadastrados.",
+  },
   "Aéreo Internacional": {
     categoria: "Aéreos",
     label: "Anexar voucher / bilhete aéreo",
@@ -400,8 +405,9 @@ function RequisitoDrawer({
   const mostraComprado = ehAereo;
   // Questionário (perguntas Sim/Não + anexo): aéreos, vacina e seguro.
   const ehQuestionario = ehAereo || ehVacina || ehSeguro;
-  // "Só anexo" = sem perguntas, só o arquivo: Documento Pessoal.
-  const soAnexo = req.tipo === "Documento Pessoal";
+  // "Só anexo" = sem perguntas, só o arquivo: Documento Pessoal e Passaporte
+  // (no Passaporte a validade é checada pelos dados cadastrados, não aqui).
+  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Passaporte";
   // Perguntas Sim/Não.
   const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
   const [comprado, setComprado] = React.useState<boolean | null>(

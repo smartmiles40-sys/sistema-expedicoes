@@ -6,11 +6,12 @@
  * instâncias de requisito, devolve uma checagem por exigência e o status final
  * Apto / Atenção / Bloqueado.
  *
- * Duas fontes por exigência:
- *  - COLUNA  (Passaporte, Pagamento, Contrato, Dados Pessoais): derivada direto
- *    dos campos do passageiro — sempre fresca, sem precisar de instância.
+ * Fontes por exigência:
+ *  - COLUNA  (Contrato, Dados Pessoais): derivada direto dos campos do passageiro.
  *  - INSTÂNCIA (Seguro, Visto, Vacina, RG, Aéreo…): lida de `passageiro_requisitos`,
  *    onde o time registra status, validade e evidência.
+ *  - HÍBRIDA (Passaporte): validade vem das colunas (validade_passaporte) E o anexo
+ *    foto/PDF vem da instância (arquivo_id) — só fica Apto com os dois ok.
  */
 import { parseISO } from "date-fns";
 import { MESES_VALIDADE_PASSAPORTE_PADRAO } from "@/lib/constants";
@@ -25,10 +26,14 @@ import type {
 
 /** Tipos cuja prontidão é derivada de colunas do passageiro (não viram instância). */
 export const REQUISITOS_DE_COLUNA: ReadonlySet<TipoRequisito> = new Set([
-  "Passaporte",
   "Contrato",
   "Dados Pessoais",
 ]);
+
+// "Passaporte" é HÍBRIDO: a validade vem das colunas (checarPassaporte) e o anexo
+// (foto/PDF) vem da instância (arquivo_id). Só fica Apto com os DOIS ok. Por isso
+// saiu de REQUISITOS_DE_COLUNA (precisa virar instância p/ guardar o arquivo) e é
+// tratado num ramo próprio em avaliarProntidao.
 
 /**
  * Requisitos que NÃO se aplicam a passageiros do tipo "Líder" (vai a trabalho,
@@ -50,6 +55,10 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
  */
 export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
   "Documento Pessoal",
+  // Passaporte exige anexo (foto/PDF) — mas é tratado num ramo PRÓPRIO de
+  // avaliarProntidao (validade + anexo), então não cai no caminho genérico abaixo.
+  // Está aqui só para o drawer (ProntidaoPaxDrawer) renderizar o anexador.
+  "Passaporte",
   "Aéreo Internacional",
   "Aéreo Doméstico",
   "Voo Interno",
@@ -58,6 +67,12 @@ export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new 
 ]);
 
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
+
+/** Severidade relativa dos semáforos (pra combinar duas checagens no pior caso). */
+const SEVERIDADE_SEMAFORO: Record<Semaforo, number> = { na: 0, ok: 1, atencao: 2, bloqueio: 3 };
+function piorSemaforo(a: Semaforo, b: Semaforo): Semaforo {
+  return SEVERIDADE_SEMAFORO[a] >= SEVERIDADE_SEMAFORO[b] ? a : b;
+}
 
 export type ChecagemProntidao = {
   tipo: TipoRequisito;
@@ -238,12 +253,39 @@ export function avaliarProntidao(params: {
         requisito_id: porTipo.get(t.tipo)?.id ?? null,
       };
     }
+    // Passaporte: HÍBRIDO — validade (colunas) + anexo foto/PDF (instância).
+    // Só fica Apto com passaporte válido E arquivo anexado. "Dispensado" libera ambos.
+    if (t.tipo === "Passaporte") {
+      const inst = porTipo.get("Passaporte");
+      const bloqueia = t.bloqueia_embarque;
+      if (inst?.status === "Dispensado") {
+        return {
+          tipo: t.tipo, descricao: t.descricao, obrigatoriedade: t.obrigatoriedade,
+          bloqueia_embarque: bloqueia, semaforo: "ok", detalhe: "Dispensado",
+          requisito_id: inst.id,
+        };
+      }
+      const semValidade = checarPassaporte(passageiro, expedicao, bloqueia);
+      const reprovado = inst?.status === "Reprovado" || inst?.status === "Vencido";
+      const temArquivo = Boolean(inst?.arquivo_id) && !reprovado;
+      const semAnexo: Semaforo = temArquivo ? "ok" : bloqueia ? "bloqueio" : "atencao";
+      const semaforo = piorSemaforo(semValidade, semAnexo);
+      const msgValidade = detalheColuna("Passaporte", passageiro, semValidade);
+      const msgAnexo = temArquivo
+        ? "documento anexado"
+        : reprovado
+          ? "documento reprovado — reenviar"
+          : "falta anexar o passaporte";
+      return {
+        tipo: t.tipo, descricao: t.descricao, obrigatoriedade: t.obrigatoriedade,
+        bloqueia_embarque: bloqueia, semaforo,
+        detalhe: `${msgValidade} · ${msgAnexo}`,
+        requisito_id: inst?.id ?? null,
+      };
+    }
     if (REQUISITOS_DE_COLUNA.has(t.tipo)) {
       let semaforo: Semaforo;
       switch (t.tipo) {
-        case "Passaporte":
-          semaforo = checarPassaporte(passageiro, expedicao, t.bloqueia_embarque);
-          break;
         case "Contrato":
           semaforo = checarContrato(passageiro);
           break;

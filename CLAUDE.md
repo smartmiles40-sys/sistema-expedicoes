@@ -210,6 +210,14 @@ de processos do P8 (catálogo + instâncias + status):
 - **Financeiro:** `passageiros` ganhou `valor_contratado_brl`, `valor_pago_brl`,
   `saldo_brl` (gerado) e `status_financeiro` — espelhados do Bitrix via n8n.
   Mais campos de embarque: contato de emergência, restrições, contrato, check-in.
+- **Passaporte (híbrido):** o item "Passaporte" exige **validade** (campo
+  `validade_passaporte` ≥ 6 meses após o retorno) **E** um **anexo foto/PDF**
+  (instância `arquivo_id`) — só fica Apto com os dois. Saiu de `REQUISITOS_DE_COLUNA`
+  (virou instância p/ guardar o arquivo) e tem ramo próprio em `avaliarProntidao`
+  (combina os dois no pior caso, helper `piorSemaforo`). Está em
+  `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador (modo `soAnexo`).
+  Backfill: migration `0023_passaporte_anexo.sql` (sem ALTER TYPE — o enum já tinha
+  o valor). Novos pax recebem a instância automaticamente.
 - **Semáforo:** `vw_prontidao_passageiro` (SQL) e `lib/prontidao/regras.ts` (TS, usado
   no mock) implementam a MESMA lógica → `Apto` / `Atenção` / `Bloqueado`.
   Regras: passaporte válido ≥ 6m após retorno (`MESES_VALIDADE_PASSAPORTE_PADRAO`),

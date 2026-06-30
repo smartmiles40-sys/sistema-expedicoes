@@ -15,6 +15,7 @@ const BUCKET = "arquivos-expedicoes";
 /** Categoria de arquivo de cada tipo de requisito (pra mostrar o doc ao lado). */
 const CATEGORIA_REQUISITO: Record<string, string> = {
   "Documento Pessoal": "Documentos pessoais",
+  "Passaporte": "Documentos pessoais",
   "Aéreo Internacional": "Aéreos",
   "Aéreo Doméstico": "Aéreos",
   "Voo Interno": "Aéreos",
