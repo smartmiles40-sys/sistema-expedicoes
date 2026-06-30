@@ -321,6 +321,11 @@ role**, **só leitura**.
   **Avisos e boas práticas** (com tipo/cor); **Links úteis**.
   Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro.
   Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
+- **Baixar PDF da viagem:** botão por viagem (`app/amigo/ViagemPDF.tsx`, **`@react-pdf/renderer`**)
+  gerado **no cliente** sob demanda (import() dinâmico → fora do bundle principal). Reaproveita
+  os dados já carregados (sem rota/re-login). Capa + roteiro (com fotos embutidas, JPG/PNG via
+  data URL; falhas são puladas) + vouchers + info + avisos. Voucher (arquivo) vira nota
+  "disponível no portal" (não dá pra embutir PDF em PDF).
 - **Conteúdo é autorado no operacional:** aba **"ExpedAmigo"** no detalhe da
   expedição (`/expedicoes/[id]/portal`, `PortalEditor.tsx`). Editor genérico
   (allowlist de tabelas) com CRUD por seção; ordem por campo numérico.

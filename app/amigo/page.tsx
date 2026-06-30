@@ -4,6 +4,7 @@ import {
   CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
   CalendarDays, Ticket, Info, ChevronRight, Megaphone, Download,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -124,7 +125,7 @@ export default function AmigoPage() {
 
       <main className="mx-auto max-w-3xl space-y-6 p-4">
         {dados.expedicoes.map((exp) => (
-          <ViagemCard key={exp.id} exp={exp} />
+          <ViagemCard key={exp.id} exp={exp} nome={dados.nome} />
         ))}
         <p className="pb-6 text-center text-[11px] text-muted-foreground">
           Dúvidas sobre a sua viagem? Fale com a equipe da agência.
@@ -134,10 +135,30 @@ export default function AmigoPage() {
   );
 }
 
-function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
+function ViagemCard({ exp, nome }: { exp: AmigoExpedicao; nome: string }) {
   // Sempre recolhida ao logar — o viajante abre a viagem que quiser.
   const [aberta, setAberta] = React.useState(false);
+  const [gerandoPdf, setGerandoPdf] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
+
+  async function baixarPdf() {
+    setGerandoPdf(true);
+    try {
+      const { gerarPdfViagem } = await import("./ViagemPDF");
+      const blob = await gerarPdfViagem(exp, nome);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${exp.nome.replace(/[^\w\-]+/g, "_") || "viagem"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Não foi possível gerar o PDF", { description: "Tente novamente em instantes." });
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       {/* Hero (clicável para recolher/expandir) */}
@@ -160,6 +181,18 @@ function ViagemCard({ exp }: { exp: AmigoExpedicao }) {
           <span className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-[var(--brand-lime)]" /> {formatDate(exp.data_embarque)} → {formatDate(exp.data_retorno)}</span>
         </div>
       </button>
+
+      {/* Barra de ação: baixar PDF (sempre visível) */}
+      <div className="flex justify-end border-b border-border bg-muted/20 px-4 py-2">
+        <button
+          type="button"
+          onClick={baixarPdf}
+          disabled={gerandoPdf}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-editavel-700 hover:bg-accent disabled:opacity-60"
+        >
+          <Download className="h-3.5 w-3.5" /> {gerandoPdf ? "Gerando PDF…" : "Baixar PDF da viagem"}
+        </button>
+      </div>
 
       {aberta && (
       <div className="space-y-4 p-4">
