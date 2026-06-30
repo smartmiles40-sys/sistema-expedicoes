@@ -258,34 +258,6 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 rounded-md border border-border p-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Embarque</span>
-              <label className="flex items-center gap-2 text-[12px]">
-                <input
-                  type="checkbox"
-                  {...register("contrato_assinado")}
-                  className="h-3.5 w-3.5"
-                />
-                Contrato assinado
-              </label>
-              <label className="flex items-center gap-2 text-[12px]">
-                <input
-                  type="checkbox"
-                  {...register("checkin_online_feito")}
-                  className="h-3.5 w-3.5"
-                />
-                Check-in online feito
-              </label>
-              <label className="flex items-center gap-2 text-[12px]">
-                <input
-                  type="checkbox"
-                  {...register("voo_nacional_necessario")}
-                  className="h-3.5 w-3.5"
-                />
-                Voo nacional necessário
-              </label>
-            </div>
-
             <div className="space-y-1">
               <Label htmlFor="ep-obs">Observações</Label>
               <textarea
