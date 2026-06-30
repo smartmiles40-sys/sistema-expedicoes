@@ -26,11 +26,13 @@ type FormData = z.input<typeof schema>;
 
 interface Props {
   expedicaoId: string;
+  /** Preenche hotel/datas (ao adicionar quartos a uma seção/hotel já existente). */
+  prefill?: { hotel_cidade: string; check_in: string; check_out: string } | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
 
-export function QuartosAutomaticosDrawer({ expedicaoId, open, onOpenChange }: Props) {
+export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenChange }: Props) {
   const router = useRouter();
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } =
     useForm<FormData>({
@@ -39,8 +41,15 @@ export function QuartosAutomaticosDrawer({ expedicaoId, open, onOpenChange }: Pr
     });
 
   React.useEffect(() => {
-    if (open) reset({ tipo: "Duplo", quantidade: 5 });
-  }, [open, reset]);
+    if (!open) return;
+    reset({
+      tipo: "Duplo",
+      quantidade: prefill ? 1 : 5,
+      hotel_cidade: prefill?.hotel_cidade ?? "",
+      check_in: prefill?.check_in ?? "",
+      check_out: prefill?.check_out ?? "",
+    });
+  }, [open, reset, prefill]);
 
   async function onSubmit(data: FormData) {
     const r = await criarQuartosAutomaticos({
@@ -65,10 +74,11 @@ export function QuartosAutomaticosDrawer({ expedicaoId, open, onOpenChange }: Pr
       <DrawerContent>
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <DrawerHeader>
-            <DrawerTitle>Criar quartos automaticamente</DrawerTitle>
+            <DrawerTitle>{prefill ? "Adicionar quartos à seção" : "Criar quartos automaticamente"}</DrawerTitle>
             <DrawerDescription>
-              Cria vários quartos do mesmo tipo para um hotel/trecho de uma vez. Os números são
-              gerados em sequência (continuando os que já existem nesse hotel).
+              {prefill
+                ? `Adiciona quartos a ${prefill.hotel_cidade || "este hotel"} (mesmas datas). Os números continuam a sequência do hotel.`
+                : "Cria vários quartos do mesmo tipo para um hotel/trecho de uma vez. Os números são gerados em sequência (continuando os que já existem nesse hotel)."}
             </DrawerDescription>
           </DrawerHeader>
           <DrawerBody className="space-y-3">
