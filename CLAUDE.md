@@ -218,6 +218,11 @@ de processos do P8 (catálogo + instâncias + status):
   `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador (modo `soAnexo`).
   Backfill: migration `0023_passaporte_anexo.sql` (sem ALTER TYPE — o enum já tinha
   o valor). Novos pax recebem a instância automaticamente.
+- **Anexos OPCIONAIS:** o anexo do **Documento Pessoal** é opcional (anexado/Dispensado
+  = ok; reprovado = atenção; sem anexo = neutro "na" — não bloqueia). O **Contrato**
+  também é opcional (assinado = ok; senão "na"). Ambos têm ramo próprio em
+  `avaliarProntidao` (Documento Pessoal) / `checarContrato`. Documento Pessoal segue
+  em `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador.
 - **Semáforo:** `vw_prontidao_passageiro` (SQL) e `lib/prontidao/regras.ts` (TS, usado
   no mock) implementam a MESMA lógica → `Apto` / `Atenção` / `Bloqueado`.
   Regras: passaporte válido ≥ 6m após retorno (`MESES_VALIDADE_PASSAPORTE_PADRAO`),

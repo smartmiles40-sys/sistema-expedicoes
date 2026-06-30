@@ -54,10 +54,11 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
  * instância em passageiro_requisitos.
  */
 export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
+  // Documento Pessoal e Passaporte têm ramos PRÓPRIOS em avaliarProntidao (não caem
+  // no caminho genérico abaixo). Ficam neste conjunto só para o drawer
+  // (ProntidaoPaxDrawer) renderizar o anexador. OBS: o anexo do Documento Pessoal é
+  // OPCIONAL (não bloqueia); o do Passaporte é obrigatório (validade + anexo).
   "Documento Pessoal",
-  // Passaporte exige anexo (foto/PDF) — mas é tratado num ramo PRÓPRIO de
-  // avaliarProntidao (validade + anexo), então não cai no caminho genérico abaixo.
-  // Está aqui só para o drawer (ProntidaoPaxDrawer) renderizar o anexador.
   "Passaporte",
   "Aéreo Internacional",
   "Aéreo Doméstico",
@@ -281,6 +282,28 @@ export function avaliarProntidao(params: {
         bloqueia_embarque: bloqueia, semaforo,
         detalhe: `${msgValidade} · ${msgAnexo}`,
         requisito_id: inst?.id ?? null,
+      };
+    }
+    // Documento Pessoal: anexo OPCIONAL — não bloqueia nem alarma se faltar.
+    // Anexado/Dispensado = ok; reprovado = atenção; sem anexo = neutro ("na").
+    if (t.tipo === "Documento Pessoal") {
+      const docInst = porTipo.get("Documento Pessoal");
+      let semaforo: Semaforo;
+      if (!docInst) semaforo = "na";
+      else if (docInst.status === "Dispensado") semaforo = "ok";
+      else if (docInst.status === "Reprovado") semaforo = "atencao";
+      else semaforo = docInst.arquivo_id ? "ok" : "na";
+      return {
+        tipo: t.tipo,
+        descricao: docInst?.descricao ?? t.descricao,
+        obrigatoriedade: docInst?.obrigatoriedade ?? t.obrigatoriedade,
+        bloqueia_embarque: false,
+        semaforo,
+        detalhe:
+          semaforo === "ok" ? "Documento anexado"
+            : semaforo === "atencao" ? "Documento reprovado — reenviar"
+              : "Anexo opcional",
+        requisito_id: docInst?.id ?? null,
       };
     }
     if (REQUISITOS_DE_COLUNA.has(t.tipo)) {
