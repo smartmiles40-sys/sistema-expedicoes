@@ -302,6 +302,16 @@ se não couberem juntos no quarto), e o **export fica bloqueado** (faixa vermelh
 `conexoesSeparadas` (membros em quartos diferentes no mesmo hotel) > 0. A separação só
 surge ao criar conexão sobre gente já em quartos distintos → resolve no botão "Juntar".
 
+## 🎉 Momentos especiais (Visão Geral da expedição)
+
+Card na Visão Geral (`app/(app)/expedicoes/[id]/page.tsx`, largura total) com os
+"acontecimentos" do grupo, calculados no servidor:
+- **Marcos de fidelidade** (3ª/5ª/10ª): `construirPosicoesFidelidade(pessoas, id)` +
+  `ehMarco` (`lib/fidelidade.ts`); rótulo via `ordinalFem`.
+- **Aniversariantes na viagem**: `aniversarioNaViagem(nascimento, embarque, retorno)` (`lib/utils.ts`).
+- **Estreantes** (1ª viagem): posição de fidelidade === 1.
+Tudo derivado (sem tabela nova). Cada item = avatar + nome + detalhe.
+
 ## 🧭 Portal do ExpedAmigo (passageiro)
 
 Portal público do viajante, **separado do sistema operacional** (sem sidebar/abas
