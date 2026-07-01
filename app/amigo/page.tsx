@@ -14,12 +14,41 @@ import {
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
 
+const STORAGE_KEY = "expedamigo-sessao";
+
 export default function AmigoPage() {
   const [cpf, setCpf] = React.useState("");
   const [nascimento, setNascimento] = React.useState("");
   const [dados, setDados] = React.useState<AmigoDados | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
+  // Verificando se há sessão salva (evita piscar o login ao dar refresh).
+  const [checando, setChecando] = React.useState(true);
+
+  // Ao carregar, tenta restaurar a sessão salva (CPF + nascimento) e re-buscar.
+  React.useEffect(() => {
+    let ativo = true;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const saved = raw ? (JSON.parse(raw) as { cpf?: string; nascimento?: string }) : null;
+      if (saved?.cpf && saved?.nascimento) {
+        setCpf(saved.cpf);
+        setNascimento(saved.nascimento);
+        entrarExpedAmigo(saved.cpf, saved.nascimento)
+          .then((r) => {
+            if (!ativo) return;
+            if (r.ok) setDados(r.dados);
+            else localStorage.removeItem(STORAGE_KEY);
+          })
+          .finally(() => ativo && setChecando(false));
+        return;
+      }
+    } catch {
+      /* localStorage indisponível — segue sem sessão */
+    }
+    setChecando(false);
+    return () => { ativo = false; };
+  }, []);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -27,8 +56,32 @@ export default function AmigoPage() {
     setErro(null);
     const r = await entrarExpedAmigo(cpf, nascimento);
     setLoading(false);
-    if (r.ok) setDados(r.dados);
-    else setErro(r.error);
+    if (r.ok) {
+      setDados(r.dados);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, nascimento })); } catch { /* ignore */ }
+    } else {
+      setErro(r.error);
+    }
+  }
+
+  function sair() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    setDados(null);
+    setCpf("");
+    setNascimento("");
+    setErro(null);
+  }
+
+  // ---------- Restaurando sessão ----------
+  if (checando) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <CompassIcon className="h-7 w-7 animate-pulse text-[var(--brand-dark)]" />
+          <span className="text-[13px]">Entrando…</span>
+        </div>
+      </div>
+    );
   }
 
   // ---------- Portão de acesso ----------
@@ -116,7 +169,7 @@ export default function AmigoPage() {
         </div>
         <button
           type="button"
-          onClick={() => { setDados(null); setCpf(""); setNascimento(""); setErro(null); }}
+          onClick={sair}
           className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
         >
           Sair
