@@ -37,14 +37,11 @@ export const REQUISITOS_DE_COLUNA: ReadonlySet<TipoRequisito> = new Set([
 
 /**
  * Requisitos que NÃO se aplicam a passageiros do tipo "Líder" (vai a trabalho,
- * não-pagante): contrato, seguro, aéreo internacional e vacina. Ficam como
- * "não necessário" (semáforo N/A) e não geram atenção/bloqueio.
+ * não-pagante). Fica só o Contrato como "não necessário" (semáforo N/A); os demais
+ * (Seguro, Aéreo, Vacina, etc.) valem igual aos outros passageiros.
  */
 export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
   "Contrato",
-  "Seguro",
-  "Aéreo Internacional",
-  "Vacina",
 ]);
 
 /**
