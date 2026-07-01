@@ -9,6 +9,7 @@ import {
   Coins,
   Settings,
   CompassIcon,
+  LayoutDashboard,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import type { CurrentUser } from "@/lib/supabase/auth";
 import { UserMenu } from "./UserMenu";
 
 const NAV = [
+  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
   { href: "/expedicoes", label: "Expedições", icon: Map },

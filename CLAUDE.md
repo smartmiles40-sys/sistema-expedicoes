@@ -67,7 +67,7 @@ Web app interno para uma agência de turismo focada em **expedições** (viagens
 /app
   /(auth)
     /login           — magic link
-  /(app)             — rotas autenticadas (entrada padrão: /expedicoes)
+  /(app)             — rotas autenticadas (entrada padrão: /dashboard)
     /expedicoes      — lista
       /[id]          — detalhe (7 tabs)
         /passageiros
@@ -385,7 +385,10 @@ controle de **pagamento de passageiro foi removido** (funcional):
   continuam no schema/tipos como **dormentes** (não exibidas/usadas). A seed
   `0011` ainda traz a linha `Pagamento` em `requisitos_destino`, mas o builder
   (`construirRequisitosPadrao`) usa o template TS, então nada instancia "Pagamento".
-- **Não há Dashboard.** A entrada padrão é `/expedicoes`.
+- **Dashboard é a tela inicial** (`/dashboard`, `app/(app)/dashboard/page.tsx`): resumo
+  geral clicável (números-chave, próximas expedições, prontidão/alertas, prazos, momentos
+  especiais). Home (`app/page.tsx`) e pós-login redirecionam pra `/dashboard`; sidebar tem
+  "Início". Reaproveita `listExpedicoesComAgregados`/`getResumoProntidao`/`getResumoProcessos`.
 
 ## ⚠️ Convenções obrigatórias
 

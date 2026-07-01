@@ -6,7 +6,7 @@ import { LoginForm } from "../LoginForm";
 
 export default async function OperacionalPage() {
   if (DEV_AUTH_BYPASS) {
-    redirect("/expedicoes");
+    redirect("/dashboard");
   }
 
   return (

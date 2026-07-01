@@ -17,7 +17,7 @@ export function LoginForm() {
     const result = await entrarComSenha(email, senha);
     if (result.ok) {
       // Recarrega no servidor pra a sessão (cookie) ser lida pelo layout.
-      window.location.assign("/expedicoes");
+      window.location.assign("/dashboard");
     } else {
       setLoading(false);
       toast.error("Não foi possível entrar", { description: result.error });
