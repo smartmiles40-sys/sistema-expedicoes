@@ -33,6 +33,7 @@ export default async function PassageirosPage({
         quartos={quartos}
         arquivos={arquivos}
         dataEmbarque={expedicao.data_embarque}
+        dataRetorno={expedicao.data_retorno}
         destino={expedicao.destino}
         prontidao={prontidao}
         usuarios={usuarios}

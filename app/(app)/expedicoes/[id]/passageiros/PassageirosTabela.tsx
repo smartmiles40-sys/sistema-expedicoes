@@ -12,7 +12,7 @@ import { EditableCell } from "@/components/tables/EditableCell";
 import { atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
-import { formatDate, daysUntil, cn } from "@/lib/utils";
+import { formatDate, daysUntil, cn, aniversarioNaViagem } from "@/lib/utils";
 import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO } from "@/lib/constants";
 import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
@@ -39,6 +39,7 @@ interface Props {
   quartos: QuartoRow[];
   arquivos: ArquivoRow[];
   dataEmbarque: string;
+  dataRetorno: string;
   destino: string;
   prontidao: ProntidaoPassageiro[];
   usuarios: UsuarioRow[];
@@ -47,7 +48,7 @@ interface Props {
   posicoesFidelidade: Record<string, number>;
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, destino, prontidao, usuarios, pessoas, posicoesFidelidade }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade }: Props) {
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
@@ -126,6 +127,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     const embarqueDias = daysUntil(dataEmbarque);
     const validadeAlerta = validadeDias != null && embarqueDias != null ? validadeDias - embarqueDias < 180 : false;
     const quarto = p.quarto_id ? quartosById.get(p.quarto_id) : null;
+    const aniv = aniversarioNaViagem(p.data_nascimento, dataEmbarque, dataRetorno);
     return (
       <tr key={p.id} className="border-b border-border hover:bg-accent/30">
         <td className="px-2.5 font-mono text-[11px] text-muted-foreground tabular-nums">
@@ -143,6 +145,14 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
               {p.nome_completo}
             </button>
             <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
+            {aniv && (
+              <span
+                title={`Faz aniversário durante a viagem — ${formatDate(aniv.data)}${aniv.idade != null ? ` (${aniv.idade} anos)` : ""}`}
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-600"
+              >
+                🎂 {formatDate(aniv.data, "dd/MM")}
+              </span>
+            )}
           </div>
         </td>
         <td className="px-2.5">
@@ -164,9 +174,6 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         </td>
         <td className="px-2.5 text-muted-foreground">
           {quarto ? `${quarto.numero} (${quarto.tipo})` : "—"}
-        </td>
-        <td className="px-2.5 text-muted-foreground tabular-nums">
-          {p.companhia_aerea ? `${p.companhia_aerea} ${p.localizador ?? ""}` : p.voo_nacional_necessario ? "Voo nac. pendente" : "—"}
         </td>
         <td className="px-2.5">
           <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
@@ -209,7 +216,6 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                 <Th>Passaporte</Th>
                 <Th>Validade</Th>
                 <Th>Quarto</Th>
-                <Th>Voo</Th>
                 <Th>Status</Th>
                 <Th>Prontidão</Th>
                 <Th>Observações</Th>
@@ -218,7 +224,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             <tbody>
               {linhas.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
+                  <td colSpan={10} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
                 </tr>
               ) : (
                 linhas.map(renderLinha)
@@ -388,6 +394,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         passageiro={passageiroEditando}
         arquivos={arquivos}
         destino={destino}
+        dataEmbarque={dataEmbarque}
+        dataRetorno={dataRetorno}
         prontidao={passageiroEditando ? prontidaoByPax.get(passageiroEditando.id) ?? null : null}
         usuarios={usuarios}
         posicaoFidelidade={passageiroEditando ? posicoesFidelidade[passageiroEditando.id] ?? null : null}

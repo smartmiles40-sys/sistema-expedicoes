@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/Select";
 import { TIPO_PASSAGEIRO, STATUS_RESERVA, COR_PRONTIDAO } from "@/lib/constants";
 import { Badge } from "@/components/ui/Badge";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, aniversarioNaViagem } from "@/lib/utils";
 import { Drive } from "@/components/arquivos/Drive";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
@@ -63,6 +63,8 @@ interface Props {
   passageiro: PassageiroRow | null;
   arquivos: ArquivoRow[];
   destino: string;
+  dataEmbarque: string;
+  dataRetorno: string;
   prontidao: ProntidaoPassageiro | null;
   usuarios: Tables<"usuarios">[];
   /** Posição cronológica desta expedição na história da pessoa (1ª, 2ª...). */
@@ -70,7 +72,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, prontidao, usuarios, posicaoFidelidade, onOpenChange }: Props) {
+export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, dataEmbarque, dataRetorno, prontidao, usuarios, posicaoFidelidade, onOpenChange }: Props) {
   const router = useRouter();
   const open = passageiro !== null;
   const [tab, setTab] = React.useState<"passageiro" | "prontidao" | "saude">("passageiro");
@@ -247,15 +249,19 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="ep-cia">Companhia aérea</Label>
-                <Input id="ep-cia" {...register("companhia_aerea")} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="ep-loc">Localizador</Label>
-                <Input id="ep-loc" {...register("localizador")} />
-              </div>
+            {/* Campo inteligente: aniversário durante a viagem (calculado). */}
+            <div className="rounded-md border border-border bg-muted/20 p-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aniversário na viagem</div>
+              {(() => {
+                const aniv = aniversarioNaViagem(watch("data_nascimento"), dataEmbarque, dataRetorno);
+                return aniv ? (
+                  <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-lista-100 px-2.5 py-1 text-[12px] font-medium text-lista-600">
+                    🎂 Faz aniversário em {formatDate(aniv.data)}{aniv.idade != null ? ` (${aniv.idade} anos)` : ""}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[12px] text-muted-foreground">Não faz aniversário durante esta viagem.</p>
+                );
+              })()}
             </div>
 
             <div className="space-y-1">

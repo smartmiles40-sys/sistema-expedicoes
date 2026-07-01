@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Mail, Phone, IdCard, Calendar } from "lucide-react";
-import { getPassageiro } from "@/lib/data/expedicoes";
+import { getPassageiro, getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosPassageiro } from "@/lib/data/arquivos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Drive } from "@/components/arquivos/Drive";
-import { formatDate } from "@/lib/utils";
+import { formatDate, aniversarioNaViagem } from "@/lib/utils";
 import type { StatusReserva } from "@/types/database";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
@@ -22,11 +22,16 @@ export default async function PerfilPassageiroPage({
   params: Promise<{ id: string; paxId: string }>;
 }) {
   const { id, paxId } = await params;
-  const [passageiro, arquivos] = await Promise.all([
+  const [passageiro, arquivos, expedicao] = await Promise.all([
     getPassageiro(paxId),
     listArquivosPassageiro(paxId),
+    getExpedicao(id),
   ]);
   if (!passageiro || passageiro.expedicao_id !== id) notFound();
+
+  const aniv = expedicao
+    ? aniversarioNaViagem(passageiro.data_nascimento, expedicao.data_embarque, expedicao.data_retorno)
+    : null;
 
   return (
     <div className="p-4 space-y-4">
@@ -74,15 +79,16 @@ export default async function PerfilPassageiroPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Voo</CardTitle>
+            <CardTitle>Aniversário na viagem</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1.5 text-[13px]">
-            <Linha label="Companhia" value={passageiro.companhia_aerea} />
-            <Linha label="Localizador" value={passageiro.localizador} />
-            <Linha
-              label="Voo nacional"
-              value={passageiro.voo_nacional_necessario ? "Necessário" : "Não"}
-            />
+          <CardContent className="text-[13px]">
+            {aniv ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-lista-100 px-2.5 py-1 text-[12px] font-medium text-lista-600">
+                🎂 Faz aniversário em {formatDate(aniv.data)}{aniv.idade != null ? ` (${aniv.idade} anos)` : ""}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Não faz aniversário durante esta viagem.</span>
+            )}
           </CardContent>
         </Card>
 

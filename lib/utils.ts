@@ -57,6 +57,32 @@ export function daysUntil(date: string | Date | null | undefined): number | null
   return differenceInDays(d, new Date());
 }
 
+/**
+ * Se o passageiro faz aniversário DURANTE a viagem, retorna a data (ISO YYYY-MM-DD)
+ * do aniversário dentro do período e a idade que fará; senão null. Campo "inteligente":
+ * calculado a partir do nascimento + datas da expedição.
+ */
+export function aniversarioNaViagem(
+  nascimento: string | null | undefined,
+  embarque: string | null | undefined,
+  retorno: string | null | undefined,
+): { data: string; idade: number | null } | null {
+  if (!nascimento || !embarque || !retorno) return null;
+  const nasc = nascimento.slice(0, 10); // YYYY-MM-DD
+  const emb = embarque.slice(0, 10);
+  const ret = retorno.slice(0, 10);
+  if (nasc.length < 10 || emb.length < 10 || ret.length < 10 || ret < emb) return null;
+  const monthDay = nasc.slice(5); // MM-DD
+  const anoNasc = Number(nasc.slice(0, 4));
+  for (let y = Number(emb.slice(0, 4)); y <= Number(ret.slice(0, 4)); y++) {
+    const cand = `${y}-${monthDay}`;
+    if (cand >= emb && cand <= ret) {
+      return { data: cand, idade: anoNasc > 0 ? y - anoNasc : null };
+    }
+  }
+  return null;
+}
+
 export function generateExpedicaoCodigo(destino: string, dataEmbarque: string | Date): string {
   const meses = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
   const d = typeof dataEmbarque === "string" ? parseISO(dataEmbarque) : dataEmbarque;
