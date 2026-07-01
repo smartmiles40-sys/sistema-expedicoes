@@ -26,7 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/Select";
-import { TIPO_PASSAGEIRO, STATUS_RESERVA, COR_PRONTIDAO } from "@/lib/constants";
+import { TIPO_PASSAGEIRO, STATUS_RESERVA, COR_PRONTIDAO, CATEGORIA_ARQUIVO } from "@/lib/constants";
+import { PassaporteAnexo } from "@/components/arquivos/PassaporteAnexo";
+
+/** Pastas do Drive no perfil, sem "Documentos pessoais" (o passaporte tem item próprio). */
+const CATEGORIAS_SEM_DOC_PESSOAL = CATEGORIA_ARQUIVO.filter((c) => c !== "Documentos pessoais");
 import { Badge } from "@/components/ui/Badge";
 import { cn, formatDate, aniversarioNaViagem } from "@/lib/utils";
 import { Drive } from "@/components/arquivos/Drive";
@@ -279,15 +283,21 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                 {passageiro && (
                   <div className="pt-4 border-t border-border space-y-2">
                     <div>
-                      <h3 className="text-sm font-semibold">Arquivos do cliente</h3>
+                      <h3 className="text-sm font-semibold">Documentos do passageiro</h3>
                       <p className="text-[11px] text-muted-foreground">
-                        Apólices, bilhetes, documentos pessoais. Vinculados a este passageiro.
+                        Passaporte e demais arquivos vinculados a este passageiro.
                       </p>
                     </div>
+                    <PassaporteAnexo
+                      expedicaoId={expedicaoId}
+                      passageiroId={passageiro.id}
+                      arquivoId={passageiro.passaporte_arquivo_id}
+                    />
                     <Drive
                       expedicaoId={expedicaoId}
                       passageiroId={passageiro.id}
                       arquivos={arquivosDoPassageiro}
+                      categorias={CATEGORIAS_SEM_DOC_PESSOAL}
                     />
                   </div>
                 )}

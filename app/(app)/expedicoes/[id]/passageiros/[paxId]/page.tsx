@@ -6,6 +6,11 @@ import { listArquivosPassageiro } from "@/lib/data/arquivos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Drive } from "@/components/arquivos/Drive";
+import { PassaporteAnexo } from "@/components/arquivos/PassaporteAnexo";
+import { CATEGORIA_ARQUIVO } from "@/lib/constants";
+
+/** Pastas do Drive no perfil, sem "Documentos pessoais" (o passaporte tem item próprio). */
+const CATEGORIAS_SEM_DOC_PESSOAL = CATEGORIA_ARQUIVO.filter((c) => c !== "Documentos pessoais");
 import { formatDate, aniversarioNaViagem } from "@/lib/utils";
 import type { StatusReserva } from "@/types/database";
 
@@ -104,13 +109,19 @@ export default async function PerfilPassageiroPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Drive — arquivos do passageiro</CardTitle>
+          <CardTitle>Documentos do passageiro</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <PassaporteAnexo
+            expedicaoId={id}
+            passageiroId={paxId}
+            arquivoId={passageiro.passaporte_arquivo_id}
+          />
           <Drive
             expedicaoId={id}
             passageiroId={paxId}
             arquivos={arquivos}
+            categorias={CATEGORIAS_SEM_DOC_PESSOAL}
           />
         </CardContent>
       </Card>

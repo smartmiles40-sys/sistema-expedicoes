@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/Label";
 import { Badge } from "@/components/ui/Badge";
 import { FilterPopover } from "@/components/ui/FilterPopover";
 import { Drive } from "@/components/arquivos/Drive";
+import { PassaporteAnexo } from "@/components/arquivos/PassaporteAnexo";
+import { CATEGORIA_ARQUIVO } from "@/lib/constants";
 import { ImportarPassageirosDrawer } from "@/app/(app)/expedicoes/[id]/passageiros/ImportarPassageirosDrawer";
 import { SaudeCampos } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import {
@@ -27,6 +29,9 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import type { StatusReserva, ArquivoRow, SaudePassageiro } from "@/types/database";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
+
+/** Pastas do Drive no perfil, sem "Documentos pessoais" (o passaporte tem item próprio). */
+const CATEGORIAS_SEM_DOC_PESSOAL = CATEGORIA_ARQUIVO.filter((c) => c !== "Documentos pessoais");
 
 const RESERVA_VARIANT: Record<StatusReserva, "vinculado" | "atencao" | "auto" | "critico"> = {
   Confirmado: "vinculado",
@@ -840,15 +845,23 @@ function PessoaDrawer({
                   <div>
                     <h3 className="text-sm font-semibold">Documentos do passageiro</h3>
                     <p className="text-[11px] text-muted-foreground">
-                      Passaporte, CNH, RG e demais documentos pessoais — compartilhados por todas as expedições.
+                      Passaporte e demais documentos — compartilhados por todas as expedições.
                     </p>
                   </div>
                   {pessoa.expedicaoIdAncora && pessoa.passageiroIdAncora ? (
-                    <Drive
-                      expedicaoId={pessoa.expedicaoIdAncora}
-                      passageiroId={pessoa.passageiroIdAncora}
-                      arquivos={arquivos}
-                    />
+                    <>
+                      <PassaporteAnexo
+                        expedicaoId={pessoa.expedicaoIdAncora}
+                        passageiroId={pessoa.passageiroIdAncora}
+                        arquivoId={pessoa.passaporte_arquivo_id}
+                      />
+                      <Drive
+                        expedicaoId={pessoa.expedicaoIdAncora}
+                        passageiroId={pessoa.passageiroIdAncora}
+                        arquivos={arquivos}
+                        categorias={CATEGORIAS_SEM_DOC_PESSOAL}
+                      />
+                    </>
                   ) : (
                     <p className="text-[12px] text-muted-foreground italic">
                       Vincule a pessoa a uma expedição para anexar documentos.

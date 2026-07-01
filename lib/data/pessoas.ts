@@ -34,6 +34,7 @@ export type PessoaAgregada = {
   cpf: string | null;
   passaporte: string | null;
   validade_passaporte: string | null;
+  passaporte_arquivo_id: string | null;
   data_nascimento: string | null;
   email: string | null;
   telefone: string | null;
@@ -86,6 +87,7 @@ function agregar(
         cpf: p.cpf,
         passaporte: p.passaporte,
         validade_passaporte: p.validade_passaporte,
+        passaporte_arquivo_id: p.passaporte_arquivo_id,
         data_nascimento: p.data_nascimento,
         email: p.email,
         telefone: p.telefone,
@@ -107,6 +109,7 @@ function agregar(
       pessoa.cpf = maisRecente(pessoa.cpf, p.cpf);
       pessoa.passaporte = maisRecente(pessoa.passaporte, p.passaporte);
       pessoa.validade_passaporte = maisRecente(pessoa.validade_passaporte, p.validade_passaporte);
+      pessoa.passaporte_arquivo_id = maisRecente(pessoa.passaporte_arquivo_id, p.passaporte_arquivo_id);
       pessoa.data_nascimento = maisRecente(pessoa.data_nascimento, p.data_nascimento);
       pessoa.email = maisRecente(pessoa.email, p.email);
       pessoa.telefone = maisRecente(pessoa.telefone, p.telefone);
