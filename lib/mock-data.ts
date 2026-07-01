@@ -316,6 +316,7 @@ type PassageiroBase = Omit<
   | "contrato_assinado"
   | "checkin_online_feito"
   | "conexao_viagem_id"
+  | "passaporte_arquivo_id"
 >;
 
 /** Conexões "viajam juntas" de demonstração (mesmo token = mesmo quarto). */
@@ -402,6 +403,7 @@ function normalizarPassageiro(p: PassageiroBase): Tables<"passageiros"> {
   return {
     ...p,
     conexao_viagem_id: CONEXAO_DEMO[p.id] ?? null,
+    passaporte_arquivo_id: null,
     valor_contratado_brl,
     valor_pago_brl,
     saldo_brl: valor_contratado_brl - valor_pago_brl, // espelha a coluna gerada
@@ -677,6 +679,7 @@ function passageiroDeSeed(
     passaporte: d.passaporte,
     data_nascimento: d.data_nascimento,
     validade_passaporte: d.validade_passaporte,
+    passaporte_arquivo_id: null,
     email: d.email,
     telefone: d.telefone,
     status_reserva: d.status_reserva,

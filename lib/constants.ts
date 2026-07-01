@@ -173,7 +173,6 @@ export const TIPO_REQUISITO = [
   "Autorização de Menor",
   "Pagamento",
   "Dados Pessoais",
-  "Documento Pessoal",
   "Ingresso Machu Picchu",
   "Ingresso Trem Machu Picchu",
 ] as const;

@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
       email: data.email ?? null,
       telefone: data.telefone ?? null,
       status_reserva,
+      passaporte_arquivo_id: null,
       voo_nacional_necessario: data.voo_nacional_necessario ?? false,
       companhia_aerea: null,
       localizador: null,

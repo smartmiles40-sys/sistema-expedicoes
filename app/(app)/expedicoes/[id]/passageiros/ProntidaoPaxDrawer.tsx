@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Drive } from "@/components/arquivos/Drive";
 import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia } from "@/app/(app)/expedicoes/actions";
+import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia, atualizarAnexoPassaporte } from "@/app/(app)/expedicoes/actions";
 import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, ANEXO_OPCIONAL, type Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type {
@@ -43,11 +43,6 @@ const STATUS_COR: Record<StatusRequisito, { off: string; on: string }> = {
 
 /** Requisitos com anexo: para onde vai o arquivo + textos amigáveis. */
 const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo; label: string; dica: string }>> = {
-  "Documento Pessoal": {
-    categoria: "Documentos pessoais",
-    label: "Anexar foto do documento",
-    dica: "RG, CNH ou passaporte. Anexar já deixa a exigência aprovada.",
-  },
   "Passaporte": {
     categoria: "Documentos pessoais",
     label: "Anexar foto/PDF do passaporte",
@@ -285,6 +280,7 @@ export function ProntidaoConteudo({
         <RequisitoDrawer
           expedicaoId={expedicaoId}
           paxNome={passageiro.nome_completo}
+          passageiro={passageiro}
           req={editando}
           usuarios={usuarios}
           usuariosById={usuariosById}
@@ -381,10 +377,11 @@ function ContratoDrawer({
 // Drawer de edição de um requisito (movido da antiga aba Prontidão)
 // =============================================================================
 function RequisitoDrawer({
-  expedicaoId, paxNome, req, usuarios, usuariosById, arquivos, onClose,
+  expedicaoId, paxNome, passageiro, req, usuarios, usuariosById, arquivos, onClose,
 }: {
   expedicaoId: string;
   paxNome: string;
+  passageiro: PassageiroRow;
   req: PassageiroRequisitoRow;
   usuarios: Tables<"usuarios">[];
   usuariosById: Map<string, string>;
@@ -398,7 +395,10 @@ function RequisitoDrawer({
   const [responsavel, setResponsavel] = React.useState(req.responsavel_id ?? "_none");
   const [observacoes, setObservacoes] = React.useState(req.observacoes ?? "");
   const [salvando, setSalvando] = React.useState(false);
-  const [arquivoId, setArquivoId] = React.useState(req.arquivo_id);
+  // Passaporte: o anexo é 1 por PESSOA (passageiro.passaporte_arquivo_id), não da instância.
+  const [arquivoId, setArquivoId] = React.useState(
+    req.tipo === "Passaporte" ? passageiro.passaporte_arquivo_id : req.arquivo_id,
+  );
   const [anexando, setAnexando] = React.useState(false);
   const [previewErro, setPreviewErro] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<string | null>(null);
@@ -419,9 +419,10 @@ function RequisitoDrawer({
   // Ingresso do trem = ida e volta → vários anexos, sem perguntas.
   const ehIngressoTrem = req.tipo === "Ingresso Trem Machu Picchu";
   const soAnexoMultiplo = ehIngressoTrem;
-  // "Só anexo" = sem perguntas, só o arquivo (único): Documento Pessoal, Passaporte,
-  // Ingresso Machu Picchu (no Passaporte a validade vem dos dados cadastrados).
-  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Passaporte" || req.tipo === "Ingresso Machu Picchu";
+  // "Só anexo" = sem perguntas, só o arquivo (único): Passaporte, Ingresso Machu Picchu
+  // (no Passaporte a validade vem dos dados cadastrados; o anexo é 1 por pessoa).
+  const ehPassaporte = req.tipo === "Passaporte";
+  const soAnexo = ehPassaporte || req.tipo === "Ingresso Machu Picchu";
   // Perguntas Sim/Não.
   const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
   const [comprado, setComprado] = React.useState<boolean | null>(
@@ -451,7 +452,9 @@ function RequisitoDrawer({
       setAnexando(false);
       return;
     }
-    const r = await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", json.id);
+    const r = ehPassaporte
+      ? await atualizarAnexoPassaporte(passageiro.id, json.id)
+      : await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", json.id);
     setAnexando(false);
     if (!r.ok) {
       toast.error("Erro ao vincular o anexo", { description: r.error });
@@ -464,7 +467,9 @@ function RequisitoDrawer({
   }
 
   async function removerAnexo() {
-    const r = await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", null);
+    const r = ehPassaporte
+      ? await atualizarAnexoPassaporte(passageiro.id, null)
+      : await atualizarRequisitoCampo(req.id, expedicaoId, "arquivo_id", null);
     if (!r.ok) {
       toast.error("Erro ao remover o anexo", { description: r.error });
       return;

@@ -46,7 +46,6 @@ export type TipoRequisito =
   | "Autorização de Menor"
   | "Pagamento"
   | "Dados Pessoais"
-  | "Documento Pessoal"
   | "Ingresso Machu Picchu"
   | "Ingresso Trem Machu Picchu";
 export type Obrigatoriedade = "Obrigatório" | "Condicional" | "Recomendado";
@@ -132,6 +131,8 @@ export type PassageiroRow = {
   passaporte: string | null;
   data_nascimento: string | null;
   validade_passaporte: string | null;
+  /** Arquivo do passaporte (foto/PDF) — 1 por PESSOA, propaga entre expedições. Migration 0026. */
+  passaporte_arquivo_id: string | null;
   email: string | null;
   telefone: string | null;
   status_reserva: StatusReserva;

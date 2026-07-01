@@ -210,24 +210,22 @@ de processos do P8 (catálogo + instâncias + status):
 - **Financeiro:** `passageiros` ganhou `valor_contratado_brl`, `valor_pago_brl`,
   `saldo_brl` (gerado) e `status_financeiro` — espelhados do Bitrix via n8n.
   Mais campos de embarque: contato de emergência, restrições, contrato, check-in.
-- **Passaporte (híbrido):** o item "Passaporte" exige **validade** (campo
-  `validade_passaporte` ≥ 6 meses após o retorno) **E** um **anexo foto/PDF**
-  (instância `arquivo_id`) — só fica Apto com os dois. Saiu de `REQUISITOS_DE_COLUNA`
-  (virou instância p/ guardar o arquivo) e tem ramo próprio em `avaliarProntidao`
-  (combina os dois no pior caso, helper `piorSemaforo`). Está em
-  `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador (modo `soAnexo`).
-  Backfill: migration `0023_passaporte_anexo.sql` (sem ALTER TYPE — o enum já tinha
-  o valor). Novos pax recebem a instância automaticamente.
+- **Passaporte (híbrido):** o item "Passaporte" exige **validade** (`validade_passaporte`
+  ≥ 6 meses após o retorno) **E** um **anexo foto/PDF** — só fica Apto com os dois
+  (ramo próprio em `avaliarProntidao`, `piorSemaforo`). O **anexo é 1 por PESSOA**:
+  `passageiros.passaporte_arquivo_id` (CAMPO_PESSOAL → propaga entre todas as expedições
+  da pessoa; migration `0026`). O drawer (modo `soAnexo`) grava via `atualizarAnexoPassaporte`
+  (não na instância). O **item "Documento Pessoal" foi REMOVIDO** (migration `0026` apaga
+  instâncias + arquivos "Documento Pessoal — prontidão"; enum mantém o valor, inofensivo).
 - **Ingressos Machu Picchu (só Peru):** requisitos "Ingresso Machu Picchu" (1 anexo) e
   "Ingresso Trem Machu Picchu" (vários anexos — ida e volta) só entram no template de
   Peru; OPCIONAIS e só-anexo (conjunto `ANEXO_OPCIONAL` em `regras.ts`; clicáveis mesmo
   com semáforo "na"). Categoria de arquivo "Bilhetes". Migration `0025` só faz
   `ALTER TYPE tipo_requisito ADD VALUE` (sem backfill).
-- **Anexos OPCIONAIS:** o anexo do **Documento Pessoal** é opcional (anexado/Dispensado
-  = ok; reprovado = atenção; sem anexo = neutro "na" — não bloqueia). O **Contrato**
-  também é opcional (assinado = ok; senão "na"). Ambos têm ramo próprio em
-  `avaliarProntidao` (Documento Pessoal) / `checarContrato`. Documento Pessoal segue
-  em `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador.
+- **Anexos OPCIONAIS:** o **Contrato** é opcional (assinado = ok; senão "na", não
+  bloqueia — `checarContrato`). Os **Ingressos Machu Picchu** também (conjunto
+  `ANEXO_OPCIONAL`). Ficam em `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar
+  o anexador.
 - **Semáforo:** `vw_prontidao_passageiro` (SQL) e `lib/prontidao/regras.ts` (TS, usado
   no mock) implementam a MESMA lógica → `Apto` / `Atenção` / `Bloqueado`.
   Regras: passaporte válido ≥ 6m após retorno (`MESES_VALIDADE_PASSAPORTE_PADRAO`),

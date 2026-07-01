@@ -51,11 +51,11 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
  * instância em passageiro_requisitos.
  */
 export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
-  // Documento Pessoal, Passaporte e os Ingressos têm ramos PRÓPRIOS em avaliarProntidao
-  // (não caem no caminho genérico abaixo). Ficam neste conjunto só para o drawer
-  // (ProntidaoPaxDrawer) renderizar o anexador. OBS: Documento Pessoal e os Ingressos
-  // são OPCIONAIS (não bloqueiam); o do Passaporte é obrigatório (validade + anexo).
-  "Documento Pessoal",
+  // Passaporte e os Ingressos têm ramos PRÓPRIOS em avaliarProntidao (não caem no
+  // caminho genérico abaixo). Ficam neste conjunto só para o drawer (ProntidaoPaxDrawer)
+  // renderizar o anexador. OBS: os Ingressos são OPCIONAIS (não bloqueiam); o do
+  // Passaporte é obrigatório (validade + anexo, agora 1 por pessoa via
+  // passageiros.passaporte_arquivo_id).
   "Passaporte",
   "Ingresso Machu Picchu",
   "Ingresso Trem Machu Picchu",
@@ -72,7 +72,6 @@ export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new 
  * avaliarProntidao e sempre clicáveis no drawer (pra poder criar a instância e anexar).
  */
 export const ANEXO_OPCIONAL: ReadonlySet<TipoRequisito> = new Set([
-  "Documento Pessoal",
   "Ingresso Machu Picchu",
   "Ingresso Trem Machu Picchu",
 ]);
@@ -264,7 +263,8 @@ export function avaliarProntidao(params: {
         requisito_id: porTipo.get(t.tipo)?.id ?? null,
       };
     }
-    // Passaporte: HÍBRIDO — validade (colunas) + anexo foto/PDF (instância).
+    // Passaporte: HÍBRIDO — validade (colunas) + anexo (foto/PDF). O anexo é 1 por
+    // PESSOA (passageiros.passaporte_arquivo_id, propaga entre as expedições dela).
     // Só fica Apto com passaporte válido E arquivo anexado. "Dispensado" libera ambos.
     if (t.tipo === "Passaporte") {
       const inst = porTipo.get("Passaporte");
@@ -277,16 +277,11 @@ export function avaliarProntidao(params: {
         };
       }
       const semValidade = checarPassaporte(passageiro, expedicao, bloqueia);
-      const reprovado = inst?.status === "Reprovado" || inst?.status === "Vencido";
-      const temArquivo = Boolean(inst?.arquivo_id) && !reprovado;
+      const temArquivo = Boolean(passageiro.passaporte_arquivo_id);
       const semAnexo: Semaforo = temArquivo ? "ok" : bloqueia ? "bloqueio" : "atencao";
       const semaforo = piorSemaforo(semValidade, semAnexo);
       const msgValidade = detalheColuna("Passaporte", passageiro, semValidade);
-      const msgAnexo = temArquivo
-        ? "documento anexado"
-        : reprovado
-          ? "documento reprovado — reenviar"
-          : "falta anexar o passaporte";
+      const msgAnexo = temArquivo ? "documento anexado" : "falta anexar o passaporte";
       return {
         tipo: t.tipo, descricao: t.descricao, obrigatoriedade: t.obrigatoriedade,
         bloqueia_embarque: bloqueia, semaforo,
@@ -294,7 +289,7 @@ export function avaliarProntidao(params: {
         requisito_id: inst?.id ?? null,
       };
     }
-    // Anexo OPCIONAL (Documento Pessoal, Ingressos): não bloqueia nem alarma se faltar.
+    // Anexo OPCIONAL (Ingressos Machu Picchu): não bloqueia nem alarma se faltar.
     // Anexado/Dispensado = ok; reprovado = atenção; sem anexo = neutro ("na").
     if (ANEXO_OPCIONAL.has(t.tipo)) {
       const inst = porTipo.get(t.tipo);

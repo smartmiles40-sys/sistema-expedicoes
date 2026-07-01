@@ -280,6 +280,7 @@ const CAMPOS_PESSOAIS = [
   "cpf",
   "passaporte",
   "validade_passaporte",
+  "passaporte_arquivo_id",
   "data_nascimento",
   "email",
   "telefone",
@@ -345,6 +346,23 @@ function revalidarPessoa(expedicaoIds: string[]) {
   // Avisos/prontidão derivam dos dados do passageiro (ex.: validade do
   // passaporte) — revalidar pra o aviso sumir/atualizar na hora.
   revalidatePath("/avisos");
+}
+
+/**
+ * Anexo do PASSAPORTE = 1 por PESSOA. Grava `passaporte_arquivo_id` e propaga para
+ * todas as expedições da pessoa (é um CAMPO_PESSOAL). Usado pela prontidão.
+ */
+export async function atualizarAnexoPassaporte(
+  passageiroId: string,
+  arquivoId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const afetados = await propagarDadosPessoais(passageiroId, { passaporte_arquivo_id: arquivoId });
+    revalidarPessoa(afetados);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Falha ao salvar o anexo" };
+  }
 }
 
 export async function atualizarPassageiroLote(
@@ -560,6 +578,7 @@ export async function criarPassageiro(
       conexao_viagem_id: null,
       bitrix_contact_id: null,
       bitrix_deal_id: null,
+      passaporte_arquivo_id: null,
       voo_nacional_necessario: false,
       companhia_aerea: null,
       localizador: null,
@@ -661,6 +680,7 @@ export async function criarPassageiroAvulso(
       conexao_viagem_id: null,
       bitrix_contact_id: null,
       bitrix_deal_id: null,
+      passaporte_arquivo_id: null,
       voo_nacional_necessario: false,
       companhia_aerea: null,
       localizador: null,
@@ -2208,6 +2228,7 @@ function novoPassageiroDeImport(
     passaporte: d.passaporte ?? null,
     data_nascimento: d.data_nascimento ?? null,
     validade_passaporte: d.validade_passaporte ?? null,
+    passaporte_arquivo_id: null,
     email: d.email ?? null,
     telefone: d.telefone ?? null,
     status_reserva: d.status_reserva,

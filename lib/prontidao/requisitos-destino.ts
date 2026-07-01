@@ -35,7 +35,6 @@ const P = MESES_VALIDADE_PASSAPORTE_PADRAO;
 const BASE_INTERNACIONAL: RequisitoDestinoTemplate[] = [
   { tipo: "Passaporte", descricao: `Passaporte válido (≥ ${P} meses após o retorno) + foto/PDF anexado`, obrigatoriedade: "Obrigatório", bloqueia_embarque: true, meses_validade_minima: P, papel_responsavel: "operacional" },
   { tipo: "Dados Pessoais", descricao: "Cadastro completo (CPF, nascimento, contato)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
-  { tipo: "Documento Pessoal", descricao: "Foto do documento pessoal (RG, CNH ou passaporte)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
   { tipo: "Contrato", descricao: "Contrato assinado", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
   { tipo: "Seguro", descricao: "Seguro viagem emitido cobrindo todo o período", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
   { tipo: "Aéreo Internacional", descricao: "Bilhete internacional emitido (localizador)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
