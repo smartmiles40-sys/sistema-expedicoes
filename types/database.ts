@@ -46,7 +46,9 @@ export type TipoRequisito =
   | "Autorização de Menor"
   | "Pagamento"
   | "Dados Pessoais"
-  | "Documento Pessoal";
+  | "Documento Pessoal"
+  | "Ingresso Machu Picchu"
+  | "Ingresso Trem Machu Picchu";
 export type Obrigatoriedade = "Obrigatório" | "Condicional" | "Recomendado";
 export type StatusRequisito =
   | "Pendente"

@@ -16,7 +16,7 @@ import { Drive } from "@/components/arquivos/Drive";
 import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia } from "@/app/(app)/expedicoes/actions";
-import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, type Semaforo } from "@/lib/prontidao/regras";
+import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, ANEXO_OPCIONAL, type Semaforo } from "@/lib/prontidao/regras";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type {
   PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables,
@@ -52,6 +52,16 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
     categoria: "Documentos pessoais",
     label: "Anexar foto/PDF do passaporte",
     dica: "Foto ou PDF do passaporte. A validade continua sendo checada pelos dados cadastrados.",
+  },
+  "Ingresso Machu Picchu": {
+    categoria: "Bilhetes",
+    label: "Anexar ingresso de Machu Picchu",
+    dica: "Opcional — anexe o ingresso (imagem ou PDF).",
+  },
+  "Ingresso Trem Machu Picchu": {
+    categoria: "Bilhetes",
+    label: "Anexar ingressos do trem (ida e volta)",
+    dica: "Opcional — anexe os dois trechos (ida e volta).",
   },
   "Aéreo Internacional": {
     categoria: "Aéreos",
@@ -220,8 +230,9 @@ export function ProntidaoConteudo({
           const ehContrato = c.tipo === "Contrato";
           const ehColuna = REQUISITOS_DE_COLUNA.has(c.tipo);
           // Requisito de instância que ainda não foi criado (e não é coluna nem
-          // dispensado/N-A): clicar cria a instância e abre pra editar.
-          const podeCriar = !req && !ehContrato && !ehColuna && c.semaforo !== "na";
+          // dispensado/N-A): clicar cria a instância e abre pra editar. Os de anexo
+          // opcional (semáforo "na") também são clicáveis, pra poder anexar.
+          const podeCriar = !req && !ehContrato && !ehColuna && (c.semaforo !== "na" || ANEXO_OPCIONAL.has(c.tipo));
           const clicavel = Boolean(req) || ehContrato || podeCriar;
           return (
             <li key={c.tipo}>
@@ -405,9 +416,12 @@ function RequisitoDrawer({
   const mostraComprado = ehAereo;
   // Questionário (perguntas Sim/Não + anexo): aéreos, vacina e seguro.
   const ehQuestionario = ehAereo || ehVacina || ehSeguro;
-  // "Só anexo" = sem perguntas, só o arquivo: Documento Pessoal e Passaporte
-  // (no Passaporte a validade é checada pelos dados cadastrados, não aqui).
-  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Passaporte";
+  // Ingresso do trem = ida e volta → vários anexos, sem perguntas.
+  const ehIngressoTrem = req.tipo === "Ingresso Trem Machu Picchu";
+  const soAnexoMultiplo = ehIngressoTrem;
+  // "Só anexo" = sem perguntas, só o arquivo (único): Documento Pessoal, Passaporte,
+  // Ingresso Machu Picchu (no Passaporte a validade vem dos dados cadastrados).
+  const soAnexo = req.tipo === "Documento Pessoal" || req.tipo === "Passaporte" || req.tipo === "Ingresso Machu Picchu";
   // Perguntas Sim/Não.
   const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
   const [comprado, setComprado] = React.useState<boolean | null>(
@@ -465,9 +479,9 @@ function RequisitoDrawer({
     (a) =>
       a.passageiro_id === req.passageiro_id &&
       a.categoria === (anexoCfg?.categoria ?? "Outros") &&
-      // Internacional e doméstico dividem a categoria "Aéreos"; separa pela
-      // descrição (gravada como "<tipo> — prontidão" no upload).
-      (!ehAereo || (a.descricao ?? "").startsWith(req.tipo)),
+      // Tipos que dividem a mesma categoria (aéreos em "Aéreos"; ingressos em
+      // "Bilhetes") se separam pela descrição (gravada como "<tipo> — prontidão").
+      (!(ehAereo || ehIngressoTrem) || (a.descricao ?? "").startsWith(req.tipo)),
   );
 
   async function anexarMultiplos(files: FileList) {
@@ -723,6 +737,8 @@ function RequisitoDrawer({
                 </>
               )}
             </>
+          ) : soAnexoMultiplo ? (
+            anexoMultiplo
           ) : soAnexo ? (
             anexoBlock
           ) : (

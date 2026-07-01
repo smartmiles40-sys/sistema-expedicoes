@@ -218,6 +218,11 @@ de processos do P8 (catálogo + instâncias + status):
   `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar o anexador (modo `soAnexo`).
   Backfill: migration `0023_passaporte_anexo.sql` (sem ALTER TYPE — o enum já tinha
   o valor). Novos pax recebem a instância automaticamente.
+- **Ingressos Machu Picchu (só Peru):** requisitos "Ingresso Machu Picchu" (1 anexo) e
+  "Ingresso Trem Machu Picchu" (vários anexos — ida e volta) só entram no template de
+  Peru; OPCIONAIS e só-anexo (conjunto `ANEXO_OPCIONAL` em `regras.ts`; clicáveis mesmo
+  com semáforo "na"). Categoria de arquivo "Bilhetes". Migration `0025` só faz
+  `ALTER TYPE tipo_requisito ADD VALUE` (sem backfill).
 - **Anexos OPCIONAIS:** o anexo do **Documento Pessoal** é opcional (anexado/Dispensado
   = ok; reprovado = atenção; sem anexo = neutro "na" — não bloqueia). O **Contrato**
   também é opcional (assinado = ok; senão "na"). Ambos têm ramo próprio em

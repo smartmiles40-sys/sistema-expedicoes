@@ -174,6 +174,8 @@ export const TIPO_REQUISITO = [
   "Pagamento",
   "Dados Pessoais",
   "Documento Pessoal",
+  "Ingresso Machu Picchu",
+  "Ingresso Trem Machu Picchu",
 ] as const;
 export type TipoRequisito = (typeof TIPO_REQUISITO)[number];
 

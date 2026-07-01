@@ -51,17 +51,30 @@ export const DISPENSAVEIS_LIDER: ReadonlySet<TipoRequisito> = new Set([
  * instância em passageiro_requisitos.
  */
 export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new Set([
-  // Documento Pessoal e Passaporte têm ramos PRÓPRIOS em avaliarProntidao (não caem
-  // no caminho genérico abaixo). Ficam neste conjunto só para o drawer
-  // (ProntidaoPaxDrawer) renderizar o anexador. OBS: o anexo do Documento Pessoal é
-  // OPCIONAL (não bloqueia); o do Passaporte é obrigatório (validade + anexo).
+  // Documento Pessoal, Passaporte e os Ingressos têm ramos PRÓPRIOS em avaliarProntidao
+  // (não caem no caminho genérico abaixo). Ficam neste conjunto só para o drawer
+  // (ProntidaoPaxDrawer) renderizar o anexador. OBS: Documento Pessoal e os Ingressos
+  // são OPCIONAIS (não bloqueiam); o do Passaporte é obrigatório (validade + anexo).
   "Documento Pessoal",
   "Passaporte",
+  "Ingresso Machu Picchu",
+  "Ingresso Trem Machu Picchu",
   "Aéreo Internacional",
   "Aéreo Doméstico",
   "Voo Interno",
   "Seguro",
   "Vacina",
+]);
+
+/**
+ * Requisitos de ANEXO OPCIONAL: não bloqueiam nem alarmam. Anexado/Dispensado = ok,
+ * reprovado = atenção, sem anexo = neutro ("na"). Tratados num ramo próprio em
+ * avaliarProntidao e sempre clicáveis no drawer (pra poder criar a instância e anexar).
+ */
+export const ANEXO_OPCIONAL: ReadonlySet<TipoRequisito> = new Set([
+  "Documento Pessoal",
+  "Ingresso Machu Picchu",
+  "Ingresso Trem Machu Picchu",
 ]);
 
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
@@ -281,26 +294,26 @@ export function avaliarProntidao(params: {
         requisito_id: inst?.id ?? null,
       };
     }
-    // Documento Pessoal: anexo OPCIONAL — não bloqueia nem alarma se faltar.
+    // Anexo OPCIONAL (Documento Pessoal, Ingressos): não bloqueia nem alarma se faltar.
     // Anexado/Dispensado = ok; reprovado = atenção; sem anexo = neutro ("na").
-    if (t.tipo === "Documento Pessoal") {
-      const docInst = porTipo.get("Documento Pessoal");
+    if (ANEXO_OPCIONAL.has(t.tipo)) {
+      const inst = porTipo.get(t.tipo);
       let semaforo: Semaforo;
-      if (!docInst) semaforo = "na";
-      else if (docInst.status === "Dispensado") semaforo = "ok";
-      else if (docInst.status === "Reprovado") semaforo = "atencao";
-      else semaforo = docInst.arquivo_id ? "ok" : "na";
+      if (!inst) semaforo = "na";
+      else if (inst.status === "Dispensado") semaforo = "ok";
+      else if (inst.status === "Reprovado") semaforo = "atencao";
+      else semaforo = inst.arquivo_id ? "ok" : "na";
       return {
         tipo: t.tipo,
-        descricao: docInst?.descricao ?? t.descricao,
-        obrigatoriedade: docInst?.obrigatoriedade ?? t.obrigatoriedade,
+        descricao: inst?.descricao ?? t.descricao,
+        obrigatoriedade: inst?.obrigatoriedade ?? t.obrigatoriedade,
         bloqueia_embarque: false,
         semaforo,
         detalhe:
-          semaforo === "ok" ? "Documento anexado"
-            : semaforo === "atencao" ? "Documento reprovado — reenviar"
+          semaforo === "ok" ? "Anexado"
+            : semaforo === "atencao" ? "Reprovado — reenviar"
               : "Anexo opcional",
-        requisito_id: docInst?.id ?? null,
+        requisito_id: inst?.id ?? null,
       };
     }
     if (REQUISITOS_DE_COLUNA.has(t.tipo)) {

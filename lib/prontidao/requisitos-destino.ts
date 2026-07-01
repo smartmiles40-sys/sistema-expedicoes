@@ -77,6 +77,8 @@ export const REQUISITOS_POR_DESTINO: Record<string, RequisitoDestinoTemplate[]> 
     { ...VACINA_FEBRE_AMARELA, observacoes: "Recomendada para selva/Machu Picchu; conferir exigência." },
     VOO_DOMESTICO,
     VOO_INTERNO,
+    { tipo: "Ingresso Machu Picchu", descricao: "Ingresso de Machu Picchu (anexo)", obrigatoriedade: "Recomendado", bloqueia_embarque: false, papel_responsavel: "operacional" },
+    { tipo: "Ingresso Trem Machu Picchu", descricao: "Ingresso de trem para Machu Picchu — ida e volta (anexos)", obrigatoriedade: "Recomendado", bloqueia_embarque: false, papel_responsavel: "operacional" },
   ],
   // Argentina — Mercosul: RG ou passaporte; sem visto; sem vacina obrigatória.
   Argentina: [

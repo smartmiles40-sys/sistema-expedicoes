@@ -16,6 +16,8 @@ const BUCKET = "arquivos-expedicoes";
 const CATEGORIA_REQUISITO: Record<string, string> = {
   "Documento Pessoal": "Documentos pessoais",
   "Passaporte": "Documentos pessoais",
+  "Ingresso Machu Picchu": "Bilhetes",
+  "Ingresso Trem Machu Picchu": "Bilhetes",
   "Aéreo Internacional": "Aéreos",
   "Aéreo Doméstico": "Aéreos",
   "Voo Interno": "Aéreos",
