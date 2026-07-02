@@ -32,6 +32,7 @@ export default function LiderPage() {
   const [erro, setErro] = React.useState<string | null>(null);
   const [lightbox, setLightbox] = React.useState<string | null>(null);
   const [atualizando, setAtualizando] = React.useState(false);
+  const [passadasAbertas, setPassadasAbertas] = React.useState(false);
 
   // Recarrega os dados em silêncio (reflete o que a operação atualizou).
   const recarregar = React.useCallback(async () => {
@@ -179,11 +180,41 @@ export default function LiderPage() {
           <p className="py-12 text-center text-[13px] text-muted-foreground">
             Nenhuma expedição atribuída a você no momento.
           </p>
-        ) : (
-          dados.expedicoes.map((exp) => (
-            <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
-          ))
-        )}
+        ) : (() => {
+          const ativas = dados.expedicoes.filter((e) => e.status !== "Concluída");
+          const passadas = dados.expedicoes.filter((e) => e.status === "Concluída");
+          return (
+            <>
+              {ativas.map((exp) => (
+                <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
+              ))}
+              {passadas.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setPassadasAbertas((v) => !v)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-semibold">Expedições passadas</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {passadas.length} concluída{passadas.length === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", passadasAbertas && "rotate-90")} />
+                  </button>
+                  {passadasAbertas && (
+                    <div className="space-y-3 border-t border-border p-3">
+                      {passadas.map((exp) => (
+                        <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          );
+        })()}
         <p className="pb-6 text-center text-[11px] text-muted-foreground">
           Visualização apenas. Para qualquer alteração, fale com a equipe da agência.
         </p>
