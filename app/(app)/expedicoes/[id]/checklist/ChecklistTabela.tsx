@@ -631,10 +631,6 @@ function ChecklistGrafico({
   faseAtual: EtapaChecklist | null;
 }) {
   const router = useRouter();
-  const ordemFase = (e: string) => ETAPA_CHECKLIST.indexOf(e as EtapaChecklist);
-  const linhas = [...itens].sort(
-    (a, b) => ordemFase(a.etapa) - ordemFase(b.etapa) || (a.ordem ?? 0) - (b.ordem ?? 0),
-  );
 
   async function salvarStatus(id: string, status: string) {
     const r = await atualizarChecklistCampo(id, "status", status);
@@ -642,75 +638,100 @@ function ChecklistGrafico({
     return r;
   }
 
+  const tarefasDaFase = (fase: EtapaChecklist) =>
+    itens
+      .filter((i) => i.etapa === fase)
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || (a.prazo ?? "").localeCompare(b.prazo ?? ""));
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-background">
-      <div className="min-w-[760px]">
-        {/* Cabeçalho: fases (prazos) na horizontal */}
-        <div className="flex border-b-2 border-border bg-muted/40 text-[11px] font-semibold">
-          <div className="sticky left-0 z-10 w-52 shrink-0 border-r border-border bg-muted/40 px-3 py-2">
-            Tarefa
-          </div>
-          {ETAPA_CHECKLIST.map((fase) => (
-            <div
-              key={fase}
-              className={cn(
-                "flex-1 min-w-[116px] border-l border-border px-2 py-2 text-center",
-                fase === faseAtual && "bg-editavel-50 text-editavel-700",
-              )}
-            >
-              <div className="leading-tight">{fase}</div>
-              {fase === faseAtual && <div className="text-[9px] font-normal">fase atual</div>}
-            </div>
+    <div className="space-y-2">
+      {/* Instrução + legenda de cores (anti-burro) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">
+          Cada <strong className="text-foreground">coluna é um prazo</strong> (fase antes do embarque, da esquerda p/ a direita).
+          As <strong className="text-foreground">tarefas daquele prazo</strong> ficam abaixo. Clique no status pra mudar.
+        </p>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {STATUS_CHECKLIST.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_DOT[s])} /> {s}
+            </span>
           ))}
         </div>
+      </div>
 
-        {/* Linhas: uma por tarefa; marcador clicável na coluna da fase dela */}
-        {linhas.map((it) => {
-          const resp = it.responsavel_id ? usuariosById.get(it.responsavel_id) : null;
-          const dias = daysUntil(it.prazo);
-          const atrasada = it.status !== "Concluído" && dias != null && dias < 0;
-          return (
-            <div key={it.id} className="flex items-stretch border-b border-border last:border-b-0 hover:bg-accent/20">
-              <div className="sticky left-0 z-10 w-52 shrink-0 border-r border-border bg-background px-3 py-2">
-                <div className="line-clamp-2 text-[12px] font-medium leading-tight">{it.tarefa}</div>
-                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  {it.prazo && (
-                    <span className={cn(atrasada && "font-medium text-critico-600")}>
-                      {formatDate(it.prazo)}
-                    </span>
+      {/* Quadro: uma coluna por prazo (fase); tarefas empilhadas embaixo */}
+      <div className="overflow-x-auto pb-2">
+        <div className="flex gap-3">
+          {ETAPA_CHECKLIST.map((fase) => {
+            const tarefas = tarefasDaFase(fase);
+            const feitas = tarefas.filter((t) => t.status === "Concluído").length;
+            const atual = fase === faseAtual;
+            return (
+              <div
+                key={fase}
+                className={cn(
+                  "w-60 shrink-0 rounded-xl border bg-background",
+                  atual ? "border-editavel-500 ring-2 ring-editavel-500/30" : "border-border",
+                )}
+              >
+                <div className={cn("rounded-t-xl px-3 py-2", atual ? "bg-editavel-50" : "bg-muted/40")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold leading-tight">{fase}</span>
+                    {atual && (
+                      <span className="rounded-full bg-editavel-600 px-1.5 py-0.5 text-[9px] font-bold text-white">AGORA</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    {feitas}/{tarefas.length} concluída{tarefas.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <div className="min-h-[44px] space-y-1.5 p-2">
+                  {tarefas.length === 0 ? (
+                    <p className="py-2 text-center text-[10px] text-muted-foreground">Nada aqui</p>
+                  ) : (
+                    tarefas.map((it) => {
+                      const dias = daysUntil(it.prazo);
+                      const atrasada = it.status !== "Concluído" && dias != null && dias < 0;
+                      const resp = it.responsavel_id ? usuariosById.get(it.responsavel_id) : null;
+                      return (
+                        <div
+                          key={it.id}
+                          className={cn(
+                            "rounded-lg border bg-card p-2",
+                            atrasada ? "border-critico-500/50 bg-critico-50/40" : "border-border",
+                          )}
+                        >
+                          <div className="line-clamp-2 text-[12px] font-medium leading-tight">{it.tarefa}</div>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                              {it.prazo && (
+                                <span className={cn(atrasada && "font-medium text-critico-600")}>{formatDate(it.prazo)}</span>
+                              )}
+                              {resp && <Avatar nome={resp.nome} size={14} />}
+                            </span>
+                            <EditableSelectCell
+                              value={it.status}
+                              options={STATUS_OPTIONS}
+                              heading="Status"
+                              onSave={(v) => salvarStatus(it.id, v)}
+                              renderValue={(opt) => (
+                                <span className="inline-flex items-center gap-1">
+                                  <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_DOT[(opt?.value as StatusChecklist) ?? it.status])} />
+                                  <span className="text-[10px] font-medium">{opt?.label ?? it.status}</span>
+                                </span>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
-                  {resp && <Avatar nome={resp.nome} size={16} />}
                 </div>
               </div>
-              {ETAPA_CHECKLIST.map((fase) => (
-                <div
-                  key={fase}
-                  className={cn(
-                    "flex flex-1 min-w-[116px] items-center justify-center border-l border-border px-1 py-2",
-                    fase === faseAtual && "bg-editavel-50/40",
-                  )}
-                >
-                  {it.etapa === fase ? (
-                    <EditableSelectCell
-                      value={it.status}
-                      options={STATUS_OPTIONS}
-                      heading="Status"
-                      onSave={(v) => salvarStatus(it.id, v)}
-                      renderValue={(opt) => (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className={cn("h-3 w-3 rounded-full", STATUS_DOT[(opt?.value as StatusChecklist) ?? it.status])} />
-                          <span className="text-[11px] font-medium">{opt?.label ?? it.status}</span>
-                        </span>
-                      )}
-                    />
-                  ) : (
-                    <span className="h-px w-full bg-border/40" />
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
