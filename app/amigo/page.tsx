@@ -349,6 +349,36 @@ function ViagemCard({ exp, nome }: { exp: AmigoExpedicao; nome: string }) {
           </div>
         </Bloco>
 
+        {/* Ingressos de Machu Picchu (só os do próprio passageiro) */}
+        {(exp.destino === "Peru" || exp.ingressos_mp.length > 0 || exp.ingressos_trem.length > 0) && (
+          <Bloco icone={<Ticket className="h-4 w-4" />} titulo="Ingressos de Machu Picchu">
+            {exp.ingressos_mp.length > 0 || exp.ingressos_trem.length > 0 ? (
+              <div className="space-y-3">
+                {exp.ingressos_mp.length > 0 && (
+                  <div>
+                    <SubTitulo icone={<Ticket className="h-3.5 w-3.5" />}>Entrada Machu Picchu</SubTitulo>
+                    <div className="flex flex-wrap gap-2">
+                      {exp.ingressos_mp.map((ing, i) => <IngressoLink key={i} ing={ing} />)}
+                    </div>
+                  </div>
+                )}
+                {exp.ingressos_trem.length > 0 && (
+                  <div>
+                    <SubTitulo icone={<Ticket className="h-3.5 w-3.5" />}>Trem (ida e volta)</SubTitulo>
+                    <div className="flex flex-wrap gap-2">
+                      {exp.ingressos_trem.map((ing, i) => <IngressoLink key={i} ing={ing} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">
+                Seus ingressos de Machu Picchu (entrada e trem) ficam disponíveis aqui quando forem emitidos.
+              </p>
+            )}
+          </Bloco>
+        )}
+
         {/* Links úteis */}
         {exp.links.length > 0 && (
           <Bloco icone={<LinkIcon className="h-4 w-4" />} titulo="Links úteis">
@@ -475,6 +505,20 @@ function VoucherLink({ url }: { url: string }) {
       className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-editavel-700 hover:bg-accent"
     >
       <Download className="h-3 w-3" /> Baixar voucher
+    </a>
+  );
+}
+
+function IngressoLink({ ing }: { ing: { nome: string; url: string } }) {
+  return (
+    <a
+      href={ing.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-editavel-700 hover:bg-accent"
+    >
+      <Download className="h-3 w-3 shrink-0" />
+      <span className="max-w-[180px] truncate" title={ing.nome}>{ing.nome}</span>
     </a>
   );
 }

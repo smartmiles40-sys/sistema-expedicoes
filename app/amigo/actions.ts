@@ -7,12 +7,16 @@ import {
   mockRoteiroDiaFotos, mockExpedicaoAvisos,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
+import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
   RoteiroDiaFotoRow, ExpedicaoAvisoRow,
 } from "@/types/database";
+
+/** Arquivo de ingresso (Bilhetes) do passageiro — só os campos que o portal usa. */
+type IngressoArq = { id: string; nome: string; passageiro_id: string | null; descricao: string | null };
 
 const BUCKET = "arquivos-expedicoes";
 
@@ -70,6 +74,7 @@ export type AmigoPasseio = {
   voucher_url: string | null;
 };
 export type AmigoInfo = { titulo: string; conteudo: string };
+export type AmigoIngresso = { nome: string; url: string };
 
 export type AmigoExpedicao = {
   id: string;
@@ -86,6 +91,9 @@ export type AmigoExpedicao = {
   passeios: AmigoPasseio[];
   info: AmigoInfo[];
   avisos: AmigoAviso[];
+  /** Ingressos do próprio passageiro (só os dele) — Peru. */
+  ingressos_mp: AmigoIngresso[];
+  ingressos_trem: AmigoIngresso[];
 };
 export type AmigoDados = {
   nome: string;
@@ -179,8 +187,24 @@ export async function entrarExpedAmigo(
   const expById = new Map(exps.map((e) => [e.id, e]));
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
 
-  // Resolve as URLs dos arquivos (fotos do roteiro + vouchers de voo/passeio) das
-  // expedições futuras da pessoa: signed URL (prod) ou rota de download do mock (dev).
+  // Ingressos (categoria "Bilhetes") das linhas da PRÓPRIA pessoa — só os dela.
+  const meusIds = minhasRows.map((r) => r.id);
+  let ingressoArqs: IngressoArq[] = [];
+  if (DEV_USE_MOCK_DATA) {
+    ingressoArqs = (await listArquivosMock())
+      .filter((a) => a.categoria === "Bilhetes" && a.passageiro_id && meusIds.includes(a.passageiro_id))
+      .map((a) => ({ id: a.id, nome: a.nome, passageiro_id: a.passageiro_id, descricao: a.descricao }));
+  } else if (sb && meusIds.length > 0) {
+    const { data } = await sb
+      .from("arquivos")
+      .select("id,nome,passageiro_id,descricao")
+      .eq("categoria", "Bilhetes")
+      .in("passageiro_id", meusIds);
+    ingressoArqs = (data ?? []) as IngressoArq[];
+  }
+
+  // Resolve as URLs dos arquivos (fotos do roteiro + vouchers de voo/passeio + ingressos)
+  // das expedições futuras da pessoa: signed URL (prod) ou rota de download do mock (dev).
   const fotoUrl = new Map<string, string>(); // arquivo_id -> url
   {
     const expIdsFuturas = new Set<string>();
@@ -194,6 +218,7 @@ export async function entrarExpedAmigo(
     for (const f of rtFotos) if (expIdsFuturas.has(f.expedicao_id)) idsRelevantes.add(f.arquivo_id);
     for (const v of voosGrupo) if (v.arquivo_id && expIdsFuturas.has(v.expedicao_id)) idsRelevantes.add(v.arquivo_id);
     for (const p of passeios) if (p.arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.arquivo_id);
+    for (const a of ingressoArqs) idsRelevantes.add(a.id);
 
     if (DEV_USE_MOCK_DATA) {
       for (const id of idsRelevantes) fotoUrl.set(id, `/api/arquivos/${id}/download?inline=1`);
@@ -285,6 +310,14 @@ export async function entrarExpedAmigo(
         .filter((a) => a.expedicao_id === e.id)
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((a) => ({ tipo: a.tipo, titulo: a.titulo, conteudo: a.conteudo })),
+      ingressos_mp: ingressoArqs
+        .filter((a) => a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Machu Picchu"))
+        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
+      ingressos_trem: ingressoArqs
+        .filter((a) => a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
+        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
     });
   }
 
