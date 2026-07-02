@@ -5,7 +5,7 @@ import { Compass, Upload, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, mascaraTelefone } from "@/lib/utils";
 import { mascaraCpf } from "@/lib/cpf";
 import { SaudeCampos } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import type { SaudePassageiro } from "@/types/database";
@@ -179,7 +179,14 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
             </Campo>
             <Campo label="Data de nascimento"><Input type="date" value={f.data_nascimento} onChange={set("data_nascimento")} /></Campo>
             <Campo label="E-mail"><Input type="email" value={f.email} onChange={set("email")} /></Campo>
-            <Campo label="Telefone / WhatsApp"><Input value={f.telefone} onChange={set("telefone")} inputMode="tel" /></Campo>
+            <Campo label="Telefone / WhatsApp">
+              <Input
+                value={f.telefone}
+                onChange={(e) => setF((p) => ({ ...p, telefone: mascaraTelefone(e.target.value) }))}
+                inputMode="tel"
+                placeholder="(00) 00000-0000"
+              />
+            </Campo>
           </div>
         </Secao>
 
@@ -225,7 +232,14 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         <Secao titulo="Contato de emergência">
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Nome"><Input value={f.contato_emergencia_nome} onChange={set("contato_emergencia_nome")} /></Campo>
-            <Campo label="Telefone"><Input value={f.contato_emergencia_fone} onChange={set("contato_emergencia_fone")} inputMode="tel" /></Campo>
+            <Campo label="Telefone">
+              <Input
+                value={f.contato_emergencia_fone}
+                onChange={(e) => setF((p) => ({ ...p, contato_emergencia_fone: mascaraTelefone(e.target.value) }))}
+                inputMode="tel"
+                placeholder="(00) 00000-0000"
+              />
+            </Campo>
           </div>
           <Campo label="Vínculo com você">
             <Input value={f.contato_emergencia_vinculo} onChange={set("contato_emergencia_vinculo")} placeholder="Ex.: mãe, pai, irmão, cônjuge, amigo(a)…" />

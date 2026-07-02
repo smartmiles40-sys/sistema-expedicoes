@@ -45,6 +45,17 @@ export function formatDateTime(date: string | Date | null | undefined): string {
   return formatDate(date, "dd/MM/yyyy HH:mm");
 }
 
+/** Máscara PROGRESSIVA de telefone BR: (XX) XXXXX-XXXX (celular) ou (XX) XXXX-XXXX (fixo). */
+export function mascaraTelefone(valor: string): string {
+  const d = (valor ?? "").replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : "";
+  const ddd = d.slice(0, 2);
+  const resto = d.slice(2);
+  if (resto.length <= 4) return `(${ddd}) ${resto}`;
+  const corte = d.length > 10 ? 5 : 4; // 11 díg = celular (5-4); 10 díg = fixo (4-4)
+  return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`;
+}
+
 export function relativeDate(date: string | Date | null | undefined): string {
   if (!date) return "—";
   const d = typeof date === "string" ? parseISO(date) : date;

@@ -23,6 +23,7 @@ import {
   desalocarPassageiro,
   desfazerConexao,
   alocarConexaoNoQuarto,
+  conectarPassageiros,
 } from "@/app/(app)/expedicoes/actions";
 import { CAPACIDADE_QUARTO } from "@/lib/constants";
 import { formatDate, cn } from "@/lib/utils";
@@ -50,6 +51,11 @@ const CORES_CONEXAO = ["#2563eb", "#16a34a", "#db2777", "#d97706", "#7c3aed", "#
 /** Chave do hotel/trecho: mesmo hotel/cidade + mesmas datas de check-in/out. */
 function trechoKey(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
   return `${q.hotel_cidade ?? ""}|${q.check_in ?? ""}|${q.check_out ?? ""}`;
+}
+
+/** Normaliza nome pra casar acompanhante (minúsculas, sem acento, espaços colapsados). */
+function normalizarNome(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 }
 
 type Trecho = {
@@ -118,6 +124,34 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     }
     return m;
   }, [conexoes]);
+
+  // Acompanhantes indicados na inscrição: tenta casar o nome com um pax da expedição.
+  const acompanhantes = React.useMemo(() => {
+    return paxAtivos
+      .filter((p) => (p.acompanhante_nome ?? "").trim())
+      .map((p) => {
+        const alvo = normalizarNome(p.acompanhante_nome!);
+        const candidatos = paxAtivos.filter((o) => {
+          if (o.id === p.id) return false;
+          const n = normalizarNome(o.nome_completo);
+          return n === alvo || n.includes(alvo) || alvo.includes(n);
+        });
+        const candidato = candidatos.length === 1 ? candidatos[0] : null;
+        const jaConectados =
+          !!candidato && !!p.conexao_viagem_id && p.conexao_viagem_id === candidato.conexao_viagem_id;
+        return { pax: p, candidato, varios: candidatos.length > 1, jaConectados };
+      });
+  }, [paxAtivos]);
+
+  async function vincularAcompanhante(paxId: string, candidatoId: string) {
+    const r = await conectarPassageiros(expedicaoId, [paxId, candidatoId]);
+    if (r.ok) {
+      toast.success("Vinculados como 'viajam juntas'");
+      router.refresh();
+    } else {
+      toast.error("Não foi possível vincular", { description: r.error });
+    }
+  }
 
   // paxId -> ids de TODOS os membros da conexão (inclui ele). Vazio se sem conexão.
   // Usado para mover/remover a conexão como um bloco (não pode ficar separada).
@@ -515,6 +549,42 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
             )}
           </div>
         </section>
+
+        {/* Acompanhantes indicados na inscrição (sugestão de conexão) */}
+        {acompanhantes.length > 0 && (
+          <section className="rounded-md border border-border">
+            <header className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+              <BedDouble className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-[13px] font-semibold">Acompanhantes indicados</span>
+              <span className="text-[11px] text-muted-foreground">informado na inscrição</span>
+            </header>
+            <div className="space-y-1.5 p-3">
+              {acompanhantes.map(({ pax, candidato, varios, jaConectados }) => (
+                <div key={pax.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5">
+                  <span className="text-[12px]">
+                    <strong>{pax.nome_completo.split(" ")[0]}</strong> quer viajar com <strong>{pax.acompanhante_nome}</strong>
+                  </span>
+                  {pax.acompanhante_divide_quarto && <Badge variant="lista">{pax.acompanhante_divide_quarto}</Badge>}
+                  <span className="flex-1" />
+                  {jaConectados ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-vinculado-600"><CheckCircle2 className="h-3 w-3" /> vinculados</span>
+                  ) : candidato ? (
+                    <>
+                      <span className="text-[11px] text-muted-foreground">→ {candidato.nome_completo}</span>
+                      <Button variant="outline" size="sm" onClick={() => vincularAcompanhante(pax.id, candidato.id)}>
+                        <Link2 className="h-3 w-3" /> Vincular
+                      </Button>
+                    </>
+                  ) : varios ? (
+                    <span className="text-[11px] text-atencao-600">vários possíveis — use &quot;Nova conexão&quot;</span>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">ainda não está na expedição</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {trechos.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/20">
