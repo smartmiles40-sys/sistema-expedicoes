@@ -32,7 +32,14 @@ export default function LiderPage() {
   const [erro, setErro] = React.useState<string | null>(null);
   const [lightbox, setLightbox] = React.useState<string | null>(null);
   const [atualizando, setAtualizando] = React.useState(false);
-  const [passadasAbertas, setPassadasAbertas] = React.useState(false);
+  // Grupos recolhíveis abertos (chave = "passadas" ou o ano, ex.: "2027").
+  const [gruposAbertos, setGruposAbertos] = React.useState<Set<string>>(new Set());
+  const toggleGrupo = (k: string) =>
+    setGruposAbertos((s) => {
+      const n = new Set(s);
+      if (n.has(k)) n.delete(k); else n.add(k);
+      return n;
+    });
 
   // Recarrega os dados em silêncio (reflete o que a operação atualizou).
   const recarregar = React.useCallback(async () => {
@@ -181,36 +188,39 @@ export default function LiderPage() {
             Nenhuma expedição atribuída a você no momento.
           </p>
         ) : (() => {
-          const ativas = dados.expedicoes.filter((e) => e.status !== "Concluída");
-          const passadas = dados.expedicoes.filter((e) => e.status === "Concluída");
+          const anoAtual = new Date().getFullYear();
+          const anoDe = (e: LiderExpedicao) =>
+            e.data_embarque ? new Date(e.data_embarque).getFullYear() : anoAtual;
+          const concluidas = dados.expedicoes.filter((e) => e.status === "Concluída");
+          const naoConcluidas = dados.expedicoes.filter((e) => e.status !== "Concluída");
+          const atuais = naoConcluidas.filter((e) => anoDe(e) <= anoAtual);
+          const futuras = naoConcluidas.filter((e) => anoDe(e) > anoAtual);
+          const anosFuturos = [...new Set(futuras.map(anoDe))].sort((a, b) => a - b);
+          const renderCards = (lista: LiderExpedicao[]) =>
+            lista.map((exp) => <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />);
           return (
             <>
-              {ativas.map((exp) => (
-                <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
+              {renderCards(atuais)}
+              {anosFuturos.map((ano) => (
+                <GrupoBox
+                  key={ano}
+                  titulo={`Expedições de ${ano}`}
+                  quantidade={futuras.filter((e) => anoDe(e) === ano).length}
+                  aberto={gruposAbertos.has(String(ano))}
+                  onToggle={() => toggleGrupo(String(ano))}
+                >
+                  {renderCards(futuras.filter((e) => anoDe(e) === ano))}
+                </GrupoBox>
               ))}
-              {passadas.length > 0 && (
-                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setPassadasAbertas((v) => !v)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-left"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[14px] font-semibold">Expedições passadas</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {passadas.length} concluída{passadas.length === 1 ? "" : "s"}
-                      </div>
-                    </div>
-                    <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", passadasAbertas && "rotate-90")} />
-                  </button>
-                  {passadasAbertas && (
-                    <div className="space-y-3 border-t border-border p-3">
-                      {passadas.map((exp) => (
-                        <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {concluidas.length > 0 && (
+                <GrupoBox
+                  titulo="Expedições passadas"
+                  quantidade={concluidas.length}
+                  aberto={gruposAbertos.has("passadas")}
+                  onToggle={() => toggleGrupo("passadas")}
+                >
+                  {renderCards(concluidas)}
+                </GrupoBox>
               )}
             </>
           );
@@ -243,6 +253,39 @@ export default function LiderPage() {
           </div>,
           document.body,
         )}
+    </div>
+  );
+}
+
+/** Caixa recolhível de um grupo de expedições (anos futuros / passadas). */
+function GrupoBox({
+  titulo, quantidade, aberto, onToggle, children,
+}: {
+  titulo: string;
+  quantidade: number;
+  aberto: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="bg-brand-gradient flex w-full items-center gap-2.5 px-4 py-3 text-left text-white"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-[16px] font-semibold leading-none">{titulo}</div>
+          <div className="mt-1 text-[11px] text-white/70">
+            {quantidade} expediç{quantidade === 1 ? "ão" : "ões"}
+          </div>
+        </div>
+        <span className="rounded-full bg-[var(--brand-lime)] px-2 py-0.5 text-[12px] font-bold text-[var(--brand-dark)]">
+          {quantidade}
+        </span>
+        <ChevronRight className={cn("h-5 w-5 shrink-0 transition-transform", aberto && "rotate-90")} />
+      </button>
+      {aberto && <div className="space-y-3 border-t border-border bg-card p-3">{children}</div>}
     </div>
   );
 }
