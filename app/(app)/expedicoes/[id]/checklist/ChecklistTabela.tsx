@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LayoutGrid, List as ListIcon, Plus, ChevronRight, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
+import { LayoutGrid, List as ListIcon, Plus, ChevronRight, Sparkles, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
@@ -72,7 +72,7 @@ interface Props {
 }
 
 export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: Props) {
-  const [view, setView] = React.useState<"tabela" | "kanban">("tabela");
+  const [view, setView] = React.useState<"tabela" | "kanban" | "grafico">("tabela");
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const usuariosById = new Map(usuarios.map((u) => [u.id, u]));
 
@@ -135,6 +135,15 @@ export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: 
             <button
               className={cn(
                 "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
+                view === "grafico" ? "bg-foreground text-background" : "hover:bg-accent",
+              )}
+              onClick={() => setView("grafico")}
+            >
+              <BarChart3 className="h-3 w-3" /> Gráfico
+            </button>
+            <button
+              className={cn(
+                "px-2 py-1 text-xs inline-flex items-center gap-1 transition-colors",
                 view === "kanban" ? "bg-foreground text-background" : "hover:bg-accent",
               )}
               onClick={() => setView("kanban")}
@@ -159,6 +168,8 @@ export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: 
           usuariosById={usuariosById}
           faseAtual={faseAtual}
         />
+      ) : view === "grafico" ? (
+        <ChecklistGrafico itens={topLevel} usuariosById={usuariosById} faseAtual={faseAtual} />
       ) : (
         <ChecklistKanban itens={topLevel} usuariosById={usuariosById} />
       )}
@@ -605,6 +616,103 @@ function ItemRow({
         />
       </td>
     </tr>
+  );
+}
+
+/* ───────────────────────── Gráfico (timeline: tarefas × fases) ───────────────────────── */
+
+function ChecklistGrafico({
+  itens,
+  usuariosById,
+  faseAtual,
+}: {
+  itens: ChecklistItemRow[];
+  usuariosById: Map<string, UsuarioRow>;
+  faseAtual: EtapaChecklist | null;
+}) {
+  const router = useRouter();
+  const ordemFase = (e: string) => ETAPA_CHECKLIST.indexOf(e as EtapaChecklist);
+  const linhas = [...itens].sort(
+    (a, b) => ordemFase(a.etapa) - ordemFase(b.etapa) || (a.ordem ?? 0) - (b.ordem ?? 0),
+  );
+
+  async function salvarStatus(id: string, status: string) {
+    const r = await atualizarChecklistCampo(id, "status", status);
+    if (r.ok) router.refresh();
+    return r;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-background">
+      <div className="min-w-[760px]">
+        {/* Cabeçalho: fases (prazos) na horizontal */}
+        <div className="flex border-b-2 border-border bg-muted/40 text-[11px] font-semibold">
+          <div className="sticky left-0 z-10 w-52 shrink-0 border-r border-border bg-muted/40 px-3 py-2">
+            Tarefa
+          </div>
+          {ETAPA_CHECKLIST.map((fase) => (
+            <div
+              key={fase}
+              className={cn(
+                "flex-1 min-w-[116px] border-l border-border px-2 py-2 text-center",
+                fase === faseAtual && "bg-editavel-50 text-editavel-700",
+              )}
+            >
+              <div className="leading-tight">{fase}</div>
+              {fase === faseAtual && <div className="text-[9px] font-normal">fase atual</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Linhas: uma por tarefa; marcador clicável na coluna da fase dela */}
+        {linhas.map((it) => {
+          const resp = it.responsavel_id ? usuariosById.get(it.responsavel_id) : null;
+          const dias = daysUntil(it.prazo);
+          const atrasada = it.status !== "Concluído" && dias != null && dias < 0;
+          return (
+            <div key={it.id} className="flex items-stretch border-b border-border last:border-b-0 hover:bg-accent/20">
+              <div className="sticky left-0 z-10 w-52 shrink-0 border-r border-border bg-background px-3 py-2">
+                <div className="line-clamp-2 text-[12px] font-medium leading-tight">{it.tarefa}</div>
+                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  {it.prazo && (
+                    <span className={cn(atrasada && "font-medium text-critico-600")}>
+                      {formatDate(it.prazo)}
+                    </span>
+                  )}
+                  {resp && <Avatar nome={resp.nome} size={16} />}
+                </div>
+              </div>
+              {ETAPA_CHECKLIST.map((fase) => (
+                <div
+                  key={fase}
+                  className={cn(
+                    "flex flex-1 min-w-[116px] items-center justify-center border-l border-border px-1 py-2",
+                    fase === faseAtual && "bg-editavel-50/40",
+                  )}
+                >
+                  {it.etapa === fase ? (
+                    <EditableSelectCell
+                      value={it.status}
+                      options={STATUS_OPTIONS}
+                      heading="Status"
+                      onSave={(v) => salvarStatus(it.id, v)}
+                      renderValue={(opt) => (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={cn("h-3 w-3 rounded-full", STATUS_DOT[(opt?.value as StatusChecklist) ?? it.status])} />
+                          <span className="text-[11px] font-medium">{opt?.label ?? it.status}</span>
+                        </span>
+                      )}
+                    />
+                  ) : (
+                    <span className="h-px w-full bg-border/40" />
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
