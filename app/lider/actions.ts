@@ -225,13 +225,16 @@ export async function linkAssinadoLider(
   if (!arq) return { ok: false, error: "Arquivo não encontrado" };
   const a = arq as { storage_path: string; nome: string; expedicao_id: string };
 
-  // Autoriza: o CPF tem que ser líder da expedição dona do arquivo.
-  const { data: liderRows } = await sb
-    .from("passageiros")
-    .select("cpf")
-    .eq("expedicao_id", a.expedicao_id)
-    .eq("tipo", "Líder");
-  const autorizado = (liderRows ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
+  // Autoriza: Master vê tudo; senão o CPF tem que ser líder da expedição dona do arquivo.
+  let autorizado = MASTERS[cpf] !== undefined;
+  if (!autorizado) {
+    const { data: liderRows } = await sb
+      .from("passageiros")
+      .select("cpf")
+      .eq("expedicao_id", a.expedicao_id)
+      .eq("tipo", "Líder");
+    autorizado = (liderRows ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
+  }
   if (!autorizado) return { ok: false, error: "Sem acesso a este documento" };
 
   const { data, error } = await sb.storage
