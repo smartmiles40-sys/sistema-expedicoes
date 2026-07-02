@@ -5,6 +5,7 @@ import { SITE_AUTH_COOKIE, tokenAcesso } from "@/lib/site-auth";
 // a própria tela de acesso, health-check, logout, webhooks do Bitrix e os crons.
 const LIBERADAS = [
   "/acesso",
+  "/inscricao", // formulário público de inscrição (clientes não têm a senha do site)
   "/api/health",
   "/api/logout",
   "/api/bitrix",

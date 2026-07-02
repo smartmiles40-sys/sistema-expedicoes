@@ -303,6 +303,25 @@ export const mockExpedicoes: Tables<"expedicoes">[] = persist("mockExpedicoes", 
  * Campos do passageiro anteriores à migration 0010 (financeiro + dados de
  * embarque entram via normalização logo abaixo, pra não repetir em 12 literais).
  */
+/** Defaults dos campos de inscrição/endereço/preferências/acompanhante (migration 0027). */
+export const PASSAGEIRO_INSCRICAO_DEFAULTS = {
+  pendente_aprovacao: false,
+  inscricao_origem: null,
+  endereco_cep: null,
+  endereco_rua: null,
+  endereco_numero: null,
+  endereco_complemento: null,
+  endereco_bairro: null,
+  endereco_cidade: null,
+  endereco_estado: null,
+  pref_marcar_assento: null,
+  pref_upgrade_classe: null,
+  ja_viajou_internacional: null,
+  paises_visitados: null,
+  acompanhante_nome: null,
+  acompanhante_divide_quarto: null,
+} satisfies Partial<Tables<"passageiros">>;
+
 type PassageiroBase = Omit<
   Tables<"passageiros">,
   | "valor_contratado_brl"
@@ -317,6 +336,7 @@ type PassageiroBase = Omit<
   | "checkin_online_feito"
   | "conexao_viagem_id"
   | "passaporte_arquivo_id"
+  | keyof typeof PASSAGEIRO_INSCRICAO_DEFAULTS
 >;
 
 /** Conexões "viajam juntas" de demonstração (mesmo token = mesmo quarto). */
@@ -402,6 +422,7 @@ function normalizarPassageiro(p: PassageiroBase): Tables<"passageiros"> {
   const valor_pago_brl = extra.valor_pago_brl ?? 0;
   return {
     ...p,
+    ...PASSAGEIRO_INSCRICAO_DEFAULTS,
     conexao_viagem_id: CONEXAO_DEMO[p.id] ?? null,
     passaporte_arquivo_id: null,
     valor_contratado_brl,
@@ -698,6 +719,7 @@ function passageiroDeSeed(
     contrato_assinado: false,
     checkin_online_feito: false,
     observacoes: d.observacoes,
+    ...PASSAGEIRO_INSCRICAO_DEFAULTS,
     created_at: pastDate(1),
     updated_at: pastDate(1),
   };

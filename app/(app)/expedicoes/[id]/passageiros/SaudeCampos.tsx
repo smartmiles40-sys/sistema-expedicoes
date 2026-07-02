@@ -15,14 +15,22 @@ export const PERGUNTAS_SAUDE: {
   pergunta: string;
   detalheCampo?: SaudeCampoKey;
   detalhePergunta?: string;
+  /** 2º detalhe (texto) também exibido quando a resposta é "Sim". */
+  detalhe2Campo?: SaudeCampoKey;
+  detalhe2Pergunta?: string;
 }[] = [
   { campo: "problema_saude", pergunta: "Você possui algum problema de saúde relevante?", detalheCampo: "problema_saude_qual", detalhePergunta: "Qual seria o problema de saúde?" },
-  { campo: "medicamento_diario", pergunta: "Você toma algum medicamento diariamente?", detalheCampo: "medicamento_diario_qual", detalhePergunta: "Qual seria o medicamento?" },
+  { campo: "medicamento_diario", pergunta: "Você toma algum medicamento diariamente?", detalheCampo: "medicamento_diario_qual", detalhePergunta: "Qual seria o medicamento?", detalhe2Campo: "medicamento_refrigeracao", detalhe2Pergunta: "Esses medicamentos precisam de refrigeração ou do transporte de algum equipamento/seringa para aplicação? Se sim, descreva." },
   { campo: "alergia_medicamento", pergunta: "Possui alergia a medicamento?", detalheCampo: "alergia_medicamento_qual", detalhePergunta: "Qual medicamento você tem alergia?" },
+  { campo: "anafilaxia_emergencia", pergunta: "Já teve algum episódio de anafilaxia que precisou procurar emergência?" },
   { campo: "alergia_alimentar", pergunta: "Possui alergia alimentar?", detalheCampo: "alergia_alimentar_qual", detalhePergunta: "Qual seria o alimento que você tem alergia?" },
   { campo: "restricao_alimentar", pergunta: "Possui restrição alimentar?", detalheCampo: "restricao_alimentar_qual", detalhePergunta: "Qual alimento você possui restrição alimentar?" },
   { campo: "limitacao_fisica", pergunta: "Possui limitação física que possa impactar caminhadas ou deslocamentos?", detalheCampo: "limitacao_fisica_qual", detalhePergunta: "Qual limitação física?" },
-  { campo: "cirurgia_importante", pergunta: "Já realizou alguma cirurgia importante?", detalheCampo: "cirurgia_qual", detalhePergunta: "Qual cirurgia e quando?" },
+  { campo: "cirurgia_importante", pergunta: "Já realizou alguma cirurgia importante ou teve que ficar internado nos últimos 12 meses?", detalheCampo: "cirurgia_qual", detalhePergunta: "Qual o motivo?" },
+  { campo: "gravidez", pergunta: "Está grávida?", detalheCampo: "gravidez_semanas", detalhePergunta: "De quantas semanas?" },
+  { campo: "enjoo_transporte", pergunta: "Costuma enjoar em avião, barco ou ônibus?" },
+  { campo: "medo_altura", pergunta: "Tem medo intenso de altura, teleférico ou atividades específicas?" },
+  { campo: "ronca_cpap", pergunta: "Ronca ou utiliza CPAP?" },
   { campo: "vacina_febre_amarela", pergunta: "Você possui o Certificado Internacional de Vacinação contra Febre Amarela?" },
 ];
 
@@ -72,6 +80,15 @@ export function SaudeCampos({
                 <Input
                   value={value[q.detalheCampo] ?? ""}
                   onChange={(e) => setCampo(q.detalheCampo as SaudeCampoKey, e.target.value)}
+                />
+              </div>
+            )}
+            {q.detalhe2Campo && val === "Sim" && (
+              <div className="space-y-1 pt-0.5">
+                <Label className="text-[11px] text-muted-foreground">{q.detalhe2Pergunta}</Label>
+                <Input
+                  value={value[q.detalhe2Campo] ?? ""}
+                  onChange={(e) => setCampo(q.detalhe2Campo as SaudeCampoKey, e.target.value)}
                 />
               </div>
             )}

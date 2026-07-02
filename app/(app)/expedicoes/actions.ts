@@ -13,6 +13,7 @@ import {
   mockChecklistItens,
   mockLinksExpedicao,
   mockUsuarios,
+  PASSAGEIRO_INSCRICAO_DEFAULTS,
 } from "@/lib/mock-data";
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
@@ -593,6 +594,7 @@ export async function criarPassageiro(
       condicoes_medicas: null,
       contrato_assinado: false,
       checkin_online_feito: false,
+      ...PASSAGEIRO_INSCRICAO_DEFAULTS,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -695,6 +697,7 @@ export async function criarPassageiroAvulso(
       condicoes_medicas: null,
       contrato_assinado: false,
       checkin_online_feito: false,
+      ...PASSAGEIRO_INSCRICAO_DEFAULTS,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -2247,6 +2250,7 @@ function novoPassageiroDeImport(
     contrato_assinado: false,
     checkin_online_feito: false,
     observacoes: d.observacoes ?? null,
+    ...PASSAGEIRO_INSCRICAO_DEFAULTS,
     created_at: now,
     updated_at: now,
   };

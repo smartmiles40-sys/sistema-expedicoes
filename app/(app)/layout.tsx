@@ -5,6 +5,7 @@ import { CommandPalette } from "@/components/layout/CommandPalette";
 import { GlobalShortcuts } from "@/components/layout/GlobalShortcuts";
 import { listExpedicoesComAgregados, getContagemAlertas } from "@/lib/data/expedicoes";
 import { listFornecedores } from "@/lib/data/fornecedores";
+import { contarInscricoesPendentes } from "./inscricoes/actions";
 import { mockPassageiros } from "@/lib/mock-data";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
@@ -21,15 +22,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [expedicoes, fornecedores, passageiros, alertas] = await Promise.all([
+  const [expedicoes, fornecedores, passageiros, alertas, inscricoesPendentes] = await Promise.all([
     listExpedicoesComAgregados(),
     listFornecedores(),
     listAllPassageiros(),
     getContagemAlertas(),
+    contarInscricoesPendentes(),
   ]);
 
   return (
-    <AppShell user={user} alertCount={alertas.total}>
+    <AppShell user={user} alertCount={alertas.total} inscricoesCount={inscricoesPendentes}>
       {children}
       <CommandPalette
         expedicoes={expedicoes}

@@ -154,6 +154,26 @@ export type PassageiroRow = {
   contrato_assinado: boolean;
   checkin_online_feito: boolean;
   observacoes: string | null;
+  // Inscrição pública / aprovação (migration 0027)
+  pendente_aprovacao: boolean;
+  inscricao_origem: string | null;
+  // Endereço (dado PESSOAL — propaga entre expedições)
+  endereco_cep: string | null;
+  endereco_rua: string | null;
+  endereco_numero: string | null;
+  endereco_complemento: string | null;
+  endereco_bairro: string | null;
+  endereco_cidade: string | null;
+  endereco_estado: string | null;
+  // Preferências de voo (dado da RESERVA)
+  pref_marcar_assento: boolean | null;
+  pref_upgrade_classe: string | null;
+  // Histórico de viagem (dado PESSOAL)
+  ja_viajou_internacional: boolean | null;
+  paises_visitados: string | null;
+  // Acompanhante (dado da RESERVA)
+  acompanhante_nome: string | null;
+  acompanhante_divide_quarto: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -181,6 +201,15 @@ export type SaudePassageiro = {
   vacina_febre_amarela?: string;
   /** id do arquivo do Certificado de Vacinação (Febre Amarela), quando anexado. */
   vacina_febre_amarela_arquivo_id?: string;
+  // Acréscimos da médica da agência (migration 0027 — só JSONB, sem coluna).
+  /** Detalhe do medicamento diário: refrigeração / equipamento-seringa. */
+  medicamento_refrigeracao?: string;
+  anafilaxia_emergencia?: string;
+  gravidez?: string;
+  gravidez_semanas?: string;
+  enjoo_transporte?: string;
+  medo_altura?: string;
+  ronca_cpap?: string;
 };
 
 export type RequisitoDestinoRow = {

@@ -3,7 +3,7 @@ import { passageiroSyncSchema } from "@/lib/bitrix/validators";
 import { mapBitrixStage } from "@/lib/bitrix/stage-mapping";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { mockExpedicoes, mockPassageiros, mockPassageiroRequisitos } from "@/lib/mock-data";
+import { mockExpedicoes, mockPassageiros, mockPassageiroRequisitos, PASSAGEIRO_INSCRICAO_DEFAULTS } from "@/lib/mock-data";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { gerarRequisitosPadrao } from "@/app/(app)/expedicoes/actions";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       contrato_assinado: false,
       checkin_online_feito: false,
       observacoes: data.observacoes ?? null,
+      ...PASSAGEIRO_INSCRICAO_DEFAULTS,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

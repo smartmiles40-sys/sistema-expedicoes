@@ -9,10 +9,12 @@ export function AppShell({
   user,
   children,
   alertCount = 0,
+  inscricoesCount = 0,
 }: {
   user: CurrentUser | null;
   children: React.ReactNode;
   alertCount?: number;
+  inscricoesCount?: number;
 }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
@@ -22,6 +24,7 @@ export function AppShell({
       <Sidebar
         user={user}
         alertCount={alertCount}
+        inscricoesCount={inscricoesCount}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
       />

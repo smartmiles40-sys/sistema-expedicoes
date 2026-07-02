@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Users,
+  UserPlus,
   Map,
   Building2,
   Coins,
@@ -20,6 +21,7 @@ const NAV = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
+  { href: "/inscricoes", label: "Inscrições", icon: UserPlus },
   { href: "/expedicoes", label: "Expedições", icon: Map },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
   { href: "/cambios", label: "Câmbios", icon: Coins },
@@ -29,11 +31,13 @@ const NAV = [
 export function Sidebar({
   user,
   alertCount = 0,
+  inscricoesCount = 0,
   mobileOpen = false,
   onClose,
 }: {
   user: CurrentUser | null;
   alertCount?: number;
+  inscricoesCount?: number;
   mobileOpen?: boolean;
   onClose?: () => void;
 }) {
@@ -94,6 +98,11 @@ export function Sidebar({
                   {item.href === "/avisos" && alertCount > 0 && (
                     <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-critico-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                       {alertCount > 99 ? "99+" : alertCount}
+                    </span>
+                  )}
+                  {item.href === "/inscricoes" && inscricoesCount > 0 && (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-[var(--brand-lime)] px-1.5 text-[10px] font-semibold leading-none text-[var(--brand-dark)]">
+                      {inscricoesCount > 99 ? "99+" : inscricoesCount}
                     </span>
                   )}
                 </Link>
