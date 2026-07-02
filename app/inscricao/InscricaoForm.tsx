@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { cn, formatDate } from "@/lib/utils";
+import { mascaraCpf } from "@/lib/cpf";
 import { SaudeCampos } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import type { SaudePassageiro } from "@/types/database";
 import { enviarInscricao, type ExpedicaoOpcao } from "./actions";
@@ -75,7 +76,7 @@ const CAMPOS_TEXTO_VAZIO = {
   passaporte: "", validade_passaporte: "",
   endereco_cep: "", endereco_rua: "", endereco_numero: "", endereco_complemento: "",
   endereco_bairro: "", endereco_cidade: "", endereco_estado: "",
-  contato_emergencia_nome: "", contato_emergencia_fone: "",
+  contato_emergencia_nome: "", contato_emergencia_fone: "", contato_emergencia_vinculo: "",
   paises_visitados: "", acompanhante_nome: "",
 };
 
@@ -168,7 +169,14 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         <Secao titulo="Dados pessoais">
           <Campo label="Nome completo"><Input value={f.nome_completo} onChange={set("nome_completo")} /></Campo>
           <div className="grid grid-cols-2 gap-3">
-            <Campo label="CPF"><Input value={f.cpf} onChange={set("cpf")} inputMode="numeric" /></Campo>
+            <Campo label="CPF">
+              <Input
+                value={f.cpf}
+                onChange={(e) => setF((p) => ({ ...p, cpf: mascaraCpf(e.target.value) }))}
+                inputMode="numeric"
+                placeholder="000.000.000-00"
+              />
+            </Campo>
             <Campo label="Data de nascimento"><Input type="date" value={f.data_nascimento} onChange={set("data_nascimento")} /></Campo>
             <Campo label="E-mail"><Input type="email" value={f.email} onChange={set("email")} /></Campo>
             <Campo label="Telefone / WhatsApp"><Input value={f.telefone} onChange={set("telefone")} inputMode="tel" /></Campo>
@@ -181,7 +189,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
             <Campo label="Cidade"><Input value={f.endereco_cidade} onChange={set("endereco_cidade")} /></Campo>
           </div>
           <div className="grid grid-cols-[1fr_90px] gap-3">
-            <Campo label="Rua"><Input value={f.endereco_rua} onChange={set("endereco_rua")} /></Campo>
+            <Campo label="Logradouro"><Input value={f.endereco_rua} onChange={set("endereco_rua")} /></Campo>
             <Campo label="Número"><Input value={f.endereco_numero} onChange={set("endereco_numero")} /></Campo>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -219,6 +227,9 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
             <Campo label="Nome"><Input value={f.contato_emergencia_nome} onChange={set("contato_emergencia_nome")} /></Campo>
             <Campo label="Telefone"><Input value={f.contato_emergencia_fone} onChange={set("contato_emergencia_fone")} inputMode="tel" /></Campo>
           </div>
+          <Campo label="Vínculo com você">
+            <Input value={f.contato_emergencia_vinculo} onChange={set("contato_emergencia_vinculo")} placeholder="Ex.: mãe, pai, irmão, cônjuge, amigo(a)…" />
+          </Campo>
         </Secao>
 
         <Secao titulo="Preferências de voo">

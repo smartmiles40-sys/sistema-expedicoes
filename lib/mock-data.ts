@@ -307,6 +307,7 @@ export const mockExpedicoes: Tables<"expedicoes">[] = persist("mockExpedicoes", 
 export const PASSAGEIRO_INSCRICAO_DEFAULTS = {
   pendente_aprovacao: false,
   inscricao_origem: null,
+  contato_emergencia_vinculo: null,
   endereco_cep: null,
   endereco_rua: null,
   endereco_numero: null,

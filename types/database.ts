@@ -148,6 +148,7 @@ export type PassageiroRow = {
   // Dados de embarque/pessoais (migration 0010)
   contato_emergencia_nome: string | null;
   contato_emergencia_fone: string | null;
+  contato_emergencia_vinculo: string | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
   saude?: SaudePassageiro | null;

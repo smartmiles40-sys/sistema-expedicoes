@@ -287,9 +287,20 @@ const CAMPOS_PESSOAIS = [
   "telefone",
   "contato_emergencia_nome",
   "contato_emergencia_fone",
+  "contato_emergencia_vinculo",
   "restricoes_alimentares",
   "condicoes_medicas",
   "saude",
+  // Endereço + histórico de viagem (dados pessoais — migration 0027/0028)
+  "endereco_cep",
+  "endereco_rua",
+  "endereco_numero",
+  "endereco_complemento",
+  "endereco_bairro",
+  "endereco_cidade",
+  "endereco_estado",
+  "ja_viajou_internacional",
+  "paises_visitados",
 ] as const;
 
 function soPessoais(dados: Record<string, unknown>): Record<string, unknown> {
