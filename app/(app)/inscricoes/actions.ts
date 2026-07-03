@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import { mockPassageiros, mockExpedicoes } from "@/lib/mock-data";
-import type { PassageiroRow, ExpedicaoRow } from "@/types/database";
+import type { PassageiroRow, ExpedicaoRow, SaudePassageiro } from "@/types/database";
 
 export type InscricaoPendente = {
   id: string;
@@ -11,15 +11,34 @@ export type InscricaoPendente = {
   expedicao_nome: string;
   destino: string;
   data_embarque: string | null;
+  created_at: string;
+  origem: string | null;
+  status_reserva: string;
+  // Pessoais
   nome_completo: string;
   cpf: string | null;
+  data_nascimento: string | null;
   email: string | null;
   telefone: string | null;
-  cidade: string | null;
-  estado: string | null;
-  acompanhante_nome: string | null;
+  // Endereço
+  endereco: { cep: string | null; rua: string | null; numero: string | null; complemento: string | null; bairro: string | null; cidade: string | null; estado: string | null };
+  // Passaporte
+  passaporte: string | null;
+  validade_passaporte: string | null;
   tem_passaporte: boolean;
-  created_at: string;
+  passaporte_arquivo_id: string | null;
+  // Emergência
+  contato_emergencia_nome: string | null;
+  contato_emergencia_fone: string | null;
+  contato_emergencia_vinculo: string | null;
+  // Preferências / histórico / acompanhante
+  pref_marcar_assento: boolean | null;
+  pref_upgrade_classe: string | null;
+  ja_viajou_internacional: boolean | null;
+  paises_visitados: string | null;
+  acompanhante_nome: string | null;
+  acompanhante_divide_quarto: string | null;
+  saude: SaudePassageiro | null;
 };
 
 function montar(p: PassageiroRow, e: ExpedicaoRow | undefined): InscricaoPendente {
@@ -29,15 +48,32 @@ function montar(p: PassageiroRow, e: ExpedicaoRow | undefined): InscricaoPendent
     expedicao_nome: e?.nome ?? "—",
     destino: e?.destino ?? "—",
     data_embarque: e?.data_embarque ?? null,
+    created_at: p.created_at,
+    origem: p.inscricao_origem,
+    status_reserva: p.status_reserva,
     nome_completo: p.nome_completo,
     cpf: p.cpf,
+    data_nascimento: p.data_nascimento,
     email: p.email,
     telefone: p.telefone,
-    cidade: p.endereco_cidade,
-    estado: p.endereco_estado,
-    acompanhante_nome: p.acompanhante_nome,
+    endereco: {
+      cep: p.endereco_cep, rua: p.endereco_rua, numero: p.endereco_numero, complemento: p.endereco_complemento,
+      bairro: p.endereco_bairro, cidade: p.endereco_cidade, estado: p.endereco_estado,
+    },
+    passaporte: p.passaporte,
+    validade_passaporte: p.validade_passaporte,
     tem_passaporte: Boolean(p.passaporte_arquivo_id),
-    created_at: p.created_at,
+    passaporte_arquivo_id: p.passaporte_arquivo_id,
+    contato_emergencia_nome: p.contato_emergencia_nome,
+    contato_emergencia_fone: p.contato_emergencia_fone,
+    contato_emergencia_vinculo: p.contato_emergencia_vinculo,
+    pref_marcar_assento: p.pref_marcar_assento,
+    pref_upgrade_classe: p.pref_upgrade_classe,
+    ja_viajou_internacional: p.ja_viajou_internacional,
+    paises_visitados: p.paises_visitados,
+    acompanhante_nome: p.acompanhante_nome,
+    acompanhante_divide_quarto: p.acompanhante_divide_quarto,
+    saude: p.saude ?? null,
   };
 }
 
@@ -74,14 +110,16 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     const p = mockPassageiros.find((x) => x.id === id);
     if (!p) return { ok: false, error: "Inscrição não encontrada." };
     p.pendente_aprovacao = false;
-    p.status_reserva = "Pré-reserva";
+    if (p.status_reserva === "Lead") p.status_reserva = "Pré-reserva"; // não rebaixa quem já é Confirmado
     p.updated_at = new Date().toISOString();
   } else {
     const sb = await getServerClient();
-    const { error } = await sb
-      .from("passageiros")
-      .update({ pendente_aprovacao: false, status_reserva: "Pré-reserva" })
-      .eq("id", id);
+    // Só promove Lead → Pré-reserva; para outros status, apenas tira a flag.
+    const { data } = await sb.from("passageiros").select("status_reserva").eq("id", id).maybeSingle();
+    const status = (data as { status_reserva: string } | null)?.status_reserva;
+    const patch: Record<string, unknown> = { pendente_aprovacao: false };
+    if (status === "Lead") patch.status_reserva = "Pré-reserva";
+    const { error } = await sb.from("passageiros").update(patch).eq("id", id);
     if (error) return { ok: false, error: error.message };
   }
   revalidatePath("/inscricoes");
@@ -95,7 +133,6 @@ export async function recusarInscricao(id: string): Promise<{ ok: boolean; error
     if (i >= 0) mockPassageiros.splice(i, 1);
   } else {
     const sb = await getServerClient();
-    // Só recusa quem ainda está pendente (trava contra apagar pax já aprovado).
     const { error } = await sb.from("passageiros").delete().eq("id", id).eq("pendente_aprovacao", true);
     if (error) return { ok: false, error: error.message };
   }
