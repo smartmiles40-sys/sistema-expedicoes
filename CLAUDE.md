@@ -359,8 +359,20 @@ role**, **só leitura**.
     No portal vira "Baixar voucher" (signed URL). Hospedagem não tem voucher.
 - Fetchers em `lib/data/expedicoes.ts`: `listRoteiro`, `listVoosExpedicao`,
   `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`.
-- **Acesso Master da Área do Líder foi desativado** (mapa `MASTERS` vazio em
-  `app/lider/actions.ts`).
+- **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
+  Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
+  `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.
+
+## 📝 Inscrição pública: auto-completar entre expedições
+
+Ao se inscrever pelo `/inscricao`, o cliente é reconhecido **em qualquer expedição**
+(não só na atual) pelo CPF — `acharLinhasPorCpf` + `agregarPerfil` (valor mais recente
+não-nulo dos `CAMPOS_PESSOAIS_CARRY`) em `app/inscricao/actions.ts`. No envio,
+`camposBackfill` completa os campos pessoais que já temos **só onde faltam** (nunca
+sobrescreve o que o passageiro digitou), e o **passaporte não é reexigido** se já temos
+o anexo da pessoa (linka `passaporte_arquivo_id`). O formulário reage sozinho aos sinais
+`temos`/`temPassaporteAnexo` do `identificarInscricao`. A fila `/inscricoes` mostra
+TODOS os dados ao aprovador (inclui restrições alimentares e condições médicas).
 
 ## 🧪 Como rodar
 

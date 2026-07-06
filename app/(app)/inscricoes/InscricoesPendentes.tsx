@@ -102,6 +102,8 @@ function Detalhe({ it }: { it: InscricaoPendente }) {
           const extra = [det, det2].filter(Boolean).join(" · ");
           return <Linha key={q.campo} label={q.pergunta} valor={extra ? `${resp} — ${extra}` : resp} />;
         })}
+        <Linha label="Restrições alimentares" valor={it.restricoes_alimentares} />
+        <Linha label="Condições médicas" valor={it.condicoes_medicas} />
       </Grupo>
     </div>
   );

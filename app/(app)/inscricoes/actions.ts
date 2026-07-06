@@ -39,6 +39,8 @@ export type InscricaoPendente = {
   acompanhante_nome: string | null;
   acompanhante_divide_quarto: string | null;
   saude: SaudePassageiro | null;
+  restricoes_alimentares: string | null;
+  condicoes_medicas: string | null;
 };
 
 function montar(p: PassageiroRow, e: ExpedicaoRow | undefined): InscricaoPendente {
@@ -74,6 +76,8 @@ function montar(p: PassageiroRow, e: ExpedicaoRow | undefined): InscricaoPendent
     acompanhante_nome: p.acompanhante_nome,
     acompanhante_divide_quarto: p.acompanhante_divide_quarto,
     saude: p.saude ?? null,
+    restricoes_alimentares: p.restricoes_alimentares,
+    condicoes_medicas: p.condicoes_medicas,
   };
 }
 

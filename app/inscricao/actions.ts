@@ -22,6 +22,55 @@ function safeName(s: string) {
 }
 const temValor = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== "";
 const str = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+const temSaude = (v: unknown) => !!v && typeof v === "object" && Object.keys(v as object).length > 0;
+
+// Campos PESSOAIS que "seguem a pessoa" entre expedições — usados para
+// autocompletar a partir do que já temos (nunca sobrescrevem o que o passageiro digitou).
+const CAMPOS_PESSOAIS_CARRY = [
+  "nome_completo", "data_nascimento", "email", "telefone",
+  "passaporte", "validade_passaporte", "passaporte_arquivo_id",
+  "endereco_cep", "endereco_rua", "endereco_numero", "endereco_complemento",
+  "endereco_bairro", "endereco_cidade", "endereco_estado",
+  "contato_emergencia_nome", "contato_emergencia_fone", "contato_emergencia_vinculo",
+  "restricoes_alimentares", "condicoes_medicas", "saude",
+  "ja_viajou_internacional", "paises_visitados",
+] as const;
+
+/** Todas as linhas de passageiro (em QUALQUER expedição) da pessoa com este CPF. */
+async function acharLinhasPorCpf(cpf: string): Promise<Pax[]> {
+  if (DEV_USE_MOCK_DATA) {
+    return mockPassageiros.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+  }
+  const sb = createServiceRoleClient();
+  const { data } = await sb.from("passageiros").select("*").not("cpf", "is", null);
+  return ((data ?? []) as Pax[]).filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+}
+
+/** Consolida o perfil PESSOAL (valor mais recente não-nulo) entre todas as linhas da pessoa. */
+function agregarPerfil(linhas: Pax[]): Partial<Pax> | null {
+  if (!linhas.length) return null;
+  const ord = [...linhas].sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+  const perfil: Record<string, unknown> = {};
+  for (const campo of CAMPOS_PESSOAIS_CARRY) {
+    for (const r of ord) {
+      const v = (r as Record<string, unknown>)[campo];
+      if (campo === "saude" ? temSaude(v) : temValor(v)) perfil[campo] = v;
+    }
+  }
+  return perfil as Partial<Pax>;
+}
+
+/** Campos a completar a partir do perfil global — só onde ainda NÃO há valor (não sobrescreve). */
+function camposBackfill(jaTem: (campo: string) => boolean, perfil: Partial<Pax> | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!perfil) return out;
+  for (const campo of CAMPOS_PESSOAIS_CARRY) {
+    const v = (perfil as Record<string, unknown>)[campo];
+    const temPerfil = campo === "saude" ? temSaude(v) : temValor(v);
+    if (temPerfil && !jaTem(campo)) out[campo] = v;
+  }
+  return out;
+}
 
 export type ExpedicaoOpcao = { id: string; nome: string; destino: string; data_embarque: string };
 
@@ -56,16 +105,7 @@ export type Identificacao =
   | { ok: true; existe: true; conflito: true }
   | { ok: true; existe: true; conflito: false; temos: string[]; temPassaporteAnexo: boolean };
 
-async function acharExistente(expedicaoId: string, cpf: string): Promise<Pax | null> {
-  if (DEV_USE_MOCK_DATA) {
-    return mockPassageiros.find((p) => p.expedicao_id === expedicaoId && soDigitosCpf(p.cpf ?? "") === cpf) ?? null;
-  }
-  const sb = createServiceRoleClient();
-  const { data } = await sb.from("passageiros").select("*").eq("expedicao_id", expedicaoId);
-  return ((data ?? []) as Pax[]).find((p) => soDigitosCpf(p.cpf ?? "") === cpf) ?? null;
-}
-
-/** Passo 1: identifica o passageiro na expedição pelo CPF + nascimento. */
+/** Passo 1: identifica o passageiro pelo CPF + nascimento (na expedição OU no histórico). */
 export async function identificarInscricao(
   expedicaoId: string,
   cpfRaw: string,
@@ -76,16 +116,19 @@ export async function identificarInscricao(
   if (!cpfValido(cpf)) return { ok: false, error: "CPF inválido." };
   if (!nascimento || nascimento.length < 8) return { ok: false, error: "Informe sua data de nascimento." };
 
-  const existente = await acharExistente(expedicaoId, cpf);
-  if (!existente) return { ok: true, existe: false };
+  const linhas = await acharLinhasPorCpf(cpf);
+  const existente = linhas.find((l) => l.expedicao_id === expedicaoId) ?? null;
+  // Reconhece o cliente pela linha desta expedição ou, se novo aqui, pelo histórico dele.
+  const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
+  if (!base) return { ok: true, existe: false };
 
   // Trava de segurança: se já temos a data de nascimento e não bate, não revela nada.
-  if (existente.data_nascimento && existente.data_nascimento.slice(0, 10) !== nascimento.slice(0, 10)) {
+  if (base.data_nascimento && base.data_nascimento.slice(0, 10) !== nascimento.slice(0, 10)) {
     return { ok: true, existe: true, conflito: true };
   }
 
-  const temos = CAMPOS_CHECAR.filter((c) => temValor((existente as Record<string, unknown>)[c]));
-  return { ok: true, existe: true, conflito: false, temos, temPassaporteAnexo: temValor(existente.passaporte_arquivo_id) };
+  const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
+  return { ok: true, existe: true, conflito: false, temos, temPassaporteAnexo: temValor(base.passaporte_arquivo_id) };
 }
 
 const dadosSchema = z.object({
@@ -219,15 +262,19 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   const cpf = soDigitosCpf(d.cpf);
   if (!cpfValido(cpf)) return { ok: false, error: "CPF inválido." };
 
-  const existente = await acharExistente(d.expedicao_id, cpf);
+  const linhas = await acharLinhasPorCpf(cpf);
+  const existente = linhas.find((l) => l.expedicao_id === d.expedicao_id) ?? null;
+  const perfil = agregarPerfil(linhas);
 
   // Conflito de nascimento (segurança): não deixa completar registro de outra pessoa.
-  if (existente?.data_nascimento && existente.data_nascimento.slice(0, 10) !== d.data_nascimento.slice(0, 10)) {
+  const nascConhecido = existente?.data_nascimento ?? perfil?.data_nascimento ?? null;
+  if (nascConhecido && nascConhecido.slice(0, 10) !== d.data_nascimento.slice(0, 10)) {
     return { ok: false, error: "Os dados não conferem com a nossa base. Confira ou fale com a agência." };
   }
 
-  // Passaporte: obrigatório só quando ainda não temos o anexo.
-  const precisaAnexo = !existente?.passaporte_arquivo_id;
+  // Passaporte: obrigatório só quando ainda não temos o anexo em NENHUMA expedição.
+  const anexoConhecido = existente?.passaporte_arquivo_id ?? perfil?.passaporte_arquivo_id ?? null;
+  const precisaAnexo = !anexoConhecido;
   const fileRaw = formData.get("passaporte");
   const file = fileRaw instanceof File && fileRaw.size > 0 ? fileRaw : null;
   if (precisaAnexo && !file) return { ok: false, error: "Anexe a foto ou PDF do seu passaporte." };
@@ -239,7 +286,9 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   // ─── MOCK ───────────────────────────────────────────────────────────────
   if (DEV_USE_MOCK_DATA) {
     if (existente) {
-      Object.assign(existente, patchMerge(existente, d), { updated_at: new Date().toISOString() });
+      const patch = patchMerge(existente, d);
+      Object.assign(patch, camposBackfill((c) => temValor((existente as Record<string, unknown>)[c]) || c in patch, perfil));
+      Object.assign(existente, patch, { updated_at: new Date().toISOString() });
       if (file) {
         const arq = await addArquivoMock(
           { expedicao_id: d.expedicao_id, passageiro_id: existente.id, categoria: "Documentos pessoais", nome: file.name, descricao: "Passaporte — prontidão", mime: file.type || null, tamanho_bytes: file.size },
@@ -270,6 +319,8 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
       restricoes_alimentares: null, condicoes_medicas: null, contrato_assinado: false,
       checkin_online_feito: false, observacoes: null, created_at: now, updated_at: now,
     };
+    // Completa com o que já temos da pessoa (só onde ela não informou).
+    Object.assign(novo, camposBackfill((c) => temValor((novo as Record<string, unknown>)[c]), perfil));
     mockPassageiros.push(novo);
     await gerarRequisitosPadrao(d.expedicao_id);
     return { ok: true, completou: false };
@@ -280,6 +331,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
 
   if (existente) {
     const patch = patchMerge(existente, d);
+    Object.assign(patch, camposBackfill((c) => temValor((existente as Record<string, unknown>)[c]) || c in patch, perfil));
     const upd = await sb.from("passageiros").update(patch).eq("id", existente.id);
     if (upd.error) return { ok: false, error: upd.error.message };
     if (file) await subirPassaporteReal(sb, d.expedicao_id, existente.id, file);
@@ -287,9 +339,11 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     return { ok: true, completou: true };
   }
 
+  const novoRegistro: Record<string, unknown> = { ...novosCampos(d, cpf), expedicao_id: d.expedicao_id };
+  Object.assign(novoRegistro, camposBackfill((c) => temValor(novoRegistro[c]), perfil));
   const ins = await sb
     .from("passageiros")
-    .insert({ ...novosCampos(d, cpf), expedicao_id: d.expedicao_id })
+    .insert(novoRegistro)
     .select("id").single();
   if (ins.error) return { ok: false, error: ins.error.message };
   const passageiroId = (ins.data as { id: string }).id;
