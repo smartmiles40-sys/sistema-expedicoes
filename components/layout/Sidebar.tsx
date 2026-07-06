@@ -9,13 +9,13 @@ import {
   Building2,
   Coins,
   Settings,
-  CompassIcon,
   LayoutDashboard,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CurrentUser } from "@/lib/supabase/auth";
 import { UserMenu } from "./UserMenu";
+import { Logo } from "@/components/ui/Logo";
 
 const NAV = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
@@ -58,12 +58,9 @@ export function Sidebar({
       >
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)] shadow-sm">
-            <CompassIcon className="h-5 w-5" />
-          </div>
           <div className="flex flex-col leading-none">
-            <span className="font-display text-[16px] font-semibold leading-none text-white">Se Tu For, Eu Vou</span>
-            <span className="mt-1 text-[10px] uppercase tracking-wider text-[var(--brand-lime)]/70">Sistema Operacional</span>
+            <Logo tone="dark" className="h-5 w-auto" />
+            <span className="mt-1.5 text-[10px] uppercase tracking-wider text-[var(--brand-lime)]/70">Sistema Operacional</span>
           </div>
           <button
             type="button"

@@ -3,7 +3,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
-  CompassIcon, MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw,
+  MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -15,6 +15,7 @@ import {
   buscarDadosLider, linkAssinadoLider,
   type LiderDados, type LiderExpedicao, type LiderPax, type LiderArquivo,
 } from "./actions";
+import { Logo, LogoMark } from "@/components/ui/Logo";
 
 type VerDoc = (a: LiderArquivo, download?: boolean) => void;
 
@@ -94,12 +95,7 @@ export default function LiderPage() {
     return (
       <div className="grid min-h-screen lg:grid-cols-2">
         <div className="bg-brand-gradient relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-              <CompassIcon className="h-5 w-5" />
-            </div>
-            <span className="font-display text-[18px] font-semibold text-[var(--brand-lime)]">Se Tu For, Eu Vou</span>
-          </div>
+          <Logo tone="dark" className="h-7 w-auto" />
           <div className="relative z-10 max-w-md">
             <h2 className="font-display text-4xl font-semibold leading-[1.1] text-white">
               Área do Líder
@@ -146,9 +142,7 @@ export default function LiderPage() {
     <div className="min-h-screen bg-background">
       <header className="bg-brand-gradient flex items-center justify-between px-5 py-4 text-white">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-            <CompassIcon className="h-5 w-5" />
-          </div>
+          <LogoMark tone="dark" className="h-9 w-9" />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-display text-[16px] font-semibold leading-none">Área do Líder</span>

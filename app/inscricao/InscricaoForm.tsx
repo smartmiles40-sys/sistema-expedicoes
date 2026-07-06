@@ -1,7 +1,8 @@
 "use client";
 import * as React from "react";
 import { toast } from "sonner";
-import { Compass, Upload, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
+import { Upload, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
@@ -152,12 +153,9 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
 
   const Header = (
     <header className="bg-brand-gradient px-4 py-6 text-white">
-      <div className="mx-auto flex max-w-2xl items-center gap-2">
-        <Compass className="h-6 w-6" />
-        <div>
-          <div className="font-display text-lg font-semibold leading-none">Se Tu For, Eu Vou</div>
-          <div className="text-[12px] text-white/70">Ficha de inscrição da expedição</div>
-        </div>
+      <div className="mx-auto flex max-w-2xl items-center gap-3">
+        <Logo tone="dark" className="h-6 w-auto" />
+        <div className="text-[12px] text-white/70">Ficha de inscrição da expedição</div>
       </div>
     </header>
   );

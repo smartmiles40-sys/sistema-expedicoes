@@ -1,16 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, Briefcase, CompassIcon, Crown } from "lucide-react";
+import { ArrowRight, Briefcase, Crown } from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
 
 export default function EntrarPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="bg-brand-gradient relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-            <CompassIcon className="h-5 w-5" />
-          </div>
-          <span className="font-display text-[18px] font-semibold text-[var(--brand-lime)]">Se Tu For, Eu Vou</span>
-        </div>
+        <Logo tone="dark" className="h-7 w-auto" />
         <div className="relative z-10 max-w-md">
           <h2 className="font-display text-4xl font-semibold leading-[1.1] text-white">
             Organize cada expedição,

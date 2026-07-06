@@ -60,6 +60,7 @@ const styles = StyleSheet.create({
   coverTop: { flexDirection: "column", alignItems: "flex-start" },
   coverWordmark: { fontFamily: SERIF, fontSize: 15, color: OFF, marginTop: 14, letterSpacing: 0.5 },
   coverWordmarkTag: { fontFamily: SERIF_ITALIC, fontSize: 9, color: GREEN_SOFT },
+  coverLogo: { width: 232 },
   coverSpacer: { flexGrow: 1 },
   coverRule: { width: 54, height: 3, backgroundColor: LIME, marginBottom: 16 },
   coverKicker: { fontFamily: SANS_BOLD, fontSize: 9, color: LIME, letterSpacing: 3, marginBottom: 8 },
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
   headerWord: { fontFamily: SERIF, fontSize: 9, color: DARK, marginLeft: 6, letterSpacing: 0.5 },
+  headerLogo: { width: 74 },
   headerTrip: { fontFamily: SANS, fontSize: 8, color: MUTED },
 
   // Cabeçalho de seção
@@ -164,24 +166,13 @@ const styles = StyleSheet.create({
   // ---------- Encerramento ----------
   endPage: { backgroundColor: DARK, color: OFF, paddingTop: 90, paddingBottom: 60, paddingHorizontal: 54, alignItems: "center" },
   endRule: { width: 54, height: 3, backgroundColor: LIME, marginTop: 22, marginBottom: 22 },
+  endLogo: { width: 122, height: 122 },
   endTagline: { fontFamily: SERIF_ITALIC, fontSize: 18, color: OFF, textAlign: "center", lineHeight: 1.4 },
   endBoa: { fontFamily: SERIF_BOLD, fontSize: 22, color: LIME, marginTop: 20 },
   endSpacer: { flexGrow: 1 },
   endSocial: { fontFamily: SANS_BOLD, fontSize: 10, color: GREEN_SOFT, letterSpacing: 1 },
   endNota: { fontFamily: SANS, fontSize: 7.5, color: TEAL_400, textAlign: "center", marginTop: 12, lineHeight: 1.5 },
 });
-
-/** Ícone da marca (duas figuras) — recriado em vetor para nitidez em qualquer tamanho. */
-function MarcaIcone({ size = 46 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <Path d="M41 34 C 23 39, 17 57, 23 73 C 25 78, 32 78, 34 72 C 38 59, 43 51, 53 46 C 50 40, 46 35, 41 34 Z" fill={LIME} />
-      <Path d="M63 50 C 81 55, 87 71, 81 87 C 79 92, 72 92, 70 86 C 66 73, 61 65, 51 60 C 54 54, 58 51, 63 50 Z" fill={LIME} />
-      <Circle cx="37" cy="25" r="11" fill={OFF} />
-      <Circle cx="66" cy="41" r="11" fill={OFF} />
-    </Svg>
-  );
-}
 
 /** Formas orgânicas decorativas da marca (canto da capa). */
 function CapaDecor() {
@@ -234,10 +225,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
       <Page size="A4" style={styles.coverPage}>
         <CapaDecor />
         <View style={styles.coverTop}>
-          <MarcaIcone size={52} />
-          <Text style={styles.coverWordmark}>
-            SE TU FOR, EU VOU! <Text style={styles.coverWordmarkTag}>Viagens</Text>
-          </Text>
+          <Image src="/brand/logo-horizontal-off-white.png" style={styles.coverLogo} />
         </View>
 
         <View style={styles.coverSpacer} />
@@ -278,8 +266,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.header} fixed>
           <View style={styles.headerLeft}>
-            <MarcaIcone size={13} />
-            <Text style={styles.headerWord}>SE TU FOR, EU VOU!</Text>
+            <Image src="/brand/sigla-dark-teal.png" style={styles.headerLogo} />
           </View>
           <Text style={styles.headerTrip}>{exp.nome}</Text>
         </View>
@@ -494,7 +481,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
 
       {/* ===== ENCERRAMENTO ===== */}
       <Page size="A4" style={styles.endPage}>
-        <MarcaIcone size={58} />
+        <Image src="/brand/logo-circular-off-white.png" style={styles.endLogo} />
         <View style={styles.endRule} />
         <Text style={styles.endTagline}>Explorando o extraordinário.{"\n"}Planejando o inesquecível.</Text>
         <Text style={styles.endBoa}>Boa viagem!</Text>

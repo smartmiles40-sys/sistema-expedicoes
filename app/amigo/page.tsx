@@ -13,6 +13,7 @@ import {
   entrarExpedAmigo,
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
+import { Logo, LogoMark } from "@/components/ui/Logo";
 
 const STORAGE_KEY = "expedamigo-sessao";
 
@@ -89,12 +90,7 @@ export default function AmigoPage() {
     return (
       <div className="grid min-h-screen lg:grid-cols-2">
         <div className="bg-brand-gradient relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-              <CompassIcon className="h-5 w-5" />
-            </div>
-            <span className="font-display text-[18px] font-semibold text-[var(--brand-lime)]">Se Tu For, Eu Vou</span>
-          </div>
+          <Logo tone="dark" className="h-7 w-auto" />
           <div className="relative z-10 max-w-md">
             <h2 className="font-display text-4xl font-semibold leading-[1.1] text-white">
               Sua próxima aventura começa aqui.
@@ -110,11 +106,8 @@ export default function AmigoPage() {
 
         <div className="flex items-center justify-center p-6">
           <form onSubmit={entrar} className="w-full max-w-sm space-y-4">
-            <div className="lg:hidden flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-dark)] text-[var(--brand-lime)]">
-                <CompassIcon className="h-5 w-5" />
-              </div>
-              <span className="font-display text-[16px] font-semibold">Se Tu For, Eu Vou</span>
+            <div className="lg:hidden">
+              <Logo tone="light" className="h-6 w-auto" />
             </div>
             <div>
               <h1 className="page-title">Minha Viagem</h1>
@@ -159,9 +152,7 @@ export default function AmigoPage() {
     <div className="min-h-screen bg-background">
       <header className="bg-brand-gradient flex items-center justify-between px-5 py-4 text-white">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-            <CompassIcon className="h-5 w-5" />
-          </div>
+          <LogoMark tone="dark" className="h-9 w-9" />
           <div className="min-w-0">
             <span className="font-display text-[16px] font-semibold leading-none">Minha Viagem</span>
             <div className="mt-0.5 truncate text-[13px] text-white/70">Olá, {dados.primeiro_nome} 👋</div>

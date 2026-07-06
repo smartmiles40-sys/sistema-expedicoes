@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CompassIcon } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
 import { DEV_AUTH_BYPASS } from "@/lib/dev-mode";
 import { LoginForm } from "../LoginForm";
 
@@ -12,12 +13,7 @@ export default async function OperacionalPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="bg-brand-gradient relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
-            <CompassIcon className="h-5 w-5" />
-          </div>
-          <span className="font-display text-[18px] font-semibold text-[var(--brand-lime)]">Se Tu For, Eu Vou</span>
-        </div>
+        <Logo tone="dark" className="h-7 w-auto" />
         <div className="relative z-10 max-w-md">
           <h2 className="font-display text-4xl font-semibold leading-[1.1] text-white">
             Organize cada expedição,
