@@ -129,9 +129,9 @@ const styles = StyleSheet.create({
   foto: { width: 150, height: 100, objectFit: "cover", borderRadius: 4, marginRight: 5, marginBottom: 5 },
 
   // Dia com foto ao lado do texto (texto à esquerda, imagem à direita)
-  diaBody: { flexDirection: "row", alignItems: "flex-start", width: "100%" },
+  diaBody: { flexDirection: "row", alignItems: "center", width: "100%" },
   diaTexto: { width: "63%" },
-  diaFotoCol: { width: "34%", marginLeft: "3%" },
+  diaFotoCol: { width: "34%", marginLeft: "3%", alignItems: "center" },
   fotoLado: { width: "100%", height: 110, objectFit: "cover", borderRadius: 4, marginBottom: 5 },
 
   // ---------- Voo (cartão de deslocamento) ----------
