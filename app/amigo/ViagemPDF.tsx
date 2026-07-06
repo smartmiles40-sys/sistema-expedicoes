@@ -129,10 +129,10 @@ const styles = StyleSheet.create({
   foto: { width: 150, height: 100, objectFit: "cover", borderRadius: 4, marginRight: 5, marginBottom: 5 },
 
   // Dia com foto ao lado do texto (texto à esquerda, imagem à direita)
-  diaBody: { flexDirection: "row", alignItems: "flex-start" },
-  diaTexto: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
-  diaFotoCol: { width: 168, marginLeft: 12 },
-  fotoLado: { width: 168, height: 122, objectFit: "cover", borderRadius: 4, marginBottom: 5 },
+  diaBody: { flexDirection: "row", alignItems: "flex-start", width: "100%" },
+  diaTexto: { width: "63%" },
+  diaFotoCol: { width: "34%", marginLeft: "3%" },
+  fotoLado: { width: "100%", height: 110, objectFit: "cover", borderRadius: 4, marginBottom: 5 },
 
   // ---------- Voo (cartão de deslocamento) ----------
   vooCard: { borderWidth: 1, borderColor: GREEN_SOFT, borderRadius: 6, marginBottom: 7, backgroundColor: "#ffffff", overflow: "hidden" },
@@ -327,29 +327,32 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
             <SecaoTitulo>Roteiro dia a dia (previsto)</SecaoTitulo>
             {exp.roteiro.map((d, i) => {
               const imgs = d.fotos.map((f) => fotos.get(f.url)).filter((x): x is string => !!x);
+              const conteudo = (
+                <>
+                  <View style={styles.itemRow}>
+                    <View style={styles.diaChip}><Text style={styles.diaChipTxt}>Dia {d.dia}</Text></View>
+                    {d.titulo ? <Text style={styles.diaTitulo}>{d.titulo}</Text> : null}
+                  </View>
+                  <Text style={styles.meta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
+                  {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
+                  {(d.refeicoes || d.hospedagem) ? (
+                    <View style={styles.tags}>
+                      {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
+                      {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
+                    </View>
+                  ) : null}
+                </>
+              );
               return (
                 <View key={i} style={styles.dia} wrap={false}>
-                  <View style={styles.diaBody}>
-                    <View style={styles.diaTexto}>
-                      <View style={styles.itemRow}>
-                        <View style={styles.diaChip}><Text style={styles.diaChipTxt}>Dia {d.dia}</Text></View>
-                        {d.titulo ? <Text style={styles.diaTitulo}>{d.titulo}</Text> : null}
-                      </View>
-                      <Text style={styles.meta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
-                      {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
-                      {(d.refeicoes || d.hospedagem) ? (
-                        <View style={styles.tags}>
-                          {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
-                          {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
-                        </View>
-                      ) : null}
-                    </View>
-                    {imgs.length > 0 && (
+                  {imgs.length > 0 ? (
+                    <View style={styles.diaBody}>
+                      <View style={styles.diaTexto}>{conteudo}</View>
                       <View style={styles.diaFotoCol}>
                         {imgs.map((src, j) => <Image key={j} src={src} style={styles.fotoLado} />)}
                       </View>
-                    )}
-                  </View>
+                    </View>
+                  ) : conteudo}
                 </View>
               );
             })}
