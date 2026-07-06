@@ -128,6 +128,12 @@ const styles = StyleSheet.create({
   fotos: { flexDirection: "row", flexWrap: "wrap", marginTop: 7 },
   foto: { width: 150, height: 100, objectFit: "cover", borderRadius: 4, marginRight: 5, marginBottom: 5 },
 
+  // Dia com foto ao lado do texto (texto à esquerda, imagem à direita)
+  diaBody: { flexDirection: "row", alignItems: "flex-start" },
+  diaTexto: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+  diaFotoCol: { width: 168, marginLeft: 12 },
+  fotoLado: { width: 168, height: 122, objectFit: "cover", borderRadius: 4, marginBottom: 5 },
+
   // ---------- Voo (cartão de deslocamento) ----------
   vooCard: { borderWidth: 1, borderColor: GREEN_SOFT, borderRadius: 6, marginBottom: 7, backgroundColor: "#ffffff", overflow: "hidden" },
   vooHead: { backgroundColor: DARK, paddingVertical: 5, paddingHorizontal: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -319,30 +325,34 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
         {exp.roteiro.length > 0 && (
           <View style={styles.secao} break>
             <SecaoTitulo>Roteiro dia a dia (previsto)</SecaoTitulo>
-            {exp.roteiro.map((d, i) => (
-              <View key={i} style={styles.dia} wrap={false}>
-                <View style={styles.itemRow}>
-                  <View style={styles.diaChip}><Text style={styles.diaChipTxt}>Dia {d.dia}</Text></View>
-                  {d.titulo ? <Text style={styles.diaTitulo}>{d.titulo}</Text> : null}
+            {exp.roteiro.map((d, i) => {
+              const imgs = d.fotos.map((f) => fotos.get(f.url)).filter((x): x is string => !!x);
+              return (
+                <View key={i} style={styles.dia} wrap={false}>
+                  <View style={styles.diaBody}>
+                    <View style={styles.diaTexto}>
+                      <View style={styles.itemRow}>
+                        <View style={styles.diaChip}><Text style={styles.diaChipTxt}>Dia {d.dia}</Text></View>
+                        {d.titulo ? <Text style={styles.diaTitulo}>{d.titulo}</Text> : null}
+                      </View>
+                      <Text style={styles.meta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
+                      {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
+                      {(d.refeicoes || d.hospedagem) ? (
+                        <View style={styles.tags}>
+                          {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
+                          {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
+                        </View>
+                      ) : null}
+                    </View>
+                    {imgs.length > 0 && (
+                      <View style={styles.diaFotoCol}>
+                        {imgs.map((src, j) => <Image key={j} src={src} style={styles.fotoLado} />)}
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <Text style={styles.meta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
-                {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
-                {(d.refeicoes || d.hospedagem) ? (
-                  <View style={styles.tags}>
-                    {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
-                    {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
-                  </View>
-                ) : null}
-                {d.fotos.length > 0 && (
-                  <View style={styles.fotos}>
-                    {d.fotos.map((f, j) => {
-                      const data = fotos.get(f.url);
-                      return data ? <Image key={j} src={data} style={styles.foto} /> : null;
-                    })}
-                  </View>
-                )}
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
