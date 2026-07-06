@@ -150,6 +150,7 @@ const styles = StyleSheet.create({
   // ---------- Info (painel numerado) ----------
   infoCard: { flexDirection: "row", borderWidth: 1, borderColor: GREEN_SOFT, borderRadius: 6, padding: 10, marginBottom: 7, backgroundColor: "#ffffff" },
   infoNum: { fontFamily: SERIF_BOLD, fontSize: 16, color: LIME_DEEP, width: 26 },
+  infoTexto: { width: "92%" },
 
   // ---------- Aviso (acento por tipo) ----------
   aviso: { borderWidth: 1, borderColor: GREEN_SOFT, borderLeftWidth: 4, borderRadius: 6, padding: 10, marginBottom: 7, backgroundColor: "#ffffff" },
@@ -437,7 +438,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
             {exp.info.map((b, i) => (
               <View key={i} style={styles.infoCard} wrap={false}>
                 <Text style={styles.infoNum}>{String(i + 1).padStart(2, "0")}</Text>
-                <View style={{ flexGrow: 1, flexShrink: 1 }}>
+                <View style={styles.infoTexto}>
                   <Text style={styles.itemTitulo}>{b.titulo}</Text>
                   <Text style={styles.texto}>{b.conteudo}</Text>
                 </View>
