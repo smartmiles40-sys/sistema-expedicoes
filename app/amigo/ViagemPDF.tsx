@@ -22,6 +22,7 @@ import {
 } from "@react-pdf/renderer";
 import { formatDate } from "@/lib/utils";
 import type { AmigoExpedicao } from "./actions";
+import { heroDoDestino, fechoDoDestino, diaImgFallback } from "./fotos";
 
 // ===== Paleta oficial da marca =====
 const DARK = "#09282B"; // Dark Teal — cor principal
@@ -47,6 +48,13 @@ Font.register({ family: "Inter", src: "/fonts/Inter-Regular.ttf" });
 Font.register({ family: "InterBold", src: "/fonts/Inter-Bold.ttf" });
 Font.register({ family: "InterItalic", src: "/fonts/Inter-Italic.ttf" });
 
+// Emojis no PDF: as fontes embutidas não têm glifos de emoji, então o @react-pdf
+// substitui os caracteres de emoji por imagens (Twemoji) buscadas na geração.
+Font.registerEmojiSource({
+  format: "png",
+  url: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/",
+});
+
 const SERIF = "Fraunces";
 const SERIF_BOLD = "FrauncesBold";
 const SERIF_ITALIC = "FrauncesItalic";
@@ -56,7 +64,11 @@ const SANS_ITALIC = "InterItalic";
 
 const styles = StyleSheet.create({
   // ---------- Capa ----------
-  coverPage: { backgroundColor: DARK, color: OFF, paddingTop: 70, paddingBottom: 54, paddingHorizontal: 48 },
+  coverPage: { position: "relative", backgroundColor: DARK, color: OFF },
+  coverInner: { flexGrow: 1, paddingTop: 70, paddingBottom: 54, paddingHorizontal: 48 },
+  coverPhoto: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" },
+  coverOverlay: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(9,40,43,0.5)" },
+  coverOverlayBottom: { position: "absolute", left: 0, bottom: 0, width: "100%", height: "58%", backgroundColor: "rgba(9,40,43,0.55)" },
   coverTop: { flexDirection: "column", alignItems: "flex-start" },
   coverWordmark: { fontFamily: SERIF, fontSize: 15, color: OFF, marginTop: 14, letterSpacing: 0.5 },
   coverWordmarkTag: { fontFamily: SERIF_ITALIC, fontSize: 9, color: GREEN_SOFT },
@@ -68,10 +80,10 @@ const styles = StyleSheet.create({
   coverDest: { fontFamily: SERIF_ITALIC, fontSize: 15, color: GREEN_SOFT, marginTop: 12 },
   coverMetaRow: { flexDirection: "row", marginTop: 14 },
   coverMetaBox: { marginRight: 26 },
-  coverMetaLabel: { fontFamily: SANS_BOLD, fontSize: 7, color: TEAL_400, letterSpacing: 1.5, marginBottom: 3 },
+  coverMetaLabel: { fontFamily: SANS_BOLD, fontSize: 7, color: GREEN_SOFT, letterSpacing: 1.5, marginBottom: 3 },
   coverMetaVal: { fontFamily: SANS, fontSize: 11, color: OFF },
   coverPax: { marginTop: 24, borderTopWidth: 1, borderTopColor: TEAL_600, paddingTop: 14 },
-  coverPaxLabel: { fontFamily: SANS_BOLD, fontSize: 8, color: TEAL_400, letterSpacing: 1.5 },
+  coverPaxLabel: { fontFamily: SANS_BOLD, fontSize: 8, color: GREEN_SOFT, letterSpacing: 1.5 },
   coverPaxNome: { fontFamily: SERIF, fontSize: 17, color: LIME, marginTop: 3 },
   coverTagline: { fontFamily: SERIF_ITALIC, fontSize: 12, color: GREEN_SOFT, marginTop: 24, lineHeight: 1.35 },
 
@@ -86,21 +98,21 @@ const styles = StyleSheet.create({
   headerLogo: { width: 74 },
   headerTrip: { fontFamily: SANS, fontSize: 8, color: MUTED },
 
-  // Cabeçalho de seção
-  secao: { marginTop: 18 },
-  secaoTituloRow: { flexDirection: "row", alignItems: "center", marginBottom: 9 },
-  secaoBar: { width: 4, height: 16, backgroundColor: LIME, borderRadius: 2, marginRight: 8 },
-  secaoTitulo: { fontFamily: SERIF_BOLD, fontSize: 16, color: DARK },
-  secaoHint: { fontFamily: SANS, fontSize: 8, color: MUTED, marginBottom: 6, marginTop: -4 },
+  // Cabeçalho de seção (editorial — regra lime + título serifado grande)
+  secao: { marginTop: 20 },
+  secaoHeader: { marginBottom: 10 },
+  secaoRule: { width: 30, height: 3, backgroundColor: LIME, borderRadius: 2, marginBottom: 7 },
+  secaoTituloBig: { fontFamily: SERIF_BOLD, fontSize: 19, color: DARK, letterSpacing: -0.2 },
+  secaoHint: { fontFamily: SANS, fontSize: 8.5, color: MUTED, marginTop: 3, lineHeight: 1.4 },
 
   subtitulo: { fontFamily: SANS_BOLD, fontSize: 8, color: TEAL_400, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
 
   // ---------- Resumo (fact grid) ----------
-  resumoPanel: { backgroundColor: PANEL, borderRadius: 8, padding: 14, flexDirection: "row", flexWrap: "wrap" },
-  fact: { width: "50%", marginBottom: 12, paddingRight: 12 },
-  factLabel: { fontFamily: SANS_BOLD, fontSize: 7, color: TEAL_400, letterSpacing: 1.2, marginBottom: 2 },
-  factVal: { fontFamily: SERIF, fontSize: 12, color: DARK },
-  factSub: { fontFamily: SANS, fontSize: 8, color: MUTED, marginTop: 1 },
+  resumoPanel: { backgroundColor: DARK, borderRadius: 8, padding: 16, flexDirection: "row", flexWrap: "wrap" },
+  fact: { width: "50%", marginBottom: 13, paddingRight: 12 },
+  factLabel: { fontFamily: SANS_BOLD, fontSize: 7, color: LIME, letterSpacing: 1.2, marginBottom: 3 },
+  factVal: { fontFamily: SERIF, fontSize: 12.5, color: OFF },
+  factSub: { fontFamily: SANS, fontSize: 8, color: GREEN_SOFT, marginTop: 1 },
 
   // ---------- Roteiro resumido ----------
   resumoDia: { flexDirection: "row", alignItems: "center", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: GREEN_SOFT },
@@ -133,6 +145,21 @@ const styles = StyleSheet.create({
   diaTexto: { width: "63%" },
   diaFotoCol: { width: "34%", marginLeft: "3%", alignItems: "center" },
   fotoLado: { width: "100%", height: 110, objectFit: "cover", borderRadius: 4, marginBottom: 5 },
+
+  // Dia com banner de foto (estilo do portal/site)
+  diaCard: { borderWidth: 1, borderColor: GREEN_SOFT, borderRadius: 8, marginBottom: 9, backgroundColor: "#ffffff", overflow: "hidden" },
+  diaBanner: { position: "relative", height: 132, justifyContent: "flex-end" },
+  diaBannerImg: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" },
+  diaBannerFallback: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: DARK },
+  diaBannerShade: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(9,40,43,0.25)" },
+  diaBannerShadeBottom: { position: "absolute", left: 0, bottom: 0, width: "100%", height: "72%", backgroundColor: "rgba(9,40,43,0.62)" },
+  diaBannerBottom: { padding: 11 },
+  diaChipRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  diaChipLime: { backgroundColor: LIME, borderRadius: 3, paddingVertical: 2, paddingHorizontal: 6, marginRight: 7 },
+  diaChipLimeTxt: { fontFamily: SANS_BOLD, fontSize: 8, color: DARK, letterSpacing: 0.5 },
+  diaBannerMeta: { fontFamily: SANS, fontSize: 8, color: OFF },
+  diaTituloBanner: { fontFamily: SERIF_BOLD, fontSize: 15, color: OFF, lineHeight: 1.1 },
+  diaContent: { padding: 11 },
 
   // ---------- Voo (cartão de deslocamento) ----------
   vooCard: { borderWidth: 1, borderColor: GREEN_SOFT, borderRadius: 6, marginBottom: 7, backgroundColor: "#ffffff", overflow: "hidden" },
@@ -171,14 +198,15 @@ const styles = StyleSheet.create({
   footerPage: { fontFamily: SANS, fontSize: 8, color: MUTED },
 
   // ---------- Encerramento ----------
-  endPage: { backgroundColor: DARK, color: OFF, paddingTop: 90, paddingBottom: 60, paddingHorizontal: 54, alignItems: "center" },
+  endPage: { position: "relative", backgroundColor: DARK, color: OFF },
+  endInner: { flexGrow: 1, paddingTop: 90, paddingBottom: 60, paddingHorizontal: 54, alignItems: "center" },
   endRule: { width: 54, height: 3, backgroundColor: LIME, marginTop: 22, marginBottom: 22 },
   endLogo: { width: 122, height: 122 },
   endTagline: { fontFamily: SERIF_ITALIC, fontSize: 18, color: OFF, textAlign: "center", lineHeight: 1.4 },
   endBoa: { fontFamily: SERIF_BOLD, fontSize: 22, color: LIME, marginTop: 20 },
   endSpacer: { flexGrow: 1 },
   endSocial: { fontFamily: SANS_BOLD, fontSize: 10, color: GREEN_SOFT, letterSpacing: 1 },
-  endNota: { fontFamily: SANS, fontSize: 7.5, color: TEAL_400, textAlign: "center", marginTop: 12, lineHeight: 1.5 },
+  endNota: { fontFamily: SANS, fontSize: 7.5, color: GREEN_SOFT, textAlign: "center", marginTop: 12, lineHeight: 1.5 },
 });
 
 /** Formas orgânicas decorativas da marca (canto da capa). */
@@ -194,11 +222,9 @@ function CapaDecor() {
 
 function SecaoTitulo({ children, hint }: { children: string; hint?: string }) {
   return (
-    <View>
-      <View style={styles.secaoTituloRow}>
-        <View style={styles.secaoBar} />
-        <Text style={styles.secaoTitulo}>{children}</Text>
-      </View>
+    <View style={styles.secaoHeader}>
+      <View style={styles.secaoRule} />
+      <Text style={styles.secaoTituloBig}>{children}</Text>
       {hint ? <Text style={styles.secaoHint}>{hint}</Text> : null}
     </View>
   );
@@ -220,52 +246,99 @@ function corAviso(tipo: string): string {
   return TEAL_400;
 }
 
+/** Emoji temático das Informações do destino (pelo título). */
+function emojiInfo(titulo: string): string {
+  const t = (titulo ?? "").toLowerCase();
+  if (t.includes("document")) return "🛂";
+  if (t.includes("vacina") || t.includes("saúde") || t.includes("saude")) return "💉";
+  if (t.includes("seguro") || t.includes("telemedicina")) return "🛡️";
+  if (t.includes("altitude") || t.includes("soroche")) return "⛰️";
+  if (t.includes("clima")) return "🌤️";
+  if (t.includes("moeda") || t.includes("câmbio") || t.includes("cambio")) return "💵";
+  if (t.includes("tomada") || t.includes("energia") || t.includes("volt")) return "🔌";
+  if (t.includes("fuso") || t.includes("horár") || t.includes("horar")) return "🕐";
+  if (t.includes("internet") || t.includes("chip") || t.includes("e-sim")) return "📱";
+  if (t.includes("levar") || t.includes("bagagem") || t.includes("mala")) return "🎒";
+  return "📍";
+}
+/** Emoji temático de um aviso (pelo título), com fallback ao tipo. */
+function emojiAviso(titulo: string, tipo: string): string {
+  const t = (titulo ?? "").toLowerCase();
+  if (t.includes("document") || t.includes("passaporte")) return "🛂";
+  if (t.includes("whatsapp") || t.includes("grupo de")) return "💬";
+  if (t.includes("levar") || t.includes("camada") || t.includes("roupa") || t.includes("mala")) return "🧳";
+  if (t.includes("desloca") || t.includes("táxi") || t.includes("taxi") || t.includes("uber")) return "🚕";
+  if (t.includes("segur")) return "🛡️";
+  if (t.includes("dinheiro") || t.includes("moeda") || t.includes("câmbio")) return "💵";
+  if (t.includes("altitude") || t.includes("soroche")) return "⛰️";
+  const tp = (tipo ?? "").toLowerCase();
+  if (tp.includes("dica")) return "💡";
+  if (tp.includes("boa")) return "✅";
+  return "⚠️";
+}
+
 function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fotos: Map<string, string> }) {
   const voos = exp.voos_grupo;
   const passeios = exp.passeios;
   const nts = noites(exp.data_embarque, exp.data_retorno);
   const meuHotel = exp.quartos[0];
+  const coverImg = heroDoDestino(exp.destino);
+  const fechoImg = fechoDoDestino(exp.destino);
+  // Resolve cada URL pra sua versão re-encodada (data URL) quando disponível.
+  const pega = (url: string | null): string | null => (url ? fotos.get(url) ?? url : null);
+  const coverSrc = pega(coverImg);
+  const fechoSrc = pega(fechoImg);
 
   return (
     <Document title={`Viagem — ${exp.nome}`} author="Se Tu For, Eu Vou">
       {/* ===== CAPA ===== */}
       <Page size="A4" style={styles.coverPage}>
-        <CapaDecor />
-        <View style={styles.coverTop}>
-          <Image src="/brand/logo-horizontal-off-white.png" style={styles.coverLogo} />
-        </View>
+        {coverSrc ? (
+          <>
+            <Image src={coverSrc} style={styles.coverPhoto} fixed />
+            <View style={styles.coverOverlay} fixed />
+            <View style={styles.coverOverlayBottom} fixed />
+          </>
+        ) : (
+          <CapaDecor />
+        )}
+        <View style={styles.coverInner}>
+          <View style={styles.coverTop}>
+            <Image src="/brand/logo-horizontal-off-white.png" style={styles.coverLogo} />
+          </View>
 
-        <View style={styles.coverSpacer} />
+          <View style={styles.coverSpacer} />
 
-        <View>
-          <View style={styles.coverRule} />
-          <Text style={styles.coverKicker}>SUA EXPEDIÇÃO</Text>
-          <Text style={styles.coverTitle}>{exp.nome}</Text>
-          <Text style={styles.coverDest}>{exp.destino}</Text>
+          <View>
+            <View style={styles.coverRule} />
+            <Text style={styles.coverKicker}>SUA EXPEDIÇÃO</Text>
+            <Text style={styles.coverTitle}>{exp.nome}</Text>
+            <Text style={styles.coverDest}>{exp.destino}</Text>
 
-          <View style={styles.coverMetaRow}>
-            <View style={styles.coverMetaBox}>
-              <Text style={styles.coverMetaLabel}>EMBARQUE</Text>
-              <Text style={styles.coverMetaVal}>{formatDate(exp.data_embarque)}</Text>
-            </View>
-            <View style={styles.coverMetaBox}>
-              <Text style={styles.coverMetaLabel}>RETORNO</Text>
-              <Text style={styles.coverMetaVal}>{formatDate(exp.data_retorno)}</Text>
-            </View>
-            {nts > 0 && (
+            <View style={styles.coverMetaRow}>
               <View style={styles.coverMetaBox}>
-                <Text style={styles.coverMetaLabel}>DURAÇÃO</Text>
-                <Text style={styles.coverMetaVal}>{nts} {nts === 1 ? "noite" : "noites"}</Text>
+                <Text style={styles.coverMetaLabel}>EMBARQUE</Text>
+                <Text style={styles.coverMetaVal}>{formatDate(exp.data_embarque)}</Text>
               </View>
-            )}
-          </View>
+              <View style={styles.coverMetaBox}>
+                <Text style={styles.coverMetaLabel}>RETORNO</Text>
+                <Text style={styles.coverMetaVal}>{formatDate(exp.data_retorno)}</Text>
+              </View>
+              {nts > 0 && (
+                <View style={styles.coverMetaBox}>
+                  <Text style={styles.coverMetaLabel}>DURAÇÃO</Text>
+                  <Text style={styles.coverMetaVal}>{nts} {nts === 1 ? "noite" : "noites"}</Text>
+                </View>
+              )}
+            </View>
 
-          <View style={styles.coverPax}>
-            <Text style={styles.coverPaxLabel}>PREPARADO PARA</Text>
-            <Text style={styles.coverPaxNome}>{nome}</Text>
-          </View>
+            <View style={styles.coverPax}>
+              <Text style={styles.coverPaxLabel}>PREPARADO PARA</Text>
+              <Text style={styles.coverPaxNome}>{nome}</Text>
+            </View>
 
-          <Text style={styles.coverTagline}>Explorando o extraordinário.{"\n"}Planejando o inesquecível.</Text>
+            <Text style={styles.coverTagline}>Explorando o extraordinário.{"\n"}Planejando o inesquecível.</Text>
+          </View>
         </View>
       </Page>
 
@@ -327,33 +400,34 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           <View style={styles.secao} break>
             <SecaoTitulo>Roteiro dia a dia (previsto)</SecaoTitulo>
             {exp.roteiro.map((d, i) => {
-              const imgs = d.fotos.map((f) => fotos.get(f.url)).filter((x): x is string => !!x);
-              const conteudo = (
-                <>
-                  <View style={styles.itemRow}>
-                    <View style={styles.diaChip}><Text style={styles.diaChipTxt}>Dia {d.dia}</Text></View>
-                    {d.titulo ? <Text style={styles.diaTitulo}>{d.titulo}</Text> : null}
-                  </View>
-                  <Text style={styles.meta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
-                  {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
-                  {(d.refeicoes || d.hospedagem) ? (
-                    <View style={styles.tags}>
-                      {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
-                      {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
-                    </View>
-                  ) : null}
-                </>
-              );
+              const dbImg = d.fotos.map((f) => fotos.get(f.url)).find((x): x is string => !!x);
+              const img = dbImg ?? pega(diaImgFallback(exp.destino, d.dia));
+              const temTexto = Boolean(d.descricao || d.refeicoes || d.hospedagem);
               return (
-                <View key={i} style={styles.dia} wrap={false}>
-                  {imgs.length > 0 ? (
-                    <View style={styles.diaBody}>
-                      <View style={styles.diaTexto}>{conteudo}</View>
-                      <View style={styles.diaFotoCol}>
-                        {imgs.map((src, j) => <Image key={j} src={src} style={styles.fotoLado} />)}
+                <View key={i} style={styles.diaCard} wrap={false}>
+                  <View style={styles.diaBanner}>
+                    {img ? <Image src={img} style={styles.diaBannerImg} /> : <View style={styles.diaBannerFallback} />}
+                    <View style={styles.diaBannerShade} />
+                    <View style={styles.diaBannerShadeBottom} />
+                    <View style={styles.diaBannerBottom}>
+                      <View style={styles.diaChipRow}>
+                        <View style={styles.diaChipLime}><Text style={styles.diaChipLimeTxt}>DIA {d.dia}</Text></View>
+                        <Text style={styles.diaBannerMeta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join("   ·   ")}</Text>
                       </View>
+                      {d.titulo ? <Text style={styles.diaTituloBanner}>{d.titulo}</Text> : null}
                     </View>
-                  ) : conteudo}
+                  </View>
+                  {temTexto && (
+                    <View style={styles.diaContent}>
+                      {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
+                      {(d.refeicoes || d.hospedagem) ? (
+                        <View style={styles.tags}>
+                          {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
+                          {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -439,7 +513,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
               <View key={i} style={styles.infoCard} wrap={false}>
                 <Text style={styles.infoNum}>{String(i + 1).padStart(2, "0")}</Text>
                 <View style={styles.infoTexto}>
-                  <Text style={styles.itemTitulo}>{b.titulo}</Text>
+                  <Text style={styles.itemTitulo}>{emojiInfo(b.titulo)} {b.titulo}</Text>
                   <Text style={styles.texto}>{b.conteudo}</Text>
                 </View>
               </View>
@@ -454,7 +528,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
             {exp.avisos.map((a, i) => (
               <View key={i} style={[styles.aviso, { borderLeftColor: corAviso(a.tipo) }]} wrap={false}>
                 <Text style={[styles.avisoTipo, { color: corAviso(a.tipo) }]}>{a.tipo.toUpperCase()}</Text>
-                <Text style={styles.itemTitulo}>{a.titulo}</Text>
+                <Text style={styles.itemTitulo}>{emojiAviso(a.titulo, a.tipo)} {a.titulo}</Text>
                 <Text style={styles.texto}>{a.conteudo}</Text>
               </View>
             ))}
@@ -495,16 +569,25 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
 
       {/* ===== ENCERRAMENTO ===== */}
       <Page size="A4" style={styles.endPage}>
-        <Image src="/brand/logo-circular-off-white.png" style={styles.endLogo} />
-        <View style={styles.endRule} />
-        <Text style={styles.endTagline}>Explorando o extraordinário.{"\n"}Planejando o inesquecível.</Text>
-        <Text style={styles.endBoa}>Boa viagem!</Text>
-        <View style={styles.endSpacer} />
-        <Text style={styles.endSocial}>@setuforeuvouviagens</Text>
-        <Text style={styles.endNota}>
-          Este material é de uso exclusivo dos participantes desta expedição da{"\n"}
-          Se Tu For, Eu Vou! — Viagens. As informações podem sofrer ajustes; acompanhe o portal e o grupo oficial.
-        </Text>
+        {fechoSrc ? (
+          <>
+            <Image src={fechoSrc} style={styles.coverPhoto} fixed />
+            <View style={styles.coverOverlay} fixed />
+            <View style={styles.coverOverlayBottom} fixed />
+          </>
+        ) : null}
+        <View style={styles.endInner}>
+          <Image src="/brand/logo-circular-off-white.png" style={styles.endLogo} />
+          <View style={styles.endRule} />
+          <Text style={styles.endTagline}>Explorando o extraordinário.{"\n"}Planejando o inesquecível.</Text>
+          <Text style={styles.endBoa}>Boa viagem!</Text>
+          <View style={styles.endSpacer} />
+          <Text style={styles.endSocial}>@setuforeuvouviagens</Text>
+          <Text style={styles.endNota}>
+            Este material é de uso exclusivo dos participantes desta expedição da{"\n"}
+            Se Tu For, Eu Vou! — Viagens. As informações podem sofrer ajustes; acompanhe o portal e o grupo oficial.
+          </Text>
+        </View>
       </Page>
     </Document>
   );
@@ -516,13 +599,23 @@ async function imagemDataUrl(url: string): Promise<string | null> {
     const res = await fetch(url);
     if (!res.ok) return null;
     const blob = await res.blob();
-    if (!/^image\/(jpe?g|png)$/i.test(blob.type)) return null; // react-pdf: jpg/png
-    return await new Promise<string | null>((resolve) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(typeof fr.result === "string" ? fr.result : null);
-      fr.onerror = () => resolve(null);
-      fr.readAsDataURL(blob);
-    });
+    if (!/^image\//i.test(blob.type)) return null;
+    // Re-encoda a foto num JPEG baseline limpo via canvas. Normaliza imagens que o
+    // @react-pdf não consegue renderizar (CMYK, progressivo, perfil de cor) — o que
+    // fazia fotos "sumirem" no PDF — e ainda reduz o tamanho do arquivo.
+    const bitmap = await createImageBitmap(blob);
+    const maxW = 1400;
+    const escala = Math.min(1, maxW / bitmap.width);
+    const w = Math.max(1, Math.round(bitmap.width * escala));
+    const alt = Math.max(1, Math.round(bitmap.height * escala));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = alt;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, w, alt);
+    if (typeof bitmap.close === "function") bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.82);
   } catch {
     return null;
   }
@@ -530,10 +623,21 @@ async function imagemDataUrl(url: string): Promise<string | null> {
 
 /** Gera o PDF da viagem e devolve o Blob. */
 export async function gerarPdfViagem(exp: AmigoExpedicao, nome: string): Promise<Blob> {
-  const urls = [...new Set(exp.roteiro.flatMap((d) => d.fotos.map((f) => f.url)))];
+  // Junta TODAS as imagens do PDF (fotos do banco + capa/fecho/fotos-por-dia da marca)
+  // e re-encoda cada uma num JPEG limpo — assim nenhuma "some" no @react-pdf.
+  const alvos = new Set<string>();
+  exp.roteiro.forEach((d) => d.fotos.forEach((f) => alvos.add(f.url)));
+  const cover = heroDoDestino(exp.destino);
+  const fecho = fechoDoDestino(exp.destino);
+  if (cover) alvos.add(cover);
+  if (fecho) alvos.add(fecho);
+  exp.roteiro.forEach((d) => {
+    const fb = diaImgFallback(exp.destino, d.dia);
+    if (fb) alvos.add(fb);
+  });
   const fotos = new Map<string, string>();
   await Promise.all(
-    urls.map(async (u) => {
+    [...alvos].map(async (u) => {
       const data = await imagemDataUrl(u);
       if (data) fotos.set(u, data);
     }),
