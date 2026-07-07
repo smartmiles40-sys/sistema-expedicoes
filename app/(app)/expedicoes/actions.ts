@@ -267,6 +267,23 @@ const editarPassageiroLoteSchema = z.object({
   checkin_online_feito: z.boolean().optional(),
   observacoes: z.string().nullable().optional(),
   saude: z.record(z.string(), z.string()).nullable().optional(),
+  // Dados complementares da inscrição (endereço/contato → pessoais; prefs/acompanhante → reserva)
+  contato_emergencia_nome: z.string().nullable().optional(),
+  contato_emergencia_fone: z.string().nullable().optional(),
+  contato_emergencia_vinculo: z.string().nullable().optional(),
+  endereco_cep: z.string().nullable().optional(),
+  endereco_rua: z.string().nullable().optional(),
+  endereco_numero: z.string().nullable().optional(),
+  endereco_complemento: z.string().nullable().optional(),
+  endereco_bairro: z.string().nullable().optional(),
+  endereco_cidade: z.string().nullable().optional(),
+  endereco_estado: z.string().nullable().optional(),
+  pref_marcar_assento: z.boolean().nullable().optional(),
+  pref_upgrade_classe: z.string().nullable().optional(),
+  ja_viajou_internacional: z.boolean().nullable().optional(),
+  paises_visitados: z.string().nullable().optional(),
+  acompanhante_nome: z.string().nullable().optional(),
+  acompanhante_divide_quarto: z.string().nullable().optional(),
 });
 
 // =============================================================================
