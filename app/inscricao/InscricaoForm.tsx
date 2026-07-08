@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { toast } from "sonner";
-import { Upload, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
+import { Upload, CheckCircle2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -91,8 +91,10 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   const [divideQuarto, setDivideQuarto] = React.useState<string | null>(null);
   const [saude, setSaude] = React.useState<SaudePassageiro>({});
   const [passaporteFile, setPassaporteFile] = React.useState<File | null>(null);
+  const [possuiPassaporte, setPossuiPassaporte] = React.useState<boolean | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [ok, setOk] = React.useState<null | "novo" | "completou">(null);
+  const [passo, setPasso] = React.useState(0); // etapa atual do wizard (fase "completar")
 
   const set = (k: keyof typeof CAMPOS_TEXTO_VAZIO) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
@@ -115,6 +117,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         setTemos(new Set());
         setTemPassaporteAnexo(false);
       }
+      setPasso(0);
       setFase("completar");
     } finally {
       setBusy(false);
@@ -122,7 +125,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   }
 
   async function enviar() {
-    if (precisaAnexo && !passaporteFile) return toast.error("Anexe a foto ou PDF do seu passaporte.");
+    if (precisaAnexo && possuiPassaporte === true && !passaporteFile) return toast.error("Anexe a foto ou PDF do seu passaporte.");
     setBusy(true);
     try {
       const dados = {
@@ -224,105 +227,129 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
     );
   }
 
-  // ─── FASE 2: completar ───────────────────────────────────────────────────
+  // ─── FASE 2: completar (em ETAPAS / wizard) ──────────────────────────────
   const secaoDadosVisivel = mostra("nome_completo") || mostra("email") || mostra("telefone");
   const secaoEnderecoVisivel = ["endereco_cep", "endereco_rua", "endereco_numero", "endereco_cidade", "endereco_estado"].some(mostra);
   const secaoPassaporteVisivel = mostra("passaporte") || mostra("validade_passaporte") || precisaAnexo;
   const secaoEmergenciaVisivel = ["contato_emergencia_nome", "contato_emergencia_fone", "contato_emergencia_vinculo"].some(mostra);
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      {Header}
-      <main className="mx-auto max-w-2xl space-y-4 p-4">
-        {bucketsTemos.length > 0 && (
-          <div className="flex items-start gap-2 rounded-2xl border border-vinculado-600/30 bg-vinculado-50 p-3">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-vinculado-600" />
-            <p className="text-[12px] text-vinculado-700">
-              <strong>Já temos {bucketsTemos.join(", ")} na nossa base</strong> — não precisa preencher de novo. Complete abaixo só o que falta.
-            </p>
-          </div>
-        )}
+  // Monta só as etapas que fazem sentido (pula o que já temos).
+  const passos: { titulo: string; node: React.ReactNode }[] = [];
 
-        {secaoDadosVisivel && (
-          <Secao titulo="Dados pessoais">
-            {mostra("nome_completo") && <Campo label="Nome completo"><Input value={f.nome_completo} onChange={set("nome_completo")} /></Campo>}
-            <div className="grid grid-cols-2 gap-3">
-              {mostra("email") && <Campo label="E-mail"><Input type="email" value={f.email} onChange={set("email")} /></Campo>}
-              {mostra("telefone") && (
-                <Campo label="Telefone / WhatsApp">
-                  <Input value={f.telefone} onChange={(e) => setF((p) => ({ ...p, telefone: mascaraTelefone(e.target.value) }))} inputMode="tel" placeholder="(00) 00000-0000" />
-                </Campo>
-              )}
-            </div>
-          </Secao>
-        )}
+  if (secaoDadosVisivel) passos.push({
+    titulo: "Dados pessoais",
+    node: (
+      <Secao titulo="Dados pessoais">
+        {mostra("nome_completo") && <Campo label="Nome completo"><Input value={f.nome_completo} onChange={set("nome_completo")} /></Campo>}
+        <div className="grid grid-cols-2 gap-3">
+          {mostra("email") && <Campo label="E-mail"><Input type="email" value={f.email} onChange={set("email")} /></Campo>}
+          {mostra("telefone") && (
+            <Campo label="Telefone / WhatsApp">
+              <Input value={f.telefone} onChange={(e) => setF((p) => ({ ...p, telefone: mascaraTelefone(e.target.value) }))} inputMode="tel" placeholder="(00) 00000-0000" />
+            </Campo>
+          )}
+        </div>
+      </Secao>
+    ),
+  });
 
-        {secaoEnderecoVisivel && (
-          <Secao titulo="Endereço">
-            <div className="grid grid-cols-2 gap-3">
-              {mostra("endereco_cep") && <Campo label="CEP"><Input value={f.endereco_cep} onChange={set("endereco_cep")} inputMode="numeric" /></Campo>}
-              {mostra("endereco_cidade") && <Campo label="Cidade"><Input value={f.endereco_cidade} onChange={set("endereco_cidade")} /></Campo>}
-            </div>
-            <div className="grid grid-cols-[1fr_90px] gap-3">
-              {mostra("endereco_rua") && <Campo label="Logradouro"><Input value={f.endereco_rua} onChange={set("endereco_rua")} /></Campo>}
-              {mostra("endereco_numero") && <Campo label="Número"><Input value={f.endereco_numero} onChange={set("endereco_numero")} /></Campo>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Campo label="Complemento"><Input value={f.endereco_complemento} onChange={set("endereco_complemento")} /></Campo>
-              <Campo label="Bairro"><Input value={f.endereco_bairro} onChange={set("endereco_bairro")} /></Campo>
-            </div>
-            {mostra("endereco_estado") && <Campo label="Estado (UF)"><Input value={f.endereco_estado} onChange={set("endereco_estado")} maxLength={20} /></Campo>}
-          </Secao>
-        )}
+  if (secaoEnderecoVisivel) passos.push({
+    titulo: "Endereço",
+    node: (
+      <Secao titulo="Endereço">
+        <div className="grid grid-cols-2 gap-3">
+          {mostra("endereco_cep") && <Campo label="CEP"><Input value={f.endereco_cep} onChange={set("endereco_cep")} inputMode="numeric" /></Campo>}
+          {mostra("endereco_cidade") && <Campo label="Cidade"><Input value={f.endereco_cidade} onChange={set("endereco_cidade")} /></Campo>}
+        </div>
+        <div className="grid grid-cols-[1fr_90px] gap-3">
+          {mostra("endereco_rua") && <Campo label="Logradouro"><Input value={f.endereco_rua} onChange={set("endereco_rua")} /></Campo>}
+          {mostra("endereco_numero") && <Campo label="Número"><Input value={f.endereco_numero} onChange={set("endereco_numero")} /></Campo>}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo label="Complemento"><Input value={f.endereco_complemento} onChange={set("endereco_complemento")} /></Campo>
+          <Campo label="Bairro"><Input value={f.endereco_bairro} onChange={set("endereco_bairro")} /></Campo>
+        </div>
+        {mostra("endereco_estado") && <Campo label="Estado (UF)"><Input value={f.endereco_estado} onChange={set("endereco_estado")} maxLength={20} /></Campo>}
+      </Secao>
+    ),
+  });
 
-        {secaoPassaporteVisivel && (
-          <Secao titulo="Passaporte">
-            <div className="grid grid-cols-2 gap-3">
-              {mostra("passaporte") && <Campo label="Número do passaporte"><Input value={f.passaporte} onChange={set("passaporte")} /></Campo>}
-              {mostra("validade_passaporte") && <Campo label="Validade"><Input type="date" value={f.validade_passaporte} onChange={set("validade_passaporte")} /></Campo>}
-            </div>
-            {precisaAnexo ? (
-              <div className="space-y-1">
-                <Label className="text-[12px]">Anexo do passaporte (foto ou PDF) — obrigatório</Label>
-                <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[13px] hover:bg-accent/40",
-                  passaporteFile && "border-solid border-vinculado-600/40 bg-vinculado-50")}>
-                  <Upload className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{passaporteFile ? passaporteFile.name : "Escolher arquivo"}</span>
-                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setPassaporteFile(e.target.files?.[0] ?? null)} />
-                </label>
+  if (secaoPassaporteVisivel) passos.push({
+    titulo: "Passaporte",
+    node: (
+      <Secao titulo="Passaporte">
+        {precisaAnexo ? (
+          <>
+            <Campo label="Você possui passaporte?">
+              <SimNao value={possuiPassaporte} onChange={setPossuiPassaporte} />
+            </Campo>
+            {possuiPassaporte === true && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {mostra("passaporte") && <Campo label="Número do passaporte"><Input value={f.passaporte} onChange={set("passaporte")} /></Campo>}
+                  {mostra("validade_passaporte") && <Campo label="Validade"><Input type="date" value={f.validade_passaporte} onChange={set("validade_passaporte")} /></Campo>}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[12px]">Anexo do passaporte (foto ou PDF) — obrigatório</Label>
+                  <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[13px] hover:bg-accent/40",
+                    passaporteFile && "border-solid border-vinculado-600/40 bg-vinculado-50")}>
+                    <Upload className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{passaporteFile ? passaporteFile.name : "Escolher arquivo"}</span>
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setPassaporteFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+              </>
+            )}
+            {possuiPassaporte === false && (
+              <p className="text-[12px] text-muted-foreground">Sem problema! Assim que você tirar o passaporte, é só enviar para a agência — a gente acompanha.</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-[12px] text-vinculado-700">✓ Já temos seu passaporte anexado.</p>
+            {(mostra("passaporte") || mostra("validade_passaporte")) && (
+              <div className="grid grid-cols-2 gap-3">
+                {mostra("passaporte") && <Campo label="Número do passaporte"><Input value={f.passaporte} onChange={set("passaporte")} /></Campo>}
+                {mostra("validade_passaporte") && <Campo label="Validade"><Input type="date" value={f.validade_passaporte} onChange={set("validade_passaporte")} /></Campo>}
               </div>
-            ) : (
-              <p className="text-[12px] text-vinculado-700">✓ Já temos seu passaporte anexado.</p>
             )}
-          </Secao>
+          </>
         )}
+      </Secao>
+    ),
+  });
 
-        {secaoEmergenciaVisivel && (
-          <Secao titulo="Contato de emergência">
-            <div className="grid grid-cols-2 gap-3">
-              {mostra("contato_emergencia_nome") && <Campo label="Nome"><Input value={f.contato_emergencia_nome} onChange={set("contato_emergencia_nome")} /></Campo>}
-              {mostra("contato_emergencia_fone") && (
-                <Campo label="Telefone">
-                  <Input value={f.contato_emergencia_fone} onChange={(e) => setF((p) => ({ ...p, contato_emergencia_fone: mascaraTelefone(e.target.value) }))} inputMode="tel" placeholder="(00) 00000-0000" />
-                </Campo>
-              )}
-            </div>
-            {mostra("contato_emergencia_vinculo") && (
-              <Campo label="Vínculo com você"><Input value={f.contato_emergencia_vinculo} onChange={set("contato_emergencia_vinculo")} placeholder="Ex.: mãe, pai, irmão, cônjuge, amigo(a)…" /></Campo>
-            )}
-          </Secao>
+  if (secaoEmergenciaVisivel) passos.push({
+    titulo: "Contato de emergência",
+    node: (
+      <Secao titulo="Contato de emergência">
+        <div className="grid grid-cols-2 gap-3">
+          {mostra("contato_emergencia_nome") && <Campo label="Nome"><Input value={f.contato_emergencia_nome} onChange={set("contato_emergencia_nome")} /></Campo>}
+          {mostra("contato_emergencia_fone") && (
+            <Campo label="Telefone">
+              <Input value={f.contato_emergencia_fone} onChange={(e) => setF((p) => ({ ...p, contato_emergencia_fone: mascaraTelefone(e.target.value) }))} inputMode="tel" placeholder="(00) 00000-0000" />
+            </Campo>
+          )}
+        </div>
+        {mostra("contato_emergencia_vinculo") && (
+          <Campo label="Vínculo com você"><Input value={f.contato_emergencia_vinculo} onChange={set("contato_emergencia_vinculo")} placeholder="Ex.: mãe, pai, irmão, cônjuge, amigo(a)…" /></Campo>
         )}
+      </Secao>
+    ),
+  });
 
+  passos.push({
+    titulo: "Sua viagem",
+    node: (
+      <div className="space-y-4">
         <Secao titulo="Preferências de voo">
           <Campo label="Deseja marcar assento?"><SimNao value={prefAssento} onChange={setPrefAssento} /></Campo>
           <Campo label="Deseja upgrade de classe?"><Opcoes opcoes={["Não", "Executiva", "Primeira classe"]} value={prefUpgrade} onChange={setPrefUpgrade} /></Campo>
         </Secao>
-
         <Secao titulo="Experiência de viagem">
           <Campo label="Você já realizou viagens internacionais / visitou outros países?"><SimNao value={jaViajou} onChange={setJaViajou} /></Campo>
           {jaViajou && <Campo label="Quais países você já visitou?"><Input value={f.paises_visitados} onChange={set("paises_visitados")} /></Campo>}
         </Secao>
-
         <Secao titulo="Acompanhante">
           <Campo label="Você irá nesta expedição acompanhado(a)?"><SimNao value={acompanhado} onChange={setAcompanhado} /></Campo>
           {acompanhado && (
@@ -334,17 +361,87 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
             </>
           )}
         </Secao>
+      </div>
+    ),
+  });
 
-        <Secao titulo="Saúde">
-          <p className="text-[12px] text-muted-foreground">Essas informações são confidenciais e ajudam a equipe a cuidar de você na viagem.</p>
-          <SaudeCampos value={saude} onChange={setSaude} expedicaoId={null} passageiroId={null} />
-        </Secao>
+  passos.push({
+    titulo: "Saúde",
+    node: (
+      <Secao titulo="Saúde">
+        <p className="text-[12px] text-muted-foreground">Essas informações são confidenciais e ajudam a equipe a cuidar de você na viagem.</p>
+        <SaudeCampos value={saude} onChange={setSaude} expedicaoId={null} passageiroId={null} />
+      </Secao>
+    ),
+  });
 
-        <div className="pb-8">
-          <Button variant="brand" className="w-full" size="lg" onClick={enviar} disabled={busy}>
-            {busy ? "Enviando…" : "Enviar inscrição"}
-          </Button>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">Após o envio, sua inscrição fica pendente de aprovação da equipe.</p>
+  const idx = Math.min(passo, passos.length - 1);
+  const passoAtual = passos[idx];
+  const ultimo = idx >= passos.length - 1;
+  const pct = Math.round(((idx + 1) / passos.length) * 100);
+
+  const avancar = () => {
+    if (passoAtual.titulo === "Passaporte" && precisaAnexo) {
+      if (possuiPassaporte === null) {
+        toast.error("Você possui passaporte? Responda para continuar.");
+        return;
+      }
+      if (possuiPassaporte === true && !passaporteFile) {
+        toast.error("Anexe a foto ou PDF do seu passaporte para continuar.");
+        return;
+      }
+    }
+    setPasso(Math.min(idx + 1, passos.length - 1));
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const voltar = () => {
+    setPasso(Math.max(0, idx - 1));
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      {Header}
+      <main className="mx-auto max-w-2xl space-y-4 p-4">
+        {idx === 0 && bucketsTemos.length > 0 && (
+          <div className="flex items-start gap-2 rounded-2xl border border-vinculado-600/30 bg-vinculado-50 p-3">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-vinculado-600" />
+            <p className="text-[12px] text-vinculado-700">
+              <strong>Já temos {bucketsTemos.join(", ")} na nossa base</strong> — não precisa preencher de novo. Complete só o que falta.
+            </p>
+          </div>
+        )}
+
+        {/* Progresso das etapas */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-[12px]">
+            <span className="text-muted-foreground">Etapa {idx + 1} de {passos.length}</span>
+            <span className="font-semibold text-foreground">{passoAtual.titulo}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-[var(--brand-lime-deep)] transition-all duration-300" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+
+        {passoAtual.node}
+
+        <div className="flex items-center justify-between gap-3 pb-8 pt-1">
+          {idx > 0 ? (
+            <Button variant="outline" onClick={voltar} disabled={busy}>
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+          ) : (
+            <span />
+          )}
+          {ultimo ? (
+            <Button variant="brand" size="lg" onClick={enviar} disabled={busy}>
+              {busy ? "Enviando…" : "Enviar inscrição"}
+            </Button>
+          ) : (
+            <Button variant="brand" onClick={avancar} disabled={busy}>
+              Próximo <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </main>
     </div>
