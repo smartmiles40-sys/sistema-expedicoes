@@ -33,6 +33,14 @@ function mascaraDeIso(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
+// CPF: texto livre que vira XXX.XXX.XXX-XX (11 dígitos) enquanto digita.
+function mascaraCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
 
 /** Seções presentes numa expedição — alimenta a barra de navegação do header. */
 function secoesDaExp(exp: AmigoExpedicao): { id: string; label: string }[] {
@@ -64,7 +72,7 @@ export default function AmigoPage() {
       const raw = localStorage.getItem(STORAGE_KEY);
       const saved = raw ? (JSON.parse(raw) as { cpf?: string; nascimento?: string }) : null;
       if (saved?.cpf && saved?.nascimento) {
-        setCpf(saved.cpf);
+        setCpf(mascaraCpf(saved.cpf));
         setNascimento(mascaraDeIso(saved.nascimento));
         entrarExpedAmigo(saved.cpf, saved.nascimento)
           .then((r) => {
@@ -153,9 +161,10 @@ export default function AmigoPage() {
               <Input
                 id="amigo-cpf"
                 value={cpf}
-                onChange={(e) => setCpf(e.target.value)}
-                placeholder="Somente números"
+                onChange={(e) => setCpf(mascaraCpf(e.target.value))}
+                placeholder="000.000.000-00"
                 inputMode="numeric"
+                maxLength={14}
                 autoFocus
                 className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
               />
