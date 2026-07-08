@@ -173,3 +173,23 @@ export async function excluirFotoRoteiro(
   revalidatePath(`/expedicoes/${expedicaoId}/portal`);
   return { ok: true };
 }
+
+// ===== Voucher único da hospedagem (nível da expedição, migration 0030) =====
+
+export async function definirVoucherHospedagem(
+  expedicaoId: string,
+  arquivoId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    revalidatePath(`/expedicoes/${expedicaoId}/portal`);
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { error } = await sb
+    .from("expedicoes")
+    .update({ hospedagem_voucher_arquivo_id: arquivoId })
+    .eq("id", expedicaoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/portal`);
+  return { ok: true };
+}

@@ -86,6 +86,8 @@ export type AmigoExpedicao = {
   voo: AmigoVoo;
   links: AmigoLink[];
   quartos: AmigoQuarto[];
+  /** Voucher único da hospedagem (mesmo hotel p/ todos) — migration 0030. */
+  hospedagem_voucher_url: string | null;
   roteiro: AmigoRoteiroDia[];
   voos_grupo: AmigoVooGrupo[];
   passeios: AmigoPasseio[];
@@ -218,6 +220,7 @@ export async function entrarExpedAmigo(
     for (const f of rtFotos) if (expIdsFuturas.has(f.expedicao_id)) idsRelevantes.add(f.arquivo_id);
     for (const v of voosGrupo) if (v.arquivo_id && expIdsFuturas.has(v.expedicao_id)) idsRelevantes.add(v.arquivo_id);
     for (const p of passeios) if (p.arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.arquivo_id);
+    for (const e of exps) if (e.hospedagem_voucher_arquivo_id && expIdsFuturas.has(e.id)) idsRelevantes.add(e.hospedagem_voucher_arquivo_id);
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
 
     if (DEV_USE_MOCK_DATA) {
@@ -273,6 +276,7 @@ export async function entrarExpedAmigo(
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((l) => ({ label: l.label, url: l.url })),
       quartos: meusQuartos,
+      hospedagem_voucher_url: e.hospedagem_voucher_arquivo_id ? fotoUrl.get(e.hospedagem_voucher_arquivo_id) ?? null : null,
       roteiro: roteiro
         .filter((r) => r.expedicao_id === e.id)
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))

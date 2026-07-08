@@ -115,6 +115,8 @@ export type ExpedicaoRow = {
   /** Vínculo leve entre expedições irmãs que rodam juntas (migration 0029). */
   viagem_grupo?: string | null;
   grupo_rotulo?: string | null;
+  /** Voucher único da hospedagem (arquivos.id) — mesmo hotel p/ todos (migration 0030). */
+  hospedagem_voucher_arquivo_id?: string | null;
   created_at: string;
   updated_at: string;
 }

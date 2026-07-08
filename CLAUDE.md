@@ -356,7 +356,10 @@ role**, **só leitura**.
   - **Voucher por item (migration 0024):** `expedicao_voos.arquivo_id` e
     `expedicao_passeios.arquivo_id` (1 arquivo, categoria "Vouchers"). Anexo/remoção no
     editor via `atualizarItemPortal({arquivo_id})` + upload/DELETE de `/api/arquivos`.
-    No portal vira "Baixar voucher" (signed URL). Hospedagem não tem voucher.
+    No portal vira "Baixar voucher" (signed URL). A **hospedagem** tem um voucher
+    ÚNICO por expedição (`expedicoes.hospedagem_voucher_arquivo_id`, migration 0030 —
+    todos no mesmo hotel), anexado no painel "Voucher da hospedagem" do editor do
+    ExpedAmigo (`definirVoucherHospedagem`) e exibido na seção Hospedagem do portal.
 - Fetchers em `lib/data/expedicoes.ts`: `listRoteiro`, `listVoosExpedicao`,
   `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros

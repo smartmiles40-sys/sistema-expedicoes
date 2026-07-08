@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -13,7 +13,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import {
   criarItemPortal, atualizarItemPortal, excluirItemPortal,
-  adicionarFotoRoteiro, excluirFotoRoteiro,
+  adicionarFotoRoteiro, excluirFotoRoteiro, definirVoucherHospedagem,
 } from "./actions";
 import type {
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
@@ -33,7 +33,7 @@ type Campo = {
 };
 
 export function PortalEditor({
-  expedicaoId, roteiro, voos, passeios, info, avisos, fotos,
+  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, hospedagemVoucherArquivoId,
 }: {
   expedicaoId: string;
   roteiro: RoteiroDiaRow[];
@@ -42,6 +42,7 @@ export function PortalEditor({
   info: ExpedicaoInfoRow[];
   avisos: ExpedicaoAvisoRow[];
   fotos: RoteiroDiaFotoRow[];
+  hospedagemVoucherArquivoId: string | null;
 }) {
   const fotosPorDia = React.useMemo(() => {
     const m: Record<string, RoteiroDiaFotoRow[]> = {};
@@ -57,6 +58,8 @@ export function PortalEditor({
           O que você preencher aqui aparece para o passageiro em <span className="font-mono">/amigo</span>.
         </p>
       </div>
+
+      <VoucherHospedagem expedicaoId={expedicaoId} arquivoId={hospedagemVoucherArquivoId} />
 
       <Secao
         tabela="roteiro_dias"
@@ -525,6 +528,75 @@ function FotosRoteiro({
         </div>
       )}
     </div>
+  );
+}
+
+/** Voucher ÚNICO da hospedagem (nível da expedição) — mesmo hotel p/ todos. */
+function VoucherHospedagem({ expedicaoId, arquivoId }: { expedicaoId: string; arquivoId: string | null }) {
+  const router = useRouter();
+  const [busy, setBusy] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  async function enviar(file: File | null) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("expedicao_id", expedicaoId);
+      fd.append("categoria", "Vouchers");
+      fd.append("descricao", "Voucher hospedagem");
+      const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.ok) { toast.error("Falha no upload", { description: json.error }); return; }
+      const r = await definirVoucherHospedagem(expedicaoId, json.id);
+      if (!r.ok) { toast.error("Falha ao salvar", { description: r.error }); return; }
+      toast.success("Voucher da hospedagem anexado");
+      router.refresh();
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function remover() {
+    if (!arquivoId) return;
+    setBusy(true);
+    try {
+      const r = await definirVoucherHospedagem(expedicaoId, null);
+      if (!r.ok) { toast.error("Falha ao remover", { description: r.error }); return; }
+      await fetch(`/api/arquivos/${arquivoId}`, { method: "DELETE" }).catch(() => {});
+      toast.success("Voucher removido");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground"><BedDouble className="h-4 w-4" /></span>
+        <div>
+          <h3 className="text-sm font-semibold leading-none">Voucher da hospedagem</h3>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Um arquivo só, vale para todos os passageiros (mesmo hotel).</p>
+        </div>
+      </div>
+      {arquivoId ? (
+        <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
+          <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Voucher anexado</span>
+          <a href={`/api/arquivos/${arquivoId}/download?inline=1`} target="_blank" rel="noopener noreferrer" className="text-[12px] font-medium text-editavel-700 hover:underline">Ver</a>
+          <button type="button" onClick={remover} disabled={busy} className="text-[12px] font-medium text-critico-600 hover:underline">Remover</button>
+        </div>
+      ) : (
+        <>
+          <Button type="button" size="sm" variant="outline" onClick={() => inputRef.current?.click()} disabled={busy}>
+            <Upload className="h-3 w-3" /> {busy ? "Enviando…" : "Anexar voucher (PDF/foto)"}
+          </Button>
+          <input ref={inputRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => enviar(e.target.files?.[0] ?? null)} />
+        </>
+      )}
+    </section>
   );
 }
 
