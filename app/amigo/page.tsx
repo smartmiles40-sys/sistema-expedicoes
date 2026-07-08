@@ -18,6 +18,22 @@ import { heroDoDestino, diaImgFallback, HERO_SLIDESHOW } from "./fotos";
 
 const STORAGE_KEY = "expedamigo-sessao";
 
+// Data de nascimento: texto livre que vira DD/MM/AAAA (8 dígitos) enquanto digita.
+function mascaraData(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+function isoDeData(mascara: string): string {
+  const d = (mascara ?? "").replace(/\D/g, "");
+  return d.length === 8 ? `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}` : "";
+}
+function mascaraDeIso(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
 /** Seções presentes numa expedição — alimenta a barra de navegação do header. */
 function secoesDaExp(exp: AmigoExpedicao): { id: string; label: string }[] {
   const s = (k: string) => `${k}-${exp.id}`;
@@ -49,7 +65,7 @@ export default function AmigoPage() {
       const saved = raw ? (JSON.parse(raw) as { cpf?: string; nascimento?: string }) : null;
       if (saved?.cpf && saved?.nascimento) {
         setCpf(saved.cpf);
-        setNascimento(saved.nascimento);
+        setNascimento(mascaraDeIso(saved.nascimento));
         entrarExpedAmigo(saved.cpf, saved.nascimento)
           .then((r) => {
             if (!ativo) return;
@@ -70,11 +86,12 @@ export default function AmigoPage() {
     e.preventDefault();
     setLoading(true);
     setErro(null);
-    const r = await entrarExpedAmigo(cpf, nascimento);
+    const nascIso = isoDeData(nascimento);
+    const r = await entrarExpedAmigo(cpf, nascIso);
     setLoading(false);
     if (r.ok) {
       setDados(r.dados);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, nascimento })); } catch { /* ignore */ }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, nascimento: nascIso })); } catch { /* ignore */ }
     } else {
       setErro(r.error);
     }
@@ -104,12 +121,9 @@ export default function AmigoPage() {
   // ---------- Portão de acesso ----------
   if (!dados) {
     return (
-      <div data-theme="light" className="grid min-h-screen lg:grid-cols-2">
+      <div data-theme="light" className="grid min-h-screen bg-background text-foreground lg:grid-cols-2">
         <div className="relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
-          <div className="ken-burns absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/destinos/peru/machu-picchu-hero.jpg" alt="" className="h-full w-full object-cover" />
-          </div>
+          <HeaderSlideshow imagens={HERO_SLIDESHOW} />
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--brand-dark)]/45 via-[var(--brand-dark)]/65 to-[var(--brand-dark)]/95" />
           <Logo tone="dark" className="relative z-10 h-7 w-auto" />
           <div className="relative z-10 max-w-md">
@@ -124,8 +138,15 @@ export default function AmigoPage() {
           <p className="relative z-10 text-xs text-white/60">Espaço do viajante</p>
         </div>
 
-        <div className="flex items-center justify-center p-6">
-          <form onSubmit={entrar} className="w-full max-w-sm space-y-4">
+        <div
+          className="relative flex items-center justify-center bg-[#F6F7F4] p-6"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(9,40,43,0.06) 1px, transparent 1.6px)",
+            backgroundSize: "18px 18px",
+          }}
+        >
+          <form onSubmit={entrar} className="relative w-full max-w-sm space-y-4">
             <div className="lg:hidden">
               <Logo tone="light" className="h-6 w-auto" />
             </div>
@@ -148,9 +169,12 @@ export default function AmigoPage() {
               <Label htmlFor="amigo-nasc">Data de nascimento</Label>
               <Input
                 id="amigo-nasc"
-                type="date"
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="DD/MM/AAAA"
                 value={nascimento}
-                onChange={(e) => setNascimento(e.target.value)}
+                onChange={(e) => setNascimento(mascaraData(e.target.value))}
               />
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
