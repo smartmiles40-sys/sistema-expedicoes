@@ -7,7 +7,7 @@ import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
 import type {
-  PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao,
+  PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
 } from "@/types/database";
 
 const BUCKET = "arquivos-expedicoes";
@@ -54,6 +54,7 @@ export type LiderPax = {
   checagens: LiderChecagem[];
   arquivos: LiderArquivo[];
 };
+export type LiderGrupoRoteiro = { rotulo: string | null; dias: RoteiroLiderDiaRow[] };
 export type LiderExpedicao = {
   id: string;
   codigo: string;
@@ -62,6 +63,12 @@ export type LiderExpedicao = {
   data_embarque: string;
   data_retorno: string;
   status: string;
+  grupo_rotulo: string | null;
+  viagem_grupo: string | null;
+  /** Roteiro operacional do líder desta expedição (migration 0029). */
+  roteiro: RoteiroLiderDiaRow[];
+  /** Todos os grupos irmãos da viagem (inclui este) — para o Mapa de Líderes e alertas. */
+  grupos: LiderGrupoRoteiro[];
   passageiros: LiderPax[];
 };
 export type LiderDados = { nome: string; master: boolean; expedicoes: LiderExpedicao[] };
@@ -77,6 +84,7 @@ export async function buscarDadosLider(
   let exps: ExpedicaoRow[];
   let reqs: PassageiroRequisitoRow[];
   let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string; descricao: string | null }[];
+  let rl: RoteiroLiderDiaRow[] = [];
 
   if (DEV_USE_MOCK_DATA) {
     pax = mockPassageiros;
@@ -97,6 +105,12 @@ export async function buscarDadosLider(
     pax = paxAll;
     reqs = reqAll;
     arqs = arqAll;
+    try {
+      rl = await fetchAllRows<RoteiroLiderDiaRow>((from, to) =>
+        sb.from("roteiro_lider_dias").select("*").order("id").range(from, to));
+    } catch {
+      rl = [];
+    }
   }
 
   const ehMaster = MASTERS[cpf] !== undefined;
@@ -134,10 +148,25 @@ export async function buscarDadosLider(
   }
 
   const expById = new Map(exps.map((e) => [e.id, e]));
+  const rlByExp = new Map<string, RoteiroLiderDiaRow[]>();
+  for (const d of rl) {
+    const arr = rlByExp.get(d.expedicao_id) ?? [];
+    arr.push(d);
+    rlByExp.set(d.expedicao_id, arr);
+  }
+  const ordenaDias = (a: RoteiroLiderDiaRow, b: RoteiroLiderDiaRow) => (a.ordem - b.ordem) || (a.dia - b.dia);
   const expedicoes: LiderExpedicao[] = [];
   for (const eid of expIds) {
     const e = expById.get(eid);
     if (!e) continue;
+    const roteiro = (rlByExp.get(eid) ?? []).slice().sort(ordenaDias);
+    const irmas = e.viagem_grupo
+      ? exps.filter((x) => x.viagem_grupo && x.viagem_grupo === e.viagem_grupo)
+      : [e];
+    const grupos = irmas
+      .map((x) => ({ rotulo: x.grupo_rotulo ?? null, dias: (rlByExp.get(x.id) ?? []).slice().sort(ordenaDias) }))
+      .filter((g) => g.dias.length > 0)
+      .sort((a, b) => (a.rotulo ?? "").localeCompare(b.rotulo ?? ""));
     const paxDaExp = pax.filter((p) => p.expedicao_id === eid && p.status_reserva !== "Cancelado");
     const passageiros: LiderPax[] = paxDaExp
       .map((p) => {
@@ -183,6 +212,10 @@ export async function buscarDadosLider(
       data_embarque: e.data_embarque,
       data_retorno: e.data_retorno,
       status: e.status,
+      grupo_rotulo: e.grupo_rotulo ?? null,
+      viagem_grupo: e.viagem_grupo ?? null,
+      roteiro,
+      grupos,
       passageiros,
     });
   }

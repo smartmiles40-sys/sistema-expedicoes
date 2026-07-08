@@ -112,6 +112,9 @@ export type ExpedicaoRow = {
   bitrix_pipeline_id: string | null;
   observacoes: string | null;
   ordem: number | null;
+  /** Vínculo leve entre expedições irmãs que rodam juntas (migration 0029). */
+  viagem_grupo?: string | null;
+  grupo_rotulo?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -473,6 +476,27 @@ export type ExpedicaoAvisoRow = {
   updated_at: string;
 };
 
+// ===== Roteiro do Líder (resumo operacional dia a dia, migration 0029) =====
+export type RoteiroLiderDiaRow = {
+  id: string;
+  expedicao_id: string;
+  dia: number;
+  data: string | null;
+  fase: string | null;
+  local: string | null;
+  programacao: string | null;
+  lideres_ativos: string | null;
+  pax: string | null;
+  observacoes: string | null;
+  alerta_nivel: string | null; // Crítico | Atenção | Verificar
+  alerta_texto: string | null;
+  alerta_acao: string | null;
+  alerta_responsavel: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DocumentoRow = {
   id: string;
   passageiro_id: string;
@@ -522,6 +546,7 @@ export type Database = {
       expedicao_info: { Row: ExpedicaoInfoRow; Insert: Partial<ExpedicaoInfoRow> & Pick<ExpedicaoInfoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoInfoRow> };
       roteiro_dia_fotos: { Row: RoteiroDiaFotoRow; Insert: Partial<RoteiroDiaFotoRow> & Pick<RoteiroDiaFotoRow, "expedicao_id" | "roteiro_dia_id" | "arquivo_id">; Update: Partial<RoteiroDiaFotoRow> };
       expedicao_avisos: { Row: ExpedicaoAvisoRow; Insert: Partial<ExpedicaoAvisoRow> & Pick<ExpedicaoAvisoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoAvisoRow> };
+      roteiro_lider_dias: { Row: RoteiroLiderDiaRow; Insert: Partial<RoteiroLiderDiaRow> & Pick<RoteiroLiderDiaRow, "expedicao_id">; Update: Partial<RoteiroLiderDiaRow> };
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };
       passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };

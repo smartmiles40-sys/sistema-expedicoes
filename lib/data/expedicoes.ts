@@ -46,6 +46,7 @@ import type {
   ExpedicaoInfoRow,
   RoteiroDiaFotoRow,
   ExpedicaoAvisoRow,
+  RoteiroLiderDiaRow,
   EtapaChecklist,
   Prontidao,
 } from "@/types/database";
@@ -321,6 +322,9 @@ export const listInfoDestino = (expedicaoId: string) =>
   listPortal<ExpedicaoInfoRow>("expedicao_info", expedicaoId, mockExpedicaoInfo);
 export const listAvisos = (expedicaoId: string) =>
   listPortal<ExpedicaoAvisoRow>("expedicao_avisos", expedicaoId, mockExpedicaoAvisos);
+/** Roteiro operacional do líder (migration 0029). Sem mock — lê direto do banco. */
+export const listRoteiroLider = (expedicaoId: string) =>
+  listPortal<RoteiroLiderDiaRow>("roteiro_lider_dias", expedicaoId, []);
 
 /** Fotos do roteiro de uma expedição (todas as fotos, de todos os dias). */
 export async function listRoteiroFotos(expedicaoId: string): Promise<RoteiroDiaFotoRow[]> {

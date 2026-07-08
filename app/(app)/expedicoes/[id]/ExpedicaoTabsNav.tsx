@@ -11,6 +11,7 @@ const TABS = [
   { slug: "documentos", label: "Documentos" },
   { slug: "links", label: "Links" },
   { slug: "portal", label: "ExpedAmigo" },
+  { slug: "roteiro-lider", label: "Roteiro do Líder" },
 ];
 
 export function ExpedicaoTabsNav({ expedicaoId }: { expedicaoId: string }) {

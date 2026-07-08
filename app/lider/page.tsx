@@ -3,7 +3,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
-  MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw,
+  MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +16,7 @@ import {
   type LiderDados, type LiderExpedicao, type LiderPax, type LiderArquivo,
 } from "./actions";
 import { Logo, LogoMark } from "@/components/ui/Logo";
+import type { RoteiroLiderDiaRow } from "@/types/database";
 
 type VerDoc = (a: LiderArquivo, download?: boolean) => void;
 
@@ -191,7 +192,7 @@ export default function LiderPage() {
           const futuras = naoConcluidas.filter((e) => anoDe(e) > anoAtual);
           const anosFuturos = [...new Set(futuras.map(anoDe))].sort((a, b) => a - b);
           const renderCards = (lista: LiderExpedicao[]) =>
-            lista.map((exp) => <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} />);
+            lista.map((exp) => <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} meuNome={dados.nome} />);
           return (
             <>
               {renderCards(atuais)}
@@ -284,7 +285,7 @@ function GrupoBox({
   );
 }
 
-function ExpedicaoLiderCard({ exp, onVerDoc }: { exp: LiderExpedicao; onVerDoc: VerDoc }) {
+function ExpedicaoLiderCard({ exp, onVerDoc, meuNome }: { exp: LiderExpedicao; onVerDoc: VerDoc; meuNome: string }) {
   // Sempre recolhida — o usuário abre a expedição que quiser.
   const [aberta, setAberta] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
@@ -316,10 +317,162 @@ function ExpedicaoLiderCard({ exp, onVerDoc }: { exp: LiderExpedicao; onVerDoc: 
 
       {aberta && (
         <div className="space-y-3 p-3">
+          <RoteiroLider exp={exp} meuNome={meuNome} />
           {lideres.length > 0 && (
             <Secao titulo="Líderes" pax={lideres} onVerDoc={onVerDoc} />
           )}
           <Secao titulo={`ExpedAmigos (${amigos.length})`} pax={amigos} onVerDoc={onVerDoc} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===================== Roteiro do Líder (dia a dia operacional) =====================
+
+type LiderDia = RoteiroLiderDiaRow;
+
+const COR_GRUPO: Record<string, string> = {
+  G1: "border-editavel-600 bg-editavel-50 text-editavel-700",
+  G2: "border-lista-600 bg-lista-50 text-lista-600",
+};
+const corGrupo = (r: string | null) => (r && COR_GRUPO[r]) || "border-border bg-muted/40 text-muted-foreground";
+
+const NIVEL_ALERTA: Record<string, { emoji: string; cls: string }> = {
+  "Crítico": { emoji: "🔴", cls: "border-critico-600 bg-critico-50" },
+  "Atenção": { emoji: "🟠", cls: "border-atencao-600 bg-atencao-50" },
+  "Verificar": { emoji: "🟡", cls: "border-editavel-600 bg-editavel-50" },
+};
+const nomesLideres = (s: string | null) => (s ?? "").split("·").map((x) => x.trim()).filter(Boolean);
+const primeiroNome = (s: string) => (s ?? "").trim().split(/\s+/)[0] ?? "";
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+type BriefDia = {
+  meuGrupo: string | null;
+  meuDia: LiderDia;
+  comigo: string[];
+  outros: { rotulo: string | null; lideres: string[] }[];
+};
+
+function RoteiroLider({ exp, meuNome }: { exp: LiderExpedicao; meuNome: string }) {
+  const [verTudo, setVerTudo] = React.useState(false);
+  const roteiro = exp.roteiro;
+  if (roteiro.length === 0) return null;
+  const eu = primeiroNome(meuNome).toLowerCase();
+  const multi = exp.grupos.length > 1;
+  const hoje = hojeISO();
+
+  // Monta o resumo PESSOAL do dia: em qual grupo VOCÊ está, com quem, e onde estão os outros.
+  function brief(d: LiderDia): BriefDia {
+    let meuGrupo: string | null = multi ? null : exp.grupo_rotulo;
+    let meuDia: LiderDia = d;
+    if (multi && d.data) {
+      for (const g of exp.grupos) {
+        const gd = g.dias.find((x) => x.data === d.data);
+        if (gd && nomesLideres(gd.lideres_ativos).some((n) => n.toLowerCase() === eu)) {
+          meuGrupo = g.rotulo;
+          meuDia = gd;
+        }
+      }
+    }
+    const comigo = nomesLideres(meuDia.lideres_ativos).filter((n) => n.toLowerCase() !== eu);
+    const outros = multi
+      ? exp.grupos
+          .filter((g) => g.rotulo !== meuGrupo)
+          .map((g) => ({ rotulo: g.rotulo, lideres: d.data ? nomesLideres(g.dias.find((x) => x.data === d.data)?.lideres_ativos ?? null) : [] }))
+          .filter((o) => o.lideres.length > 0)
+      : [];
+    return { meuGrupo, meuDia, comigo, outros };
+  }
+
+  const diaHoje = roteiro.find((d) => d.data === hoje);
+  const proximo = roteiro.find((d) => d.data && d.data >= hoje);
+  const foco = diaHoje ?? proximo ?? roteiro[0];
+  const focoLabel = diaHoje ? "HOJE" : proximo ? "A SEGUIR" : "";
+
+  return (
+    <div className="space-y-2.5">
+      {foco && <DiaBrief dia={foco} info={brief(foco)} multi={multi} destaque label={focoLabel} />}
+
+      <Recolhivel
+        titulo={`Todos os dias (${roteiro.length})`}
+        icone={<CalendarDays className="h-4 w-4 text-muted-foreground" />}
+        aberto={verTudo}
+        onToggle={() => setVerTudo((v) => !v)}
+      >
+        <div className="space-y-1.5">
+          {roteiro.map((d) => <DiaBrief key={d.id} dia={d} info={brief(d)} multi={multi} hoje={d.data === hoje} />)}
+        </div>
+      </Recolhivel>
+    </div>
+  );
+}
+
+function Recolhivel({ titulo, icone, aberto, onToggle, children }: { titulo: string; icone: React.ReactNode; aberto: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-background">
+      <button type="button" onClick={onToggle} className="flex w-full items-center gap-2 px-3 py-2 text-left">
+        {icone}
+        <span className="flex-1 text-[12px] font-semibold">{titulo}</span>
+        <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", aberto && "rotate-90")} />
+      </button>
+      {aberto && <div className="border-t border-border p-2.5">{children}</div>}
+    </div>
+  );
+}
+
+function DiaBrief({ dia, info, multi, destaque, label, hoje }: { dia: LiderDia; info: BriefDia; multi: boolean; destaque?: boolean; label?: string; hoje?: boolean }) {
+  const [aberto, setAberto] = React.useState(!!destaque);
+  const md = info.meuDia;
+  const nivel = md.alerta_nivel ? NIVEL_ALERTA[md.alerta_nivel] : null;
+  const localFase = md.local || dia.fase;
+  return (
+    <div className={cn("overflow-hidden rounded-xl border", destaque ? "border-[var(--brand-lime-deep)] bg-[var(--brand-lime)]/10 shadow-sm" : hoje ? "border-[var(--brand-lime-deep)]" : "border-border bg-background")}>
+      <button type="button" onClick={() => setAberto((v) => !v)} className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left">
+        <div className="flex w-9 shrink-0 flex-col items-center rounded-lg bg-[var(--brand-dark)] py-1 text-white">
+          <span className="text-[8px] font-bold uppercase leading-none text-[var(--brand-lime)]">Dia</span>
+          <span className="font-display text-[16px] font-bold leading-tight">{dia.dia}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          {label && (
+            <span className="mb-1 inline-block rounded bg-[var(--brand-lime)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--brand-dark)]">{label}</span>
+          )}
+          <div className="text-[11px] text-muted-foreground">
+            {dia.data ? formatDate(dia.data) : ""}{localFase ? ` · ${localFase}` : ""}
+          </div>
+          <div className="text-[13px] font-semibold leading-snug">{md.programacao ?? "—"}</div>
+          {multi && info.meuGrupo && (
+            <div className="mt-1 text-[12px]">
+              Você fica com o{" "}
+              <span className={cn("rounded-md border px-1.5 py-0.5 text-[11px] font-bold", corGrupo(info.meuGrupo))}>{info.meuGrupo}</span>
+            </div>
+          )}
+          {multi && !info.meuGrupo && <div className="mt-1 text-[12px] text-muted-foreground">Você não acompanha o grupo neste dia.</div>}
+        </div>
+        {nivel && <span className="shrink-0 text-[13px]" title={md.alerta_nivel ?? ""}>{nivel.emoji}</span>}
+        <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", aberto && "rotate-90")} />
+      </button>
+      {aberto && (
+        <div className="space-y-1.5 border-t border-border px-3 py-2.5 text-[12px]">
+          {md.pax && <div className="text-muted-foreground">{md.pax} passageiros com você.</div>}
+          {info.comigo.length > 0 && (
+            <div><span className="text-muted-foreground">Com você:</span> <span className="font-semibold">{info.comigo.join(" · ")}</span></div>
+          )}
+          {info.outros.map((o) => (
+            <div key={o.rotulo ?? "x"}>
+              <span className="text-muted-foreground">No </span>
+              <span className={cn("rounded border px-1 py-0.5 text-[10px] font-bold", corGrupo(o.rotulo))}>{o.rotulo}</span>
+              <span>: {o.lideres.join(" · ")}</span>
+            </div>
+          ))}
+          {md.observacoes && <p className="whitespace-pre-line text-muted-foreground">{md.observacoes}</p>}
+          {nivel && md.alerta_texto && (
+            <div className={cn("rounded-lg border-l-4 p-2", nivel.cls)}>
+              <div className="text-[11px] font-bold">{nivel.emoji} Atenção</div>
+              <div className="mt-0.5">{md.alerta_texto}</div>
+              {md.alerta_acao && <div className="mt-1"><span className="font-semibold">O que fazer:</span> {md.alerta_acao}</div>}
+            </div>
+          )}
         </div>
       )}
     </div>

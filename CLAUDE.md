@@ -363,6 +363,32 @@ role**, **só leitura**.
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.
 
+## 🧭 Roteiro do Líder (resumo diário operacional)
+
+Resumo dia a dia **para os líderes** (separado do roteiro do passageiro). Nasceu do
+caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
+`expedicoes` — com 6 líderes que **trocam de grupo** em dias específicos.
+
+- **Tabela `roteiro_lider_dias`** (migration `0029_roteiro_lider.sql`): por dia →
+  `dia`, `data`, `fase` (região), `local`, `programacao`, `lideres_ativos` (nomes
+  separados por " · "), `pax` (texto — aceita "18 → 25"), `observacoes` e alerta
+  (`alerta_nivel` = Crítico/Atenção/Verificar, `alerta_texto`, `alerta_acao`,
+  `alerta_responsavel`), `ordem`. Mesmo padrão de RLS/trigger das tabelas do portal.
+- **Vínculo de grupos irmãos:** `expedicoes.viagem_grupo` (rótulo compartilhado entre
+  irmãs) + `expedicoes.grupo_rotulo` ("G1"/"G2"), ambos nuláveis (migration 0029).
+  Não confundir com `grupos_expedicao` (subgrupos DENTRO de uma expedição).
+- **Editor no operacional:** aba **"Roteiro do Líder"** na expedição
+  (`app/(app)/expedicoes/[id]/roteiro-lider/`, `RoteiroLiderEditor.tsx` + `actions.ts`
+  com CRUD via service role, sem mock). Fetcher `listRoteiroLider` em
+  `lib/data/expedicoes.ts`.
+- **Área do Líder (`/lider`):** `buscarDadosLider` traz `roteiro` (dias desta
+  expedição) + `grupos` (todos os irmãos via `viagem_grupo`). A UI (`RoteiroLider`/
+  `DiaBrief` em `app/lider/page.tsx`) mostra um resumo **pessoal**: acha o primeiro
+  nome de quem logou nos `lideres_ativos` de cada grupo e diz "Você fica com o G2",
+  com quem, e onde estão os outros — destacando o dia de HOJE / A SEGUIR.
+- **Importação inicial:** a partir de `Roteiro_Japao_China_G1_G2.xlsx` (34 dias
+  G1+G2 + 7 alertas críticos), por script pontual não versionado.
+
 ## 📝 Inscrição pública: auto-completar entre expedições
 
 Ao se inscrever pelo `/inscricao`, o cliente é reconhecido **em qualquer expedição**
