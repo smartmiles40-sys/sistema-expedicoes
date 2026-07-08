@@ -138,17 +138,11 @@ export default function AmigoPage() {
           <p className="relative z-10 text-xs text-white/60">Espaço do viajante</p>
         </div>
 
-        <div
-          className="relative flex items-center justify-center bg-[#F6F7F4] p-6"
-          style={{
-            backgroundImage:
-              "radial-gradient(rgba(9,40,43,0.06) 1px, transparent 1.6px)",
-            backgroundSize: "18px 18px",
-          }}
-        >
+        <div data-theme="dark" className="relative flex items-center justify-center overflow-hidden bg-[var(--brand-dark)] p-6 text-foreground">
+          <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
           <form onSubmit={entrar} className="relative w-full max-w-sm space-y-4">
             <div className="lg:hidden">
-              <Logo tone="light" className="h-6 w-auto" />
+              <Logo tone="dark" className="h-6 w-auto" />
             </div>
             <div>
               <h1 className="page-title">Minha Viagem</h1>
@@ -163,6 +157,7 @@ export default function AmigoPage() {
                 placeholder="Somente números"
                 inputMode="numeric"
                 autoFocus
+                className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
               />
             </div>
             <div className="space-y-1">
@@ -175,6 +170,7 @@ export default function AmigoPage() {
                 placeholder="DD/MM/AAAA"
                 value={nascimento}
                 onChange={(e) => setNascimento(mascaraData(e.target.value))}
+                className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
               />
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
