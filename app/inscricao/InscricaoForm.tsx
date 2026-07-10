@@ -131,6 +131,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       const dados = {
         expedicao_id: expedicaoId, cpf, data_nascimento: nascimento,
         ...f,
+        possui_passaporte: possuiPassaporte,
         pref_marcar_assento: prefAssento,
         pref_upgrade_classe: prefUpgrade,
         ja_viajou_internacional: jaViajou,

@@ -140,6 +140,7 @@ const dadosSchema = z.object({
   telefone: z.string().trim().optional().default(""),
   passaporte: z.string().trim().optional().default(""),
   validade_passaporte: z.string().trim().optional().default(""),
+  possui_passaporte: z.boolean().nullable().default(null),
   endereco_cep: z.string().trim().optional().default(""),
   endereco_rua: z.string().trim().optional().default(""),
   endereco_numero: z.string().trim().optional().default(""),
@@ -277,7 +278,10 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   const precisaAnexo = !anexoConhecido;
   const fileRaw = formData.get("passaporte");
   const file = fileRaw instanceof File && fileRaw.size > 0 ? fileRaw : null;
-  if (precisaAnexo && !file) return { ok: false, error: "Anexe a foto ou PDF do seu passaporte." };
+  // Só exige o anexo se a pessoa DISSER que possui passaporte (não bloqueia quem não tem).
+  if (precisaAnexo && d.possui_passaporte !== false && !file) {
+    return { ok: false, error: "Anexe a foto ou PDF do seu passaporte." };
+  }
   if (file) {
     const err = validarArquivo(file);
     if (err) return { ok: false, error: err };
