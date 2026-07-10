@@ -501,6 +501,14 @@ export type RoteiroLiderDiaRow = {
   updated_at: string;
 };
 
+// ===== Senha de acesso por pessoa (ExpedAmigo / Líder, migration 0031) =====
+export type AcessoSenhaRow = {
+  cpf: string;
+  senha_hash: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DocumentoRow = {
   id: string;
   passageiro_id: string;
@@ -551,6 +559,7 @@ export type Database = {
       roteiro_dia_fotos: { Row: RoteiroDiaFotoRow; Insert: Partial<RoteiroDiaFotoRow> & Pick<RoteiroDiaFotoRow, "expedicao_id" | "roteiro_dia_id" | "arquivo_id">; Update: Partial<RoteiroDiaFotoRow> };
       expedicao_avisos: { Row: ExpedicaoAvisoRow; Insert: Partial<ExpedicaoAvisoRow> & Pick<ExpedicaoAvisoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoAvisoRow> };
       roteiro_lider_dias: { Row: RoteiroLiderDiaRow; Insert: Partial<RoteiroLiderDiaRow> & Pick<RoteiroLiderDiaRow, "expedicao_id">; Update: Partial<RoteiroLiderDiaRow> };
+      acesso_senhas: { Row: AcessoSenhaRow; Insert: Partial<AcessoSenhaRow> & Pick<AcessoSenhaRow, "cpf" | "senha_hash">; Update: Partial<AcessoSenhaRow> };
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };
       passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };

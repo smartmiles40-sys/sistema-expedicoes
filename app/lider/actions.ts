@@ -5,6 +5,7 @@ import { mockPassageiros, mockExpedicoes, mockPassageiroRequisitos } from "@/lib
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
+import { hashSenhaAcesso, conferemSenhaInicial, senhaNovaValida } from "@/lib/acesso-senha";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
@@ -76,9 +77,11 @@ export type LiderDados = { nome: string; master: boolean; expedicoes: LiderExped
 /** Acesso do LÍDER por CPF (sem login). Só leitura. Valida pelo cadastro tipo "Líder". */
 export async function buscarDadosLider(
   cpfRaw: string,
-): Promise<{ ok: true; dados: LiderDados } | { ok: false; error: string }> {
+  senhaRaw: string,
+): Promise<{ ok: true; dados: LiderDados; precisaTrocar: boolean } | { ok: false; error: string }> {
   const cpf = soDigitosCpf(cpfRaw ?? "");
   if (cpf.length !== 11) return { ok: false, error: "Digite um CPF válido (11 dígitos)." };
+  if (!(senhaRaw ?? "").trim()) return { ok: false, error: "Informe sua senha." };
 
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
@@ -113,7 +116,35 @@ export async function buscarDadosLider(
     }
   }
 
+  const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
   const ehMaster = MASTERS[cpf] !== undefined;
+  const ehLider = minhasRows.some((p) => p.tipo === "Líder");
+  if (!ehMaster && !ehLider) {
+    return { ok: false, error: "Não encontramos expedições para este CPF. Confira com a equipe." };
+  }
+
+  // Senha por pessoa (migration 0031). No 1º acesso a senha é a data de nascimento.
+  let precisaTrocar = false;
+  if (!DEV_USE_MOCK_DATA) {
+    const sbSenha = createServiceRoleClient();
+    const { data: cred } = await sbSenha.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
+    const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+    const senha = senhaRaw ?? "";
+    if (hashSalvo) {
+      if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
+        return { ok: false, error: "Senha incorreta." };
+      }
+    } else {
+      const ord = [...minhasRows].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+      const nasc = ord.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
+      if (!nasc) return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
+      if (!conferemSenhaInicial(senha, nasc)) {
+        return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
+      }
+      precisaTrocar = true;
+    }
+  }
+
   let nome: string;
   let expIds: string[];
   if (ehMaster) {
@@ -121,13 +152,7 @@ export async function buscarDadosLider(
     nome = MASTERS[cpf];
     expIds = exps.map((e) => e.id);
   } else {
-    const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
-    const ehLider = minhasRows.some((p) => p.tipo === "Líder");
-    if (!ehLider) {
-      return { ok: false, error: "Não encontramos expedições para este CPF. Confira com a equipe." };
-    }
-    // Foi líder ao menos 1 vez → enxerga TODAS as expedições que participa (mesmo
-    // onde entra como passageiro comum), sempre só leitura.
+    // Foi líder ao menos 1 vez → enxerga TODAS as expedições que participa (só leitura).
     nome = (minhasRows.find((p) => p.tipo === "Líder") ?? minhasRows[0]).nome_completo;
     expIds = [...new Set(minhasRows.map((p) => p.expedicao_id).filter((id): id is string => !!id))];
   }
@@ -231,7 +256,45 @@ export async function buscarDadosLider(
     return fa ? da.localeCompare(db) : db.localeCompare(da);
   });
 
-  return { ok: true, dados: { nome, master: ehMaster, expedicoes } };
+  return { ok: true, dados: { nome, master: ehMaster, expedicoes }, precisaTrocar };
+}
+
+/** Define/troca a senha da pessoa (por CPF). Confere a senha atual antes. */
+export async function definirSenhaLider(
+  cpfRaw: string,
+  senhaAtual: string,
+  novaSenha: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const cpf = soDigitosCpf(cpfRaw ?? "");
+  if (cpf.length !== 11) return { ok: false, error: "CPF inválido." };
+  const erro = senhaNovaValida(novaSenha);
+  if (erro) return { ok: false, error: erro };
+  if (DEV_USE_MOCK_DATA) return { ok: true };
+
+  const sb = createServiceRoleClient();
+  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
+  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+  if (hashSalvo) {
+    if ((await hashSenhaAcesso(cpf, senhaAtual)) !== hashSalvo) {
+      return { ok: false, error: "Senha atual incorreta." };
+    }
+  } else {
+    const paxAll = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string }>(
+      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to),
+    );
+    const minhas = paxAll
+      .filter((p) => soDigitosCpf(p.cpf ?? "") === cpf)
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    const nasc = minhas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
+    if (!conferemSenhaInicial(senhaAtual, nasc)) {
+      return { ok: false, error: "Senha atual incorreta." };
+    }
+  }
+  const up = await sb
+    .from("acesso_senhas")
+    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha) }, { onConflict: "cpf" });
+  if (up.error) return { ok: false, error: up.error.message };
+  return { ok: true };
 }
 
 /** Gera um link de visualização do documento para o líder (sem login). */

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import {
-  entrarExpedAmigo,
+  entrarExpedAmigo, definirSenhaExpedAmigo,
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
 import { Logo } from "@/components/ui/Logo";
@@ -18,21 +18,6 @@ import { heroDoDestino, diaImgFallback, HERO_SLIDESHOW } from "./fotos";
 
 const STORAGE_KEY = "expedamigo-sessao";
 
-// Data de nascimento: texto livre que vira DD/MM/AAAA (8 dígitos) enquanto digita.
-function mascaraData(v: string): string {
-  const d = v.replace(/\D/g, "").slice(0, 8);
-  if (d.length <= 2) return d;
-  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
-  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
-}
-function isoDeData(mascara: string): string {
-  const d = (mascara ?? "").replace(/\D/g, "");
-  return d.length === 8 ? `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}` : "";
-}
-function mascaraDeIso(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
-}
 // CPF: texto livre que vira XXX.XXX.XXX-XX (11 dígitos) enquanto digita.
 function mascaraCpf(v: string): string {
   const d = v.replace(/\D/g, "").slice(0, 11);
@@ -56,12 +41,17 @@ function secoesDaExp(exp: AmigoExpedicao): { id: string; label: string }[] {
 
 export default function AmigoPage() {
   const [cpf, setCpf] = React.useState("");
-  const [nascimento, setNascimento] = React.useState("");
+  const [senha, setSenha] = React.useState("");
   const [dados, setDados] = React.useState<AmigoDados | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
   // Verificando se há sessão salva (evita piscar o login ao dar refresh).
   const [checando, setChecando] = React.useState(true);
+  // Primeiro acesso: forçar criar uma nova senha antes de entrar.
+  const [precisaTrocar, setPrecisaTrocar] = React.useState(false);
+  const [novaSenha, setNovaSenha] = React.useState("");
+  const [confirmaSenha, setConfirmaSenha] = React.useState("");
+  const [salvandoSenha, setSalvandoSenha] = React.useState(false);
   // Viagem aberta (null = tela inicial com a lista de expedições).
   const [selecionadaId, setSelecionadaId] = React.useState<string | null>(null);
 
@@ -70,14 +60,15 @@ export default function AmigoPage() {
     let ativo = true;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      const saved = raw ? (JSON.parse(raw) as { cpf?: string; nascimento?: string }) : null;
-      if (saved?.cpf && saved?.nascimento) {
+      const saved = raw ? (JSON.parse(raw) as { cpf?: string; senha?: string; nascimento?: string }) : null;
+      const senhaSalva = saved?.senha ?? saved?.nascimento; // migra sessões antigas
+      if (saved?.cpf && senhaSalva) {
         setCpf(mascaraCpf(saved.cpf));
-        setNascimento(mascaraDeIso(saved.nascimento));
-        entrarExpedAmigo(saved.cpf, saved.nascimento)
+        setSenha(senhaSalva);
+        entrarExpedAmigo(saved.cpf, senhaSalva)
           .then((r) => {
             if (!ativo) return;
-            if (r.ok) setDados(r.dados);
+            if (r.ok) { setDados(r.dados); setPrecisaTrocar(r.precisaTrocar); }
             else localStorage.removeItem(STORAGE_KEY);
           })
           .finally(() => ativo && setChecando(false));
@@ -94,22 +85,40 @@ export default function AmigoPage() {
     e.preventDefault();
     setLoading(true);
     setErro(null);
-    const nascIso = isoDeData(nascimento);
-    const r = await entrarExpedAmigo(cpf, nascIso);
+    const r = await entrarExpedAmigo(cpf, senha);
     setLoading(false);
     if (r.ok) {
       setDados(r.dados);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, nascimento: nascIso })); } catch { /* ignore */ }
+      setPrecisaTrocar(r.precisaTrocar);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, senha })); } catch { /* ignore */ }
     } else {
       setErro(r.error);
     }
+  }
+
+  async function trocarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    if (novaSenha.trim().length < 6) return setErro("A nova senha precisa ter pelo menos 6 caracteres.");
+    if (novaSenha !== confirmaSenha) return setErro("As senhas não conferem.");
+    setSalvandoSenha(true);
+    const r = await definirSenhaExpedAmigo(cpf, senha, novaSenha);
+    setSalvandoSenha(false);
+    if (!r.ok) return setErro(r.error ?? "Não foi possível salvar a senha.");
+    setSenha(novaSenha);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ cpf, senha: novaSenha })); } catch { /* ignore */ }
+    setNovaSenha(""); setConfirmaSenha("");
+    setPrecisaTrocar(false);
+    toast.success("Senha criada! Boa viagem. 🎉");
   }
 
   function sair() {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     setDados(null);
     setCpf("");
-    setNascimento("");
+    setSenha("");
+    setPrecisaTrocar(false);
+    setNovaSenha(""); setConfirmaSenha("");
     setErro(null);
     setSelecionadaId(null);
   }
@@ -122,6 +131,34 @@ export default function AmigoPage() {
           <CompassIcon className="h-7 w-7 animate-pulse text-[var(--brand-dark)]" />
           <span className="text-[13px]">Entrando…</span>
         </div>
+      </div>
+    );
+  }
+
+  // ---------- Primeiro acesso: criar nova senha ----------
+  if (precisaTrocar) {
+    return (
+      <div data-theme="dark" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--brand-dark)] p-6 text-foreground">
+        <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
+        <form onSubmit={trocarSenha} className="relative w-full max-w-sm space-y-4">
+          <Logo tone="dark" className="h-6 w-auto" />
+          <div>
+            <h1 className="page-title">Crie sua senha</h1>
+            <p className="page-subtitle mt-1">Primeiro acesso! Escolha uma senha só sua para as próximas vezes.</p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="nova-senha">Nova senha</Label>
+            <Input id="nova-senha" type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mínimo 6 caracteres" autoFocus className="border-white/25 bg-white/10 text-white placeholder:text-white/50" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="conf-senha">Confirmar senha</Label>
+            <Input id="conf-senha" type="password" value={confirmaSenha} onChange={(e) => setConfirmaSenha(e.target.value)} placeholder="Repita a senha" className="border-white/25 bg-white/10 text-white placeholder:text-white/50" />
+          </div>
+          {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
+          <Button type="submit" variant="brand" size="lg" className="w-full" disabled={salvandoSenha}>
+            {salvandoSenha ? "Salvando…" : "Salvar e entrar"}
+          </Button>
+        </form>
       </div>
     );
   }
@@ -154,7 +191,7 @@ export default function AmigoPage() {
             </div>
             <div>
               <h1 className="page-title">Minha Viagem</h1>
-              <p className="page-subtitle mt-1">Acesse com seu CPF e sua data de nascimento.</p>
+              <p className="page-subtitle mt-1">Acesse com seu CPF e sua senha.</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="amigo-cpf">CPF</Label>
@@ -170,24 +207,23 @@ export default function AmigoPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="amigo-nasc">Data de nascimento</Label>
+              <Label htmlFor="amigo-senha">Senha</Label>
               <Input
-                id="amigo-nasc"
-                type="text"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="DD/MM/AAAA"
-                value={nascimento}
-                onChange={(e) => setNascimento(mascaraData(e.target.value))}
+                id="amigo-senha"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Sua senha"
                 className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
               />
+              <p className="text-[11px] text-white/60">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
             <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Acessar minha viagem"}
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              É o mesmo CPF e a mesma data de nascimento que você informou na sua reserva.
+              É o mesmo CPF da sua reserva. No primeiro acesso a senha é a sua data de nascimento.
               Algum dado não confere? Fale com a agência.
             </p>
           </form>

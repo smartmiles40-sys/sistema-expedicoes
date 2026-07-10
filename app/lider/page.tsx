@@ -9,10 +9,11 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 import { COR_PRONTIDAO } from "@/lib/constants";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import {
-  buscarDadosLider, linkAssinadoLider,
+  buscarDadosLider, linkAssinadoLider, definirSenhaLider,
   type LiderDados, type LiderExpedicao, type LiderPax, type LiderArquivo,
 } from "./actions";
 import { Logo, LogoMark } from "@/components/ui/Logo";
@@ -29,11 +30,16 @@ const SEM_DOT: Record<string, string> = {
 
 export default function LiderPage() {
   const [cpf, setCpf] = React.useState("");
+  const [senha, setSenha] = React.useState("");
   const [dados, setDados] = React.useState<LiderDados | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
   const [lightbox, setLightbox] = React.useState<string | null>(null);
   const [atualizando, setAtualizando] = React.useState(false);
+  const [precisaTrocar, setPrecisaTrocar] = React.useState(false);
+  const [novaSenha, setNovaSenha] = React.useState("");
+  const [confirmaSenha, setConfirmaSenha] = React.useState("");
+  const [salvandoSenha, setSalvandoSenha] = React.useState(false);
   // Grupos recolhíveis abertos (chave = "passadas" ou o ano, ex.: "2027").
   const [gruposAbertos, setGruposAbertos] = React.useState<Set<string>>(new Set());
   const toggleGrupo = (k: string) =>
@@ -47,10 +53,10 @@ export default function LiderPage() {
   const recarregar = React.useCallback(async () => {
     if (!cpf) return;
     setAtualizando(true);
-    const r = await buscarDadosLider(cpf);
+    const r = await buscarDadosLider(cpf, senha);
     setAtualizando(false);
     if (r.ok) setDados(r.dados);
-  }, [cpf]);
+  }, [cpf, senha]);
 
   // Enquanto a área está aberta: atualiza a cada 25s e ao voltar pra aba.
   const logado = dados !== null;
@@ -71,10 +77,25 @@ export default function LiderPage() {
     e.preventDefault();
     setLoading(true);
     setErro(null);
-    const r = await buscarDadosLider(cpf);
+    const r = await buscarDadosLider(cpf, senha);
     setLoading(false);
-    if (r.ok) setDados(r.dados);
+    if (r.ok) { setDados(r.dados); setPrecisaTrocar(r.precisaTrocar); }
     else setErro(r.error);
+  }
+
+  async function trocarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    if (novaSenha.trim().length < 6) return setErro("A nova senha precisa ter pelo menos 6 caracteres.");
+    if (novaSenha !== confirmaSenha) return setErro("As senhas não conferem.");
+    setSalvandoSenha(true);
+    const r = await definirSenhaLider(cpf, senha, novaSenha);
+    setSalvandoSenha(false);
+    if (!r.ok) return setErro(r.error ?? "Não foi possível salvar a senha.");
+    setSenha(novaSenha);
+    setNovaSenha(""); setConfirmaSenha("");
+    setPrecisaTrocar(false);
+    toast.success("Senha criada! 🎉");
   }
 
   async function verDoc(arq: LiderArquivo, download = false) {
@@ -89,6 +110,32 @@ export default function LiderPage() {
     }
     if (arq.mime?.startsWith("image/")) setLightbox(r.url);
     else window.open(r.url, "_blank", "noopener");
+  }
+
+  // ---------- Primeiro acesso: criar nova senha ----------
+  if (precisaTrocar) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+        <form onSubmit={trocarSenha} className="w-full max-w-sm space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div>
+            <h1 className="page-title">Crie sua senha</h1>
+            <p className="page-subtitle mt-1">Primeiro acesso! Escolha uma senha só sua para as próximas vezes.</p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="lider-nova">Nova senha</Label>
+            <Input id="lider-nova" type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mínimo 6 caracteres" autoFocus />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="lider-conf">Confirmar senha</Label>
+            <Input id="lider-conf" type="password" value={confirmaSenha} onChange={(e) => setConfirmaSenha(e.target.value)} placeholder="Repita a senha" />
+          </div>
+          {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
+          <Button type="submit" variant="brand" size="lg" className="w-full" disabled={salvandoSenha}>
+            {salvandoSenha ? "Salvando…" : "Salvar e entrar"}
+          </Button>
+        </form>
+      </div>
+    );
   }
 
   // ---------- Portão de CPF ----------
@@ -116,21 +163,23 @@ export default function LiderPage() {
             </a>
             <div>
               <h1 className="page-title">Área do Líder</h1>
-              <p className="page-subtitle mt-1">Informe seu CPF para ver suas expedições.</p>
+              <p className="page-subtitle mt-1">Acesse com seu CPF e sua senha.</p>
             </div>
-            <Input
-              value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
-              placeholder="Seu CPF"
-              inputMode="numeric"
-              autoFocus
-            />
+            <div className="space-y-1">
+              <Label htmlFor="lider-cpf">CPF</Label>
+              <Input id="lider-cpf" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="Seu CPF" inputMode="numeric" autoFocus />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="lider-senha">Senha</Label>
+              <Input id="lider-senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Sua senha" />
+              <p className="text-[11px] text-muted-foreground">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
+            </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
             <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
               {loading ? "Buscando..." : "Entrar"}
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              Sem senha — é só o CPF cadastrado como líder. Você verá apenas as informações (sem editar).
+              É o CPF cadastrado como líder. No primeiro acesso a senha é a sua data de nascimento. Só leitura.
             </p>
           </form>
         </div>
@@ -169,7 +218,7 @@ export default function LiderPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setDados(null); setCpf(""); setErro(null); }}
+            onClick={() => { setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null); }}
             className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
           >
             Sair

@@ -9,6 +9,7 @@ import {
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
+import { hashSenhaAcesso, conferemSenhaInicial, senhaNovaValida } from "@/lib/acesso-senha";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
@@ -105,12 +106,12 @@ export type AmigoDados = {
 
 export async function entrarExpedAmigo(
   cpfRaw: string,
-  nascimentoRaw: string,
-): Promise<{ ok: true; dados: AmigoDados } | { ok: false; error: string }> {
+  senhaRaw: string,
+): Promise<{ ok: true; dados: AmigoDados; precisaTrocar: boolean } | { ok: false; error: string }> {
   const cpf = soDigitosCpf(cpfRaw ?? "");
-  const nasc = (nascimentoRaw ?? "").slice(0, 10);
+  const senha = senhaRaw ?? "";
   if (cpf.length !== 11) return { ok: false, error: "Digite um CPF válido (11 dígitos)." };
-  if (!nasc) return { ok: false, error: "Informe sua data de nascimento." };
+  if (!senha.trim()) return { ok: false, error: "Informe sua senha." };
 
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
@@ -172,14 +173,31 @@ export async function entrarExpedAmigo(
     return { ok: false, error: "Não encontramos seu cadastro com este CPF. Fale com a agência." };
   }
 
-  // 2) Confere a data de nascimento (senha). Bloqueia quem não tem nascimento.
+  // 2) Senha por pessoa (migration 0031). No 1º acesso a senha é a data de nascimento.
   const ordenadas = [...minhasRows].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const nascCadastro = ordenadas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
-  if (!nascCadastro) {
-    return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
-  }
-  if (nascCadastro !== nasc) {
-    return { ok: false, error: "Data de nascimento não confere com o cadastro." };
+
+  let precisaTrocar = false;
+  {
+    let hashSalvo: string | null = null;
+    if (sb) {
+      const { data } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
+      hashSalvo = (data as { senha_hash: string } | null)?.senha_hash ?? null;
+    }
+    if (hashSalvo) {
+      if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
+        return { ok: false, error: "Senha incorreta." };
+      }
+    } else {
+      // Sem senha definida → 1º acesso: a senha é a data de nascimento.
+      if (!nascCadastro) {
+        return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
+      }
+      if (!conferemSenhaInicial(senha, nascCadastro)) {
+        return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
+      }
+      precisaTrocar = true;
+    }
   }
 
   const nome = ordenadas[0].nome_completo;
@@ -335,5 +353,47 @@ export async function entrarExpedAmigo(
   return {
     ok: true,
     dados: { nome, primeiro_nome: nome.split(" ")[0], expedicoes },
+    precisaTrocar,
   };
+}
+
+/** Define/troca a senha da pessoa (por CPF). Confere a senha atual antes. */
+export async function definirSenhaExpedAmigo(
+  cpfRaw: string,
+  senhaAtual: string,
+  novaSenha: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const cpf = soDigitosCpf(cpfRaw ?? "");
+  if (cpf.length !== 11) return { ok: false, error: "CPF inválido." };
+  const erro = senhaNovaValida(novaSenha);
+  if (erro) return { ok: false, error: erro };
+  if (DEV_USE_MOCK_DATA) return { ok: true };
+
+  const sb = createServiceRoleClient();
+  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
+  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+
+  if (hashSalvo) {
+    if ((await hashSenhaAcesso(cpf, senhaAtual)) !== hashSalvo) {
+      return { ok: false, error: "Senha atual incorreta." };
+    }
+  } else {
+    // 1º acesso: a senha atual é a data de nascimento.
+    const paxAll = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string }>(
+      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to),
+    );
+    const minhas = paxAll
+      .filter((p) => soDigitosCpf(p.cpf ?? "") === cpf)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const nasc = minhas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
+    if (!conferemSenhaInicial(senhaAtual, nasc)) {
+      return { ok: false, error: "Senha atual incorreta." };
+    }
+  }
+
+  const up = await sb
+    .from("acesso_senhas")
+    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha) }, { onConflict: "cpf" });
+  if (up.error) return { ok: false, error: up.error.message };
+  return { ok: true };
 }
