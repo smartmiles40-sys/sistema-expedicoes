@@ -33,4 +33,5 @@ export const MOCK_USER = {
   nome: "Bruno Oliveira",
   papel: "admin" as const,
   avatar_url: null,
+  senha_provisoria: false,
 };

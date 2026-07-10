@@ -68,6 +68,8 @@ export type UsuarioRow = {
   nome: string;
   papel: PapelUsuario;
   avatar_url: string | null;
+  /** true = conta criada com senha provisória; força troca no 1º acesso (migration 0032). */
+  senha_provisoria: boolean;
   created_at: string;
   updated_at: string;
 }

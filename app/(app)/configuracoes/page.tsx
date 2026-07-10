@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { MARGEM_MINIMA, MARGEM_IDEAL, PROVISAO_EXTRA_PADRAO } from "@/lib/constants";
 import { formatPercent } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { ResetarSenhaBtn } from "./ResetarSenhaBtn";
 
 export const metadata = { title: "Configurações" };
 
@@ -43,9 +44,12 @@ export default async function ConfiguracoesPage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="lista">{u.papel}</Badge>
                   {isAdmin && (
-                    <Button variant="ghost" size="sm" disabled>
-                      Mudar papel
-                    </Button>
+                    <>
+                      <Button variant="ghost" size="sm" disabled>
+                        Mudar papel
+                      </Button>
+                      <ResetarSenhaBtn usuarioId={u.id} nome={u.nome} />
+                    </>
                   )}
                 </div>
               </div>

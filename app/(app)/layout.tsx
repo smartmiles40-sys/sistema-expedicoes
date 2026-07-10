@@ -21,6 +21,8 @@ async function listAllPassageiros(): Promise<PassageiroRow[]> {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // 1º acesso: conta com senha provisória precisa definir a própria senha antes de usar.
+  if (user.senha_provisoria) redirect("/primeiro-acesso");
 
   const [expedicoes, fornecedores, passageiros, alertas, inscricoesPendentes] = await Promise.all([
     listExpedicoesComAgregados(),
