@@ -13,6 +13,7 @@ import {
   Text,
   View,
   Image,
+  Link,
   StyleSheet,
   Svg,
   Path,
@@ -136,6 +137,7 @@ const styles = StyleSheet.create({
   tags: { flexDirection: "row", flexWrap: "wrap", marginTop: 7 },
   tag: { fontFamily: SANS, fontSize: 8, color: DARK, backgroundColor: GREEN_SOFT, borderRadius: 3, paddingVertical: 2, paddingHorizontal: 5, marginRight: 4, marginBottom: 2 },
   voucherChip: { fontFamily: SANS_BOLD, fontSize: 8, color: DARK, backgroundColor: LIME, borderRadius: 3, paddingVertical: 2, paddingHorizontal: 5, marginTop: 5, alignSelf: "flex-start" },
+  ingressoLink: { fontFamily: SANS_BOLD, fontSize: 9.5, color: DARK, backgroundColor: LIME, borderRadius: 3, paddingVertical: 3, paddingHorizontal: 8, marginTop: 5, alignSelf: "flex-start", textDecoration: "none" },
 
   fotos: { flexDirection: "row", flexWrap: "wrap", marginTop: 7 },
   foto: { width: 150, height: 100, objectFit: "cover", borderRadius: 4, marginRight: 5, marginBottom: 5 },
@@ -551,11 +553,13 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
         {/* ---- Seus ingressos (Peru) ---- */}
         {(exp.ingressos_mp.length > 0 || exp.ingressos_trem.length > 0) && (
           <View style={styles.secao}>
-            <SecaoTitulo hint="Disponíveis para download no portal do ExpedAmigo.">Seus ingressos</SecaoTitulo>
+            <SecaoTitulo hint="Toque no ingresso para abrir ou baixar o arquivo.">Seus ingressos</SecaoTitulo>
             {[...exp.ingressos_mp, ...exp.ingressos_trem].map((g, i) => (
               <View key={i} style={styles.item} wrap={false}>
                 <Text style={styles.itemTitulo}>{g.nome}</Text>
-                <Text style={styles.voucherChip}>Disponível no portal</Text>
+                {g.url
+                  ? <Link src={g.url} style={styles.ingressoLink}>Abrir / baixar ingresso</Link>
+                  : <Text style={styles.voucherChip}>Disponível no portal</Text>}
               </View>
             ))}
           </View>

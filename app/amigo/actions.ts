@@ -234,7 +234,7 @@ export async function entrarExpedAmigo(
       for (const id of ids) {
         const sp = pathById.get(id);
         if (!sp) continue;
-        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 3600);
+        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 604800); // 7 dias — o link do PDF sobrevive além da sessão
         if (data?.signedUrl) fotoUrl.set(id, data.signedUrl);
       }
     }
