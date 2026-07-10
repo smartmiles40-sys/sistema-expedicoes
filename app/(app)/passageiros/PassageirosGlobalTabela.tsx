@@ -25,6 +25,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
 import { atualizarDadosPessoais, criarPassageiroAvulso, excluirPessoa } from "@/app/(app)/expedicoes/actions";
+import { ResetarSenhaPortalBtn } from "./ResetarSenhaPortalBtn";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import type { StatusReserva, ArquivoRow, SaudePassageiro } from "@/types/database";
@@ -76,10 +77,12 @@ export function PassageirosGlobalTabela({
   pessoas,
   expedicoes,
   arquivos,
+  isAdmin = false,
 }: {
   pessoas: PessoaAgregada[];
   expedicoes: { codigo: string; nome: string }[];
   arquivos: ArquivoRow[];
+  isAdmin?: boolean;
 }) {
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
@@ -421,6 +424,7 @@ export function PassageirosGlobalTabela({
         <PessoaDrawer
           pessoa={aberta}
           arquivos={arquivos.filter((a) => a.passageiro_id && aberta.idsPassageiros.includes(a.passageiro_id))}
+          isAdmin={isAdmin}
           onClose={() => setAberta(null)}
         />
       )}
@@ -682,10 +686,12 @@ type PerfilForm = z.infer<typeof perfilSchema>;
 function PessoaDrawer({
   pessoa,
   arquivos,
+  isAdmin = false,
   onClose,
 }: {
   pessoa: PessoaAgregada;
   arquivos: ArquivoRow[];
+  isAdmin?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -868,6 +874,20 @@ function PessoaDrawer({
                     </p>
                   )}
                 </section>
+
+                {/* Acesso ao portal (ExpedAmigo / Líder) — reset da senha, só admin */}
+                {isAdmin && (
+                  <section className="pt-4 border-t border-border space-y-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">Acesso ao portal</h3>
+                      <p className="text-[11px] text-muted-foreground">
+                        Senha do ExpedAmigo e da Área do Líder (por CPF). Resetar faz a pessoa voltar
+                        ao 1º acesso: entra com a data de nascimento e cria uma nova senha.
+                      </p>
+                    </div>
+                    <ResetarSenhaPortalBtn cpf={pessoa.cpf} nome={pessoa.nome_completo} />
+                  </section>
+                )}
               </div>
 
               {/* ABA: Saúde */}
