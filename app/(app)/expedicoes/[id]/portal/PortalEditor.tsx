@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -10,7 +10,7 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import {
   criarItemPortal, atualizarItemPortal, excluirItemPortal,
   adicionarFotoRoteiro, excluirFotoRoteiro, definirVoucherHospedagem,
@@ -61,52 +61,7 @@ export function PortalEditor({
 
       <VoucherHospedagem expedicaoId={expedicaoId} arquivoId={hospedagemVoucherArquivoId} />
 
-      <Secao
-        tabela="roteiro_dias"
-        titulo="Roteiro dia a dia"
-        descricao="Cada dia da viagem (com fotos)."
-        icone={<CalendarDays className="h-4 w-4" />}
-        expedicaoId={expedicaoId}
-        itens={roteiro as unknown as Item[]}
-        campos={[
-          { key: "dia", label: "Dia (nº)", type: "number" },
-          { key: "data", label: "Data", type: "date" },
-          { key: "titulo", label: "Título", type: "text", required: true, full: true },
-          { key: "cidade", label: "Cidade", type: "text" },
-          { key: "refeicoes", label: "Refeições", type: "text", placeholder: "Café, Almoço" },
-          { key: "hospedagem", label: "Hospedagem", type: "text" },
-          { key: "descricao", label: "Descrição", type: "textarea", full: true },
-        ]}
-        resumo={(r) => {
-          const n = fotosPorDia[r.id]?.length ?? 0;
-          return (
-            <>
-              <div className="text-[13px] font-medium">
-                Dia {String(r.dia ?? "")} · {String(r.titulo ?? "")}
-                {r.cidade ? <span className="text-muted-foreground"> — {String(r.cidade)}</span> : null}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                {r.data ? formatDate(String(r.data)) : "sem data"}
-                {r.refeicoes ? ` · ${String(r.refeicoes)}` : ""}
-                {n > 0 ? ` · ${n} foto${n === 1 ? "" : "s"}` : ""}
-              </div>
-            </>
-          );
-        }}
-        extra={(item) =>
-          item ? (
-            <FotosRoteiro
-              expedicaoId={expedicaoId}
-              roteiroDiaId={item.id}
-              fotos={fotosPorDia[item.id] ?? []}
-            />
-          ) : (
-            <p className="text-[12px] text-muted-foreground">
-              Salve o dia primeiro para poder anexar fotos.
-            </p>
-          )
-        }
-      />
+      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} />
 
       <Secao
         tabela="expedicao_voos"
@@ -528,6 +483,180 @@ function FotosRoteiro({
         </div>
       )}
     </div>
+  );
+}
+
+/** Editor INLINE do roteiro dia a dia — edita direto na tela, salva ao sair do campo. */
+function RoteiroInline({
+  expedicaoId, dias, fotosPorDia,
+}: {
+  expedicaoId: string;
+  dias: RoteiroDiaRow[];
+  fotosPorDia: Record<string, RoteiroDiaFotoRow[]>;
+}) {
+  const router = useRouter();
+  const [addBusy, setAddBusy] = React.useState(false);
+  const [abertos, setAbertos] = React.useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setAbertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  // "Adicionar dia" já numera e data sozinho, continuando a sequência.
+  async function adicionar(base?: RoteiroDiaRow) {
+    setAddBusy(true);
+    const maxDia = dias.reduce((m, d) => Math.max(m, d.dia ?? 0), 0);
+    const ultimaData = dias.map((d) => d.data).filter(Boolean).sort().pop() ?? null;
+    let proxData: string | null = base?.data ?? null;
+    if (!base && ultimaData) {
+      const dt = new Date(`${ultimaData}T00:00:00`);
+      dt.setDate(dt.getDate() + 1);
+      proxData = dt.toISOString().slice(0, 10);
+    }
+    const payload = base
+      ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao }
+      : { dia: maxDia + 1, data: proxData, titulo: `Dia ${maxDia + 1}`, cidade: null, refeicoes: null, hospedagem: null, descricao: null };
+    const r = await criarItemPortal("roteiro_dias", expedicaoId, payload);
+    setAddBusy(false);
+    if (r.ok) { setAbertos((s) => new Set(s).add(r.id)); router.refresh(); }
+    else toast.error("Erro ao adicionar", { description: r.error });
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground"><CalendarDays className="h-4 w-4" /></span>
+          <div>
+            <h3 className="text-sm font-semibold leading-none">Roteiro dia a dia</h3>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Clique num dia pra editar aqui mesmo — salva sozinho ao sair do campo.</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => adicionar()} disabled={addBusy}>
+          <Plus className="h-3 w-3" /> {addBusy ? "Adicionando…" : "Adicionar dia"}
+        </Button>
+      </div>
+
+      {dias.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border py-6 text-center text-[12px] text-muted-foreground">
+          Nenhum dia ainda. Clique em “Adicionar dia”.
+        </p>
+      ) : (
+        <ul className="space-y-1.5">
+          {dias.map((d) => (
+            <DiaInline
+              key={d.id}
+              expedicaoId={expedicaoId}
+              dia={d}
+              fotos={fotosPorDia[d.id] ?? []}
+              aberto={abertos.has(d.id)}
+              onToggle={() => toggle(d.id)}
+              onDuplicar={() => adicionar(d)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function DiaInline({
+  expedicaoId, dia, fotos, aberto, onToggle, onDuplicar,
+}: {
+  expedicaoId: string;
+  dia: RoteiroDiaRow;
+  fotos: RoteiroDiaFotoRow[];
+  aberto: boolean;
+  onToggle: () => void;
+  onDuplicar: () => void;
+}) {
+  const router = useRouter();
+  const [v, setV] = React.useState(() => ({
+    dia: String(dia.dia ?? ""),
+    data: dia.data ? String(dia.data).slice(0, 10) : "",
+    titulo: dia.titulo ?? "",
+    cidade: dia.cidade ?? "",
+    refeicoes: dia.refeicoes ?? "",
+    hospedagem: dia.hospedagem ?? "",
+    descricao: dia.descricao ?? "",
+  }));
+  const salvoRef = React.useRef({ ...v });
+  const [status, setStatus] = React.useState<"idle" | "saving" | "saved">("idle");
+
+  const onCampo = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setV((s) => ({ ...s, [k]: e.target.value }));
+
+  async function salvar(k: keyof typeof v) {
+    if (v[k] === salvoRef.current[k]) return; // nada mudou
+    const payload: Record<string, string | number | null> =
+      k === "dia"
+        ? { dia: v.dia.trim() === "" ? 1 : parseInt(v.dia, 10) || 1 }
+        : { [k]: v[k].trim() === "" ? null : v[k] };
+    setStatus("saving");
+    const r = await atualizarItemPortal("roteiro_dias", dia.id, expedicaoId, payload);
+    if (r.ok) {
+      salvoRef.current = { ...salvoRef.current, [k]: v[k] };
+      setStatus("saved");
+      window.setTimeout(() => setStatus("idle"), 1300);
+    } else {
+      setStatus("idle");
+      toast.error("Erro ao salvar", { description: r.error });
+    }
+  }
+
+  const nFotos = fotos.length;
+
+  return (
+    <li className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="flex h-6 min-w-[2.1rem] items-center justify-center rounded bg-[var(--brand-dark)] px-1 text-[11px] font-bold text-white">D{v.dia || "?"}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium">{v.titulo || "—"}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              {v.data ? formatDate(v.data) : "sem data"}{v.cidade ? ` · ${v.cidade}` : ""}{nFotos ? ` · ${nFotos} foto${nFotos === 1 ? "" : "s"}` : ""}
+            </span>
+          </span>
+        </button>
+        {status !== "idle" && (
+          <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+            {status === "saving" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-vinculado-600" />}
+            {status === "saving" ? "salvando" : "salvo"}
+          </span>
+        )}
+        <button type="button" onClick={onDuplicar} title="Duplicar dia" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><Copy className="h-3.5 w-3.5" /></button>
+        <ConfirmDeleteButton
+          ariaLabel="Excluir dia"
+          title="Excluir este dia?"
+          description="Esta ação não pode ser desfeita."
+          successMessage="Dia excluído"
+          onConfirm={() => excluirItemPortal("roteiro_dias", dia.id, expedicaoId)}
+        />
+        <button type="button" onClick={onToggle} aria-label="Abrir/fechar" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"><ChevronRight className={cn("h-4 w-4 transition-transform", aberto && "rotate-90")} /></button>
+      </div>
+
+      {aberto && (
+        <div className="space-y-3 border-t border-border p-3">
+          <div className="grid grid-cols-[76px_1fr] gap-2">
+            <div className="space-y-1"><Label>Dia</Label><Input inputMode="numeric" value={v.dia} onChange={onCampo("dia")} onBlur={() => salvar("dia")} /></div>
+            <div className="space-y-1"><Label>Data</Label><Input type="date" value={v.data} onChange={onCampo("data")} onBlur={() => salvar("data")} /></div>
+          </div>
+          <div className="space-y-1"><Label>Título</Label><Input value={v.titulo} onChange={onCampo("titulo")} onBlur={() => salvar("titulo")} placeholder="Ex.: Chegada em Cusco" /></div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1"><Label>Cidade</Label><Input value={v.cidade} onChange={onCampo("cidade")} onBlur={() => salvar("cidade")} /></div>
+            <div className="space-y-1"><Label>Refeições</Label><Input value={v.refeicoes} onChange={onCampo("refeicoes")} onBlur={() => salvar("refeicoes")} placeholder="Café, Almoço" /></div>
+          </div>
+          <div className="space-y-1"><Label>Hospedagem</Label><Input value={v.hospedagem} onChange={onCampo("hospedagem")} onBlur={() => salvar("hospedagem")} /></div>
+          <div className="space-y-1">
+            <Label>Descrição</Label>
+            <textarea value={v.descricao} onChange={onCampo("descricao")} onBlur={() => salvar("descricao")} rows={4}
+              className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600" />
+          </div>
+          <div className="border-t border-border pt-3">
+            <FotosRoteiro expedicaoId={expedicaoId} roteiroDiaId={dia.id} fotos={fotos} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">As mudanças salvam sozinhas ao sair de cada campo.</p>
+        </div>
+      )}
+    </li>
   );
 }
 
