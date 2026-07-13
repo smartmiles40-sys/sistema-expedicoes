@@ -3,7 +3,27 @@ import { revalidatePath } from "next/cache";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import { mockPassageiros, mockExpedicoes } from "@/lib/mock-data";
+import { enviarPassageiroParaBitrix, type PassageiroOutbound } from "@/lib/bitrix/outbound";
 import type { PassageiroRow, ExpedicaoRow, SaudePassageiro } from "@/types/database";
+
+/** Monta a "cartinha" (payload) que o sistema manda ao n8n ao aprovar. */
+function montarOutbound(p: PassageiroRow, expedicaoCodigo: string | null): PassageiroOutbound {
+  return {
+    evento: "inscricao_aprovada",
+    bitrix_deal_id: p.bitrix_deal_id,
+    bitrix_contact_id: p.bitrix_contact_id,
+    expedicao_codigo: expedicaoCodigo,
+    nome_completo: p.nome_completo,
+    cpf: p.cpf,
+    email: p.email,
+    telefone: p.telefone,
+    data_nascimento: p.data_nascimento,
+    passaporte: p.passaporte,
+    validade_passaporte: p.validade_passaporte,
+    status_reserva: p.status_reserva,
+    observacoes: p.observacoes,
+  };
+}
 
 export type InscricaoPendente = {
   id: string;
@@ -110,12 +130,17 @@ export async function contarInscricoesPendentes(): Promise<number> {
 }
 
 export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
+  // Guarda os dados já atualizados pra montar a cartinha do Bitrix depois de aprovar.
+  let outbound: PassageiroOutbound | null = null;
+
   if (DEV_USE_MOCK_DATA) {
     const p = mockPassageiros.find((x) => x.id === id);
     if (!p) return { ok: false, error: "Inscrição não encontrada." };
     p.pendente_aprovacao = false;
     if (p.status_reserva === "Lead") p.status_reserva = "Pré-reserva"; // não rebaixa quem já é Confirmado
     p.updated_at = new Date().toISOString();
+    const codigo = mockExpedicoes.find((e) => e.id === p.expedicao_id)?.codigo ?? null;
+    outbound = montarOutbound(p, codigo);
   } else {
     const sb = await getServerClient();
     // Só promove Lead → Pré-reserva; para outros status, apenas tira a flag.
@@ -125,9 +150,26 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     if (status === "Lead") patch.status_reserva = "Pré-reserva";
     const { error } = await sb.from("passageiros").update(patch).eq("id", id);
     if (error) return { ok: false, error: error.message };
+
+    // Relê a linha já atualizada + o código da expedição pra montar a cartinha.
+    const { data: pos } = await sb.from("passageiros").select("*").eq("id", id).maybeSingle();
+    const p = pos as PassageiroRow | null;
+    if (p) {
+      let codigo: string | null = null;
+      if (p.expedicao_id) {
+        const { data: exp } = await sb.from("expedicoes").select("codigo").eq("id", p.expedicao_id).maybeSingle();
+        codigo = (exp as { codigo: string } | null)?.codigo ?? null;
+      }
+      outbound = montarOutbound(p, codigo);
+    }
   }
+
   revalidatePath("/inscricoes");
   revalidatePath("/passageiros");
+
+  // Melhor esforço: avisa o Bitrix (via n8n). Falha aqui NÃO desfaz a aprovação.
+  if (outbound) await enviarPassageiroParaBitrix(outbound);
+
   return { ok: true };
 }
 
