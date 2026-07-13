@@ -50,6 +50,9 @@ export type PassageiroOutbound = {
   paises_visitados: string | null;
   /** Questionário de saúde (jsonb) — cada chave é uma pergunta; o n8n mapeia por título. */
   saude: Record<string, string> | null;
+  /** Link temporário (signed URL) do arquivo do passaporte — o n8n baixa e anexa no Bitrix. */
+  passaporte_arquivo_url: string | null;
+  passaporte_arquivo_nome: string | null;
 };
 
 /**

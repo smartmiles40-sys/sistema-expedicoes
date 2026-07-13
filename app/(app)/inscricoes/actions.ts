@@ -39,8 +39,14 @@ function montarOutbound(p: PassageiroRow, expedicaoCodigo: string | null): Passa
     ja_viajou_internacional: p.ja_viajou_internacional,
     paises_visitados: p.paises_visitados,
     saude: (p.saude as Record<string, string> | null) ?? null,
+    // O link do arquivo é gerado à parte (async) no aprovarInscricao.
+    passaporte_arquivo_url: null,
+    passaporte_arquivo_nome: null,
   };
 }
+
+/** Bucket do Supabase Storage onde ficam os anexos das expedições. */
+const BUCKET_ARQUIVOS = "arquivos-expedicoes";
 
 export type InscricaoPendente = {
   id: string;
@@ -178,6 +184,25 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
         codigo = (exp as { codigo: string } | null)?.codigo ?? null;
       }
       outbound = montarOutbound(p, codigo);
+
+      // Arquivo do passaporte: gera um link temporário pro n8n baixar e anexar no Bitrix.
+      if (p.passaporte_arquivo_id) {
+        const { data: arq } = await sb
+          .from("arquivos")
+          .select("storage_path, nome")
+          .eq("id", p.passaporte_arquivo_id)
+          .maybeSingle();
+        const a = arq as { storage_path: string; nome: string } | null;
+        if (a?.storage_path) {
+          const { data: signed } = await sb.storage
+            .from(BUCKET_ARQUIVOS)
+            .createSignedUrl(a.storage_path, 3600); // 1h — o n8n baixa na hora
+          if (signed?.signedUrl) {
+            outbound.passaporte_arquivo_url = signed.signedUrl;
+            outbound.passaporte_arquivo_nome = a.nome;
+          }
+        }
+      }
     }
   }
 
