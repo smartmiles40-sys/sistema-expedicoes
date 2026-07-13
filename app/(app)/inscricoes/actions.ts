@@ -22,6 +22,23 @@ function montarOutbound(p: PassageiroRow, expedicaoCodigo: string | null): Passa
     validade_passaporte: p.validade_passaporte,
     status_reserva: p.status_reserva,
     observacoes: p.observacoes,
+    endereco: {
+      cep: p.endereco_cep,
+      rua: p.endereco_rua,
+      numero: p.endereco_numero,
+      complemento: p.endereco_complemento,
+      bairro: p.endereco_bairro,
+      cidade: p.endereco_cidade,
+      estado: p.endereco_estado,
+    },
+    contato_emergencia_nome: p.contato_emergencia_nome,
+    contato_emergencia_vinculo: p.contato_emergencia_vinculo,
+    contato_emergencia_fone: p.contato_emergencia_fone,
+    pref_marcar_assento: p.pref_marcar_assento,
+    pref_upgrade_classe: p.pref_upgrade_classe,
+    ja_viajou_internacional: p.ja_viajou_internacional,
+    paises_visitados: p.paises_visitados,
+    saude: (p.saude as Record<string, string> | null) ?? null,
   };
 }
 

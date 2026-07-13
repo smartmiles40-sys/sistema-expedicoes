@@ -21,7 +21,7 @@ export type PassageiroOutbound = {
   bitrix_contact_id: string | null;
   /** Código da expedição no sistema (bate com expedicoes.codigo). */
   expedicao_codigo: string | null;
-  // Dados úteis — o n8n escolhe quais escrever no Bitrix.
+  // Dados úteis — o n8n distribui cada um na sua gavetinha no Bitrix.
   nome_completo: string;
   cpf: string | null;
   email: string | null;
@@ -31,6 +31,25 @@ export type PassageiroOutbound = {
   validade_passaporte: string | null;
   status_reserva: string;
   observacoes: string | null;
+  // V2 — todos os campos do formulário de inscrição.
+  endereco: {
+    cep: string | null;
+    rua: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+    cidade: string | null;
+    estado: string | null;
+  };
+  contato_emergencia_nome: string | null;
+  contato_emergencia_vinculo: string | null;
+  contato_emergencia_fone: string | null;
+  pref_marcar_assento: boolean | null;
+  pref_upgrade_classe: string | null;
+  ja_viajou_internacional: boolean | null;
+  paises_visitados: string | null;
+  /** Questionário de saúde (jsonb) — cada chave é uma pergunta; o n8n mapeia por título. */
+  saude: Record<string, string> | null;
 };
 
 /**
