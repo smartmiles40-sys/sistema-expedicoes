@@ -453,6 +453,13 @@ export type ExpedicaoInfoRow = {
   expedicao_id: string;
   titulo: string;
   conteudo: string;
+  /** PDF/imagem anexado (arquivos.id), migration 0033 — baixável no portal. */
+  arquivo_id: string | null;
+  /** Nome do link do 1º arquivo (migration 0034); vazio → "Baixar PDF". */
+  arquivo_label: string | null;
+  /** 2º arquivo opcional e seu rótulo (migration 0034). */
+  arquivo_id_2: string | null;
+  arquivo_label_2: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;

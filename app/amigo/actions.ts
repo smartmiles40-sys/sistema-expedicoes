@@ -74,7 +74,8 @@ export type AmigoPasseio = {
   observacoes: string | null;
   voucher_url: string | null;
 };
-export type AmigoInfo = { titulo: string; conteudo: string };
+export type AmigoInfoPdf = { url: string; label: string };
+export type AmigoInfo = { titulo: string; conteudo: string; pdfs: AmigoInfoPdf[] };
 export type AmigoIngresso = { nome: string; url: string };
 
 export type AmigoExpedicao = {
@@ -238,6 +239,10 @@ export async function entrarExpedAmigo(
     for (const f of rtFotos) if (expIdsFuturas.has(f.expedicao_id)) idsRelevantes.add(f.arquivo_id);
     for (const v of voosGrupo) if (v.arquivo_id && expIdsFuturas.has(v.expedicao_id)) idsRelevantes.add(v.arquivo_id);
     for (const p of passeios) if (p.arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.arquivo_id);
+    for (const i of infos) {
+      if (i.arquivo_id && expIdsFuturas.has(i.expedicao_id)) idsRelevantes.add(i.arquivo_id);
+      if (i.arquivo_id_2 && expIdsFuturas.has(i.expedicao_id)) idsRelevantes.add(i.arquivo_id_2);
+    }
     for (const e of exps) if (e.hospedagem_voucher_arquivo_id && expIdsFuturas.has(e.id)) idsRelevantes.add(e.hospedagem_voucher_arquivo_id);
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
 
@@ -327,7 +332,16 @@ export async function entrarExpedAmigo(
       info: infos
         .filter((i) => i.expedicao_id === e.id)
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
-        .map((i) => ({ titulo: i.titulo, conteudo: i.conteudo })),
+        .map((i) => ({
+          titulo: i.titulo,
+          conteudo: i.conteudo,
+          pdfs: [
+            { id: i.arquivo_id, label: i.arquivo_label },
+            { id: i.arquivo_id_2, label: i.arquivo_label_2 },
+          ]
+            .map((a) => (a.id ? { url: fotoUrl.get(a.id) ?? "", label: (a.label ?? "").trim() || "Baixar PDF" } : null))
+            .filter((x): x is AmigoInfoPdf => !!x && x.url !== ""),
+        })),
       avisos: avisosAll
         .filter((a) => a.expedicao_id === e.id)
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))

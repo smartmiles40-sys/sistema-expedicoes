@@ -517,6 +517,9 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
                 <View style={styles.infoTexto}>
                   <Text style={styles.itemTitulo}>{emojiInfo(b.titulo)} {b.titulo}</Text>
                   <Text style={styles.texto}>{b.conteudo}</Text>
+                  {b.pdfs.map((pdf, j) => (
+                    <Link key={j} src={pdf.url} style={styles.ingressoLink}>{pdf.label}</Link>
+                  ))}
                 </View>
               </View>
             ))}

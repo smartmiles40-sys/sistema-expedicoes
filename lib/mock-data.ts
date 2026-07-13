@@ -549,18 +549,18 @@ export const mockRoteiroDias: Tables<"roteiro_dias">[] = persist("mockRoteiroDia
 ]);
 
 export const mockExpedicaoVoos: Tables<"expedicao_voos">[] = persist("mockExpedicaoVoos", () => [
-  { id: "vo001", expedicao_id: PERU, trecho: "Ida", companhia: "LATAM", numero_voo: "LA1234", origem: "São Paulo (GRU)", destino: "Lima (LIM)", partida: "Dia do embarque · 23:50", chegada: "+1 dia · 03:10", localizador: null, observacoes: "Conexão de grupo — chegar 3h antes.", arquivo_id: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "vo002", expedicao_id: PERU, trecho: "Volta", companhia: "LATAM", numero_voo: "LA4321", origem: "Lima (LIM)", destino: "São Paulo (GRU)", partida: "Último dia · 08:30", chegada: "mesmo dia · 15:40", localizador: null, observacoes: null, arquivo_id: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "vo001", expedicao_id: PERU, trecho: "Ida", companhia: "LATAM", numero_voo: "LA1234", origem: "São Paulo (GRU)", destino: "Lima (LIM)", partida: "Dia do embarque · 23:50", chegada: "+1 dia · 03:10", localizador: null, observacoes: "Conexão de grupo — chegar 3h antes.", arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "vo002", expedicao_id: PERU, trecho: "Volta", companhia: "LATAM", numero_voo: "LA4321", origem: "Lima (LIM)", destino: "São Paulo (GRU)", partida: "Último dia · 08:30", chegada: "mesmo dia · 15:40", localizador: null, observacoes: null, arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
 ]);
 
 export const mockExpedicaoPasseios: Tables<"expedicao_passeios">[] = persist("mockExpedicaoPasseios", () => [
-  { id: "ps001", expedicao_id: PERU, nome: "Trilha + entrada Machu Picchu", data: futureDate(97), horario: "06:00", local: "Aguas Calientes", incluso: true, observacoes: "Levar passaporte original.", arquivo_id: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "ps002", expedicao_id: PERU, nome: "Passeio de quadriciclo", data: futureDate(96), horario: "15:00", local: "Vale Sagrado", incluso: true, observacoes: null, arquivo_id: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "ps001", expedicao_id: PERU, nome: "Trilha + entrada Machu Picchu", data: futureDate(97), horario: "06:00", local: "Aguas Calientes", incluso: true, observacoes: "Levar passaporte original.", arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "ps002", expedicao_id: PERU, nome: "Passeio de quadriciclo", data: futureDate(96), horario: "15:00", local: "Vale Sagrado", incluso: true, observacoes: null, arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
 ]);
 
 export const mockExpedicaoInfo: Tables<"expedicao_info">[] = persist("mockExpedicaoInfo", () => [
-  { id: "in001", expedicao_id: PERU, titulo: "Moeda e câmbio", conteudo: "A moeda local é o Sol peruano (PEN). Leve dólares para trocar; cartões são aceitos nos centros urbanos.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
-  { id: "in002", expedicao_id: PERU, titulo: "Altitude", conteudo: "Cusco fica a ~3.400m. Beba bastante água, evite álcool nos primeiros dias e considere o chá de coca para o soroche.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "in001", expedicao_id: PERU, titulo: "Moeda e câmbio", conteudo: "A moeda local é o Sol peruano (PEN). Leve dólares para trocar; cartões são aceitos nos centros urbanos.", arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
+  { id: "in002", expedicao_id: PERU, titulo: "Altitude", conteudo: "Cusco fica a ~3.400m. Beba bastante água, evite álcool nos primeiros dias e considere o chá de coca para o soroche.", arquivo_id: null, arquivo_label: null, arquivo_id_2: null, arquivo_label_2: null, ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
 ]);
 
 // Fotos por dia do roteiro — vazio no mock (envie pelo editor para testar o fluxo).

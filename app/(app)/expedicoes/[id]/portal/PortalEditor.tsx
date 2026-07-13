@@ -160,10 +160,29 @@ export function PortalEditor({
           <>
             <div className="text-[13px] font-medium inline-flex items-center gap-1">
               <MapPin className="h-3 w-3 text-muted-foreground" /> {String(r.titulo ?? "")}
+              {(r.arquivo_id || r.arquivo_id_2) ? <span className="text-vinculado-600"> · PDF ✓</span> : null}
             </div>
             <div className="text-[11px] text-muted-foreground line-clamp-1">{String(r.conteudo ?? "")}</div>
           </>
         )}
+        extra={(item) => {
+          if (!item) return <p className="text-[12px] text-muted-foreground">Salve a informação primeiro para anexar os arquivos.</p>;
+          const b = info.find((x) => x.id === item.id);
+          return (
+            <div className="space-y-3">
+              <VoucherAnexo
+                tabela="expedicao_info" expedicaoId={expedicaoId} itemId={item.id} categoria="Outros"
+                rotulo="PDF 1" campo="arquivo_id" arquivoId={b?.arquivo_id ?? null}
+                labelCampo="arquivo_label" labelValor={b?.arquivo_label ?? null}
+              />
+              <VoucherAnexo
+                tabela="expedicao_info" expedicaoId={expedicaoId} itemId={item.id} categoria="Outros"
+                rotulo="PDF 2" campo="arquivo_id_2" arquivoId={b?.arquivo_id_2 ?? null}
+                labelCampo="arquivo_label_2" labelValor={b?.arquivo_label_2 ?? null}
+              />
+            </div>
+          );
+        }}
       />
 
       <Secao
@@ -731,12 +750,20 @@ function VoucherHospedagem({ expedicaoId, arquivoId }: { expedicaoId: string; ar
 
 /** Anexo de UM voucher (foto/PDF) para um item de voo ou passeio. */
 function VoucherAnexo({
-  tabela, expedicaoId, itemId, arquivoId,
+  tabela, expedicaoId, itemId, arquivoId, rotulo = "Voucher", categoria = "Vouchers",
+  campo = "arquivo_id", labelCampo, labelValor,
 }: {
   tabela: string;
   expedicaoId: string;
   itemId: string;
   arquivoId: string | null;
+  rotulo?: string;
+  categoria?: string;
+  /** Coluna de arquivo a gravar (default arquivo_id; ex.: arquivo_id_2). */
+  campo?: string;
+  /** Se definido, mostra um campo pra personalizar o NOME do link (coluna de texto). */
+  labelCampo?: string;
+  labelValor?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -749,14 +776,14 @@ function VoucherAnexo({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("expedicao_id", expedicaoId);
-      fd.append("categoria", "Vouchers");
-      fd.append("descricao", "Voucher");
+      fd.append("categoria", categoria);
+      fd.append("descricao", rotulo);
       const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
       const json = await res.json();
       if (!json.ok) { toast.error("Falha no upload", { description: json.error }); return; }
-      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { arquivo_id: json.id });
+      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { [campo]: json.id });
       if (!r.ok) { toast.error("Falha ao salvar", { description: r.error }); return; }
-      toast.success("Voucher anexado");
+      toast.success(`${rotulo} anexado`);
       router.refresh();
     } finally {
       setBusy(false);
@@ -768,37 +795,54 @@ function VoucherAnexo({
     if (!arquivoId) return;
     setBusy(true);
     try {
-      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { arquivo_id: null });
+      const r = await atualizarItemPortal(tabela, itemId, expedicaoId, { [campo]: null });
       if (!r.ok) { toast.error("Falha ao remover", { description: r.error }); return; }
       await fetch(`/api/arquivos/${arquivoId}`, { method: "DELETE" }).catch(() => {});
-      toast.success("Voucher removido");
+      toast.success(`${rotulo} removido`);
       router.refresh();
     } finally {
       setBusy(false);
     }
   }
 
+  async function salvarLabel(valor: string) {
+    if (!labelCampo) return;
+    await atualizarItemPortal(tabela, itemId, expedicaoId, { [labelCampo]: valor.trim() || null });
+    router.refresh();
+  }
+
   return (
     <div className="space-y-1.5">
-      <div className="text-[12px] font-semibold">Voucher (1 arquivo)</div>
+      <div className="text-[12px] font-semibold">{rotulo} (1 arquivo)</div>
       {arquivoId ? (
-        <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
-          <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Anexado</span>
-          <a
-            href={`/api/arquivos/${arquivoId}/download?inline=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[12px] font-medium text-editavel-700 hover:underline"
-          >
-            Ver
-          </a>
-          <button type="button" onClick={remover} disabled={busy} className="text-[12px] font-medium text-critico-600 hover:underline">
-            Remover
-          </button>
-        </div>
+        <>
+          <div className="flex items-center gap-2 rounded-lg border border-vinculado-600/30 bg-vinculado-50 p-2">
+            <span className="flex-1 text-[13px] font-semibold text-vinculado-600">✓ Anexado</span>
+            <a
+              href={`/api/arquivos/${arquivoId}/download?inline=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] font-medium text-editavel-700 hover:underline"
+            >
+              Ver
+            </a>
+            <button type="button" onClick={remover} disabled={busy} className="text-[12px] font-medium text-critico-600 hover:underline">
+              Remover
+            </button>
+          </div>
+          {labelCampo && (
+            <input
+              type="text"
+              defaultValue={labelValor ?? ""}
+              placeholder='Nome do link (ex.: "Baixar visto")'
+              onBlur={(e) => salvarLabel(e.target.value)}
+              className="w-full rounded-lg border border-border px-2 py-1 text-[12px]"
+            />
+          )}
+        </>
       ) : (
         <Button type="button" size="sm" variant="outline" onClick={() => inputRef.current?.click()} disabled={busy}>
-          <Upload className="h-3 w-3" /> {busy ? "Enviando…" : "Anexar voucher"}
+          <Upload className="h-3 w-3" /> {busy ? "Enviando…" : `Anexar ${rotulo.toLowerCase()}`}
         </Button>
       )}
       <input ref={inputRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => enviar(e.target.files?.[0] ?? null)} />

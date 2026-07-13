@@ -553,6 +553,21 @@ function ViagemExperiencia({ exp, nome }: { exp: AmigoExpedicao; nome: string })
                 <div key={i} className="rounded-lg border border-border bg-background px-3 py-2">
                   <div className="text-[12px] font-semibold">{emojiInfo(b.titulo)} {b.titulo}</div>
                   <p className="mt-0.5 whitespace-pre-line text-[12px] text-muted-foreground">{b.conteudo}</p>
+                  {b.pdfs.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {b.pdfs.map((pdf, j) => (
+                        <a
+                          key={j}
+                          href={pdf.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-editavel-700 hover:bg-accent"
+                        >
+                          <Download className="h-3 w-3" /> {pdf.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -766,7 +781,7 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
       {/* Corpo recolhível */}
       {aberto && temDetalhe && (
         <div className="p-5">
-          {d.descricao && <p className="text-[13.5px] leading-relaxed text-[#09282B]/85">{d.descricao}</p>}
+          {d.descricao && <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-[#09282B]/85">{d.descricao}</p>}
           {(d.refeicoes || d.hospedagem) && (
             <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
               {d.refeicoes && <span className="rounded-full bg-[#EDF5DC] px-3 py-1 font-medium text-[#09282B]/80">🍽 {d.refeicoes}</span>}
