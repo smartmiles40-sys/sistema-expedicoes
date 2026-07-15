@@ -14,6 +14,8 @@ import {
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
 import { Logo } from "@/components/ui/Logo";
+import { useTheme } from "@/components/layout/ThemeProvider";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { heroDoDestino, diaImgFallback, HERO_SLIDESHOW } from "./fotos";
 
 const STORAGE_KEY = "expedamigo-sessao";
@@ -40,6 +42,7 @@ function secoesDaExp(exp: AmigoExpedicao): { id: string; label: string }[] {
 }
 
 export default function AmigoPage() {
+  const { theme } = useTheme();
   const [cpf, setCpf] = React.useState("");
   const [senha, setSenha] = React.useState("");
   const [dados, setDados] = React.useState<AmigoDados | null>(null);
@@ -138,21 +141,22 @@ export default function AmigoPage() {
   // ---------- Primeiro acesso: criar nova senha ----------
   if (precisaTrocar) {
     return (
-      <div data-theme="dark" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--brand-dark)] p-6 text-foreground">
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--portal-bg)] p-6 text-foreground">
+        <ThemeToggle className="absolute right-4 top-4 z-20" />
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <form onSubmit={trocarSenha} className="relative w-full max-w-sm space-y-4">
-          <Logo tone="dark" className="h-6 w-auto" />
+          <Logo tone={theme === "dark" ? "dark" : "light"} className="h-6 w-auto" />
           <div>
             <h1 className="page-title">Crie sua senha</h1>
             <p className="page-subtitle mt-1">Primeiro acesso! Escolha uma senha só sua para as próximas vezes.</p>
           </div>
           <div className="space-y-1">
             <Label htmlFor="nova-senha">Nova senha</Label>
-            <Input id="nova-senha" type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mínimo 6 caracteres" autoFocus className="border-white/25 bg-white/10 text-white placeholder:text-white/50" />
+            <Input id="nova-senha" type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mínimo 6 caracteres" autoFocus className="border-[var(--portal-border)] bg-[var(--portal-panel)] text-[var(--portal-fg)] placeholder:text-[var(--portal-fg-soft)]" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="conf-senha">Confirmar senha</Label>
-            <Input id="conf-senha" type="password" value={confirmaSenha} onChange={(e) => setConfirmaSenha(e.target.value)} placeholder="Repita a senha" className="border-white/25 bg-white/10 text-white placeholder:text-white/50" />
+            <Input id="conf-senha" type="password" value={confirmaSenha} onChange={(e) => setConfirmaSenha(e.target.value)} placeholder="Repita a senha" className="border-[var(--portal-border)] bg-[var(--portal-panel)] text-[var(--portal-fg)] placeholder:text-[var(--portal-fg-soft)]" />
           </div>
           {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
           <Button type="submit" variant="brand" size="lg" className="w-full" disabled={salvandoSenha}>
@@ -166,7 +170,8 @@ export default function AmigoPage() {
   // ---------- Portão de acesso ----------
   if (!dados) {
     return (
-      <div data-theme="light" className="grid min-h-screen bg-background text-foreground lg:grid-cols-2">
+      <div className="relative grid min-h-screen bg-background text-foreground lg:grid-cols-2">
+        <ThemeToggle className="absolute right-4 top-4 z-20" />
         <div className="relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
           <HeaderSlideshow imagens={HERO_SLIDESHOW} />
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--brand-dark)]/45 via-[var(--brand-dark)]/65 to-[var(--brand-dark)]/95" />
@@ -183,11 +188,11 @@ export default function AmigoPage() {
           <p className="relative z-10 text-xs text-white/60">Espaço do viajante</p>
         </div>
 
-        <div data-theme="dark" className="relative flex items-center justify-center overflow-hidden bg-[var(--brand-dark)] p-6 text-foreground">
+        <div className="relative flex items-center justify-center overflow-hidden bg-[var(--portal-bg)] p-6 text-foreground">
           <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
           <form onSubmit={entrar} className="relative w-full max-w-sm space-y-4">
             <div className="lg:hidden">
-              <Logo tone="dark" className="h-6 w-auto" />
+              <Logo tone={theme === "dark" ? "dark" : "light"} className="h-6 w-auto" />
             </div>
             <div>
               <h1 className="page-title">Minha Viagem</h1>
@@ -203,7 +208,7 @@ export default function AmigoPage() {
                 inputMode="numeric"
                 maxLength={14}
                 autoFocus
-                className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
+                className="border-[var(--portal-border)] bg-[var(--portal-panel)] text-[var(--portal-fg)] placeholder:text-[var(--portal-fg-soft)]"
               />
             </div>
             <div className="space-y-1">
@@ -214,9 +219,9 @@ export default function AmigoPage() {
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Sua senha"
-                className="border-white/25 bg-white/10 text-white placeholder:text-white/50"
+                className="border-[var(--portal-border)] bg-[var(--portal-panel)] text-[var(--portal-fg)] placeholder:text-[var(--portal-fg-soft)]"
               />
-              <p className="text-[11px] text-white/60">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
+              <p className="text-[11px] text-[var(--portal-fg-soft)]">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
             <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
@@ -237,33 +242,34 @@ export default function AmigoPage() {
   const secoes = selecionada ? secoesDaExp(selecionada) : [];
 
   return (
-    <div data-theme="dark" className="min-h-screen bg-[var(--brand-dark)]">
+    <div className="min-h-screen bg-[var(--portal-bg)]">
       {/* Cabeçalho flutuante translúcido — fica por cima do hero */}
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[var(--brand-dark)]/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 text-white">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[var(--portal-border)] bg-[var(--portal-bg)]/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 text-[var(--portal-fg)]">
           <button type="button" onClick={() => setSelecionadaId(null)} className="flex items-center gap-2" aria-label="Minhas viagens">
-            {selecionada && <ArrowLeft className="h-4 w-4 text-white/80" />}
-            <Logo tone="dark" className="h-5 w-auto" />
+            {selecionada && <ArrowLeft className="h-4 w-4 text-[var(--portal-fg-soft)]" />}
+            <Logo tone={theme === "dark" ? "dark" : "light"} className="h-5 w-auto" />
           </button>
           <div className="flex items-center gap-3">
-            {!selecionada && <span className="hidden text-[12px] text-white/80 sm:inline">Olá, {dados.primeiro_nome} 👋</span>}
+            {!selecionada && <span className="hidden text-[12px] text-[var(--portal-fg-soft)] sm:inline">Olá, {dados.primeiro_nome} 👋</span>}
+            <ThemeToggle className="h-8 w-8" />
             <button
               type="button"
               onClick={sair}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-medium hover:bg-white/20"
+              className="rounded-full bg-[var(--portal-panel)] px-3 py-1.5 text-[12px] font-medium hover:opacity-80"
             >
               Sair
             </button>
           </div>
         </div>
         {selecionada && secoes.length > 1 && (
-          <nav className="border-t border-white/10">
+          <nav className="border-t border-[var(--portal-border)]">
             <div className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-4 py-2">
               {secoes.map((s) => (
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="shrink-0 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-[var(--brand-lime)] hover:text-[var(--brand-dark)]"
+                  className="shrink-0 rounded-full border border-[var(--portal-border)] bg-[var(--portal-panel)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--portal-fg-soft)] transition-colors hover:bg-[var(--brand-lime)] hover:text-[var(--brand-dark)]"
                 >
                   {s.label}
                 </a>
@@ -402,7 +408,7 @@ function ViagemExperiencia({ exp, nome }: { exp: AmigoExpedicao; nome: string })
       </div>
 
       {/* Conteúdo da viagem (fundo teal com textura orgânica) */}
-      <div className="relative bg-[var(--brand-dark)]">
+      <div className="relative bg-[var(--portal-bg)]">
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <div className="relative mx-auto max-w-3xl space-y-10 px-4 py-12">
         {/* Roteiro dia a dia */}
@@ -643,7 +649,7 @@ function HomeExpedicoes({ dados, onAbrir }: { dados: AmigoDados; onAbrir: (id: s
           </p>
         </div>
       </div>
-      <div className="relative bg-[var(--brand-dark)]">
+      <div className="relative bg-[var(--portal-bg)]">
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <main className="relative mx-auto max-w-4xl px-4 pb-16 pt-8">
           <div className="grid gap-5 sm:grid-cols-2">
@@ -853,16 +859,16 @@ function Bloco({
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
-        className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3.5 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.1]"
+        className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--portal-border)] bg-[var(--portal-panel)] px-4 py-3.5 text-left backdrop-blur-sm transition-opacity hover:opacity-90"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-lime)] text-[var(--brand-dark)]">
           {icone}
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[20px] font-semibold leading-none text-white">{titulo}</h2>
-          {sub && <p className="mt-1 text-[12px] text-white/60">{sub}</p>}
+          <h2 className="font-display text-[20px] font-semibold leading-none text-[var(--portal-fg)]">{titulo}</h2>
+          {sub && <p className="mt-1 text-[12px] text-[var(--portal-fg-soft)]">{sub}</p>}
         </div>
-        <ChevronRight className={cn("h-5 w-5 shrink-0 text-white/60 transition-transform", aberto && "rotate-90")} />
+        <ChevronRight className={cn("h-5 w-5 shrink-0 text-[var(--portal-fg-soft)] transition-transform", aberto && "rotate-90")} />
       </button>
       {aberto && children}
     </section>

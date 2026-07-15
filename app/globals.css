@@ -30,6 +30,16 @@
   --brand-lime: #d7f264;   /* lime de acento */
   --brand-lime-deep: #c0e046;
 
+  /* Portal do viajante (ExpedAmigo / Área do Líder) — paleta que responde ao
+     tema. No CLARO: fundo off-white esverdeado + texto teal. No ESCURO (abaixo):
+     fundo teal + texto claro (a identidade original do portal). */
+  --portal-bg: #f4f7f5;
+  --portal-bg-2: #e7efe9;
+  --portal-fg: #09282b;
+  --portal-fg-soft: rgba(9, 40, 43, 0.66);
+  --portal-panel: rgba(9, 40, 43, 0.05);
+  --portal-border: rgba(9, 40, 43, 0.12);
+
   /* Semantic palette (UX da planilha) */
   --editavel-50: #eff6ff;
   --editavel-100: #dbeafe;
@@ -72,6 +82,14 @@
   --accent-foreground: #f8fafc;
   --destructive: #ef4444;
   --destructive-foreground: #f8fafc;
+
+  /* Portal do viajante no ESCURO — a identidade original (teal + texto claro). */
+  --portal-bg: #09282b;
+  --portal-bg-2: #0d3a3f;
+  --portal-fg: #f8f6f7;
+  --portal-fg-soft: rgba(248, 246, 247, 0.7);
+  --portal-panel: rgba(255, 255, 255, 0.06);
+  --portal-border: rgba(255, 255, 255, 0.1);
 
   --editavel-50: #0c1a33;
   --editavel-100: #1e3a8a;
@@ -272,6 +290,11 @@ button, a, [role="button"], label, summary {
 .incan-pattern {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='%23D7F264' stroke-width='1.1' opacity='0.2' stroke-linecap='round'><path d='M5 48 Q18 32, 32 48 T 58 48 T 80 48'/><path d='M15 14 Q25 24, 35 14 T 60 14 T 82 14'/><path d='M0 72 Q15 58, 30 72 T 58 72 T 80 72'/><ellipse cx='65' cy='52' rx='4' ry='7' transform='rotate(-28 65 52)'/><ellipse cx='14' cy='30' rx='3' ry='6' transform='rotate(22 14 30)'/><path d='M48 30 Q54 22, 62 26 Q66 18, 72 24'/></g></svg>");
   background-repeat: repeat; background-size: 80px 80px;
+}
+/* No modo CLARO a mesma textura vira teal (aparece sobre o fundo claro). Opacidade
+   bem maior que no escuro porque teal sobre claro tem menos contraste que o lime. */
+[data-theme="light"] .incan-pattern {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='%2309282b' stroke-width='1.2' opacity='0.55' stroke-linecap='round'><path d='M5 48 Q18 32, 32 48 T 58 48 T 80 48'/><path d='M15 14 Q25 24, 35 14 T 60 14 T 82 14'/><path d='M0 72 Q15 58, 30 72 T 58 72 T 80 72'/><ellipse cx='65' cy='52' rx='4' ry='7' transform='rotate(-28 65 52)'/><ellipse cx='14' cy='30' rx='3' ry='6' transform='rotate(22 14 30)'/><path d='M48 30 Q54 22, 62 26 Q66 18, 72 24'/></g></svg>");
 }
 
 /* Dica de rolagem (bolinha que desce) */

@@ -3,8 +3,10 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
-  MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays,
+  MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays, Moon, Sun,
 } from "lucide-react";
+import { useTheme } from "@/components/layout/ThemeProvider";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +31,7 @@ const SEM_DOT: Record<string, string> = {
 };
 
 export default function LiderPage() {
+  const { theme, toggle: alternarTema } = useTheme();
   const [cpf, setCpf] = React.useState("");
   const [senha, setSenha] = React.useState("");
   const [dados, setDados] = React.useState<LiderDados | null>(null);
@@ -141,7 +144,9 @@ export default function LiderPage() {
   // ---------- Portão de CPF ----------
   if (!dados) {
     return (
-      <div className="grid min-h-screen lg:grid-cols-2">
+      <div className="relative grid min-h-screen lg:grid-cols-2">
+        <ThemeToggle className="absolute right-4 top-4 z-20" />
+        <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <div className="bg-brand-gradient relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex">
           <Logo tone="dark" className="h-7 w-auto" />
           <div className="relative z-10 max-w-md">
@@ -156,7 +161,7 @@ export default function LiderPage() {
           <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[var(--brand-lime)] opacity-[0.07] blur-3xl" />
         </div>
 
-        <div className="flex items-center justify-center p-6">
+        <div className="relative z-10 flex items-center justify-center p-6">
           <form onSubmit={entrar} className="w-full max-w-sm space-y-4">
             <a href="/login" className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-3.5 w-3.5" /> Voltar
@@ -189,8 +194,9 @@ export default function LiderPage() {
 
   // ---------- Área do líder ----------
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-brand-gradient flex items-center justify-between px-5 py-4 text-white">
+    <div className="relative min-h-screen bg-background">
+      <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
+      <header className="relative z-10 bg-brand-gradient flex items-center justify-between px-5 py-4 text-white">
         <div className="flex items-center gap-2.5 min-w-0">
           <LogoMark tone="dark" className="h-9 w-9" />
           <div className="min-w-0">
@@ -206,6 +212,15 @@ export default function LiderPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={alternarTema}
+            title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+            className="inline-flex items-center justify-center rounded-lg bg-white/10 p-1.5 hover:bg-white/20"
+          >
+            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
           <button
             type="button"
             onClick={recarregar}
@@ -226,7 +241,7 @@ export default function LiderPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-4 p-4">
+      <main className="relative z-10 mx-auto max-w-3xl space-y-4 p-4">
         {dados.expedicoes.length === 0 ? (
           <p className="py-12 text-center text-[13px] text-muted-foreground">
             Nenhuma expedição atribuída a você no momento.
