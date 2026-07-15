@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockPassageiros, mockExpedicoes } from "@/lib/mock-data";
 import { enviarPassageiroParaBitrix, type PassageiroOutbound } from "@/lib/bitrix/outbound";
 import type { PassageiroRow, ExpedicaoRow, SaudePassageiro } from "@/types/database";
@@ -186,15 +187,19 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
       outbound = montarOutbound(p, codigo);
 
       // Arquivo do passaporte: gera um link temporário pro n8n baixar e anexar no Bitrix.
+      // Usa a SERVICE ROLE (igual /amigo e /lider): gerar signed URL no Storage exige
+      // essa chave — com o client normal (sessão do operador) o createSignedUrl falha
+      // silenciosamente e o arquivo não ia pro Bitrix.
       if (p.passaporte_arquivo_id) {
-        const { data: arq } = await sb
+        const admin = createServiceRoleClient();
+        const { data: arq } = await admin
           .from("arquivos")
           .select("storage_path, nome")
           .eq("id", p.passaporte_arquivo_id)
           .maybeSingle();
         const a = arq as { storage_path: string; nome: string } | null;
         if (a?.storage_path) {
-          const { data: signed } = await sb.storage
+          const { data: signed } = await admin.storage
             .from(BUCKET_ARQUIVOS)
             .createSignedUrl(a.storage_path, 3600); // 1h — o n8n baixa na hora
           if (signed?.signedUrl) {
