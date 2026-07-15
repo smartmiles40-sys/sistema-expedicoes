@@ -48,6 +48,9 @@ export type PassageiroOutbound = {
   pref_upgrade_classe: string | null;
   ja_viajou_internacional: boolean | null;
   paises_visitados: string | null;
+  /** Acompanhante indicado (pra o alerta/tarefa no Bitrix). */
+  acompanhante_nome: string | null;
+  acompanhante_divide_quarto: string | null;
   /** Questionário de saúde (jsonb) — cada chave é uma pergunta; o n8n mapeia por título. */
   saude: Record<string, string> | null;
   /** Link temporário (signed URL) do arquivo do passaporte — o n8n baixa e anexa no Bitrix. */

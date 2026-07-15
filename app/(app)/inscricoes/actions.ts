@@ -39,6 +39,8 @@ function montarOutbound(p: PassageiroRow, expedicaoCodigo: string | null): Passa
     pref_upgrade_classe: p.pref_upgrade_classe,
     ja_viajou_internacional: p.ja_viajou_internacional,
     paises_visitados: p.paises_visitados,
+    acompanhante_nome: p.acompanhante_nome,
+    acompanhante_divide_quarto: p.acompanhante_divide_quarto,
     saude: (p.saude as Record<string, string> | null) ?? null,
     // O link do arquivo é gerado à parte (async) no aprovarInscricao.
     passaporte_arquivo_url: null,
