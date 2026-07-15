@@ -105,6 +105,16 @@ export type AmigoDados = {
   expedicoes: AmigoExpedicao[];
 };
 
+/**
+ * CPFs com acesso ADMIN no ExpedAmigo: ao logar, veem TODAS as expedições
+ * futuras (conteúdo do portal), não só as próprias. A senha fica em `acesso_senhas`
+ * como qualquer pessoa (o admin não precisa ser passageiro/ter nascimento).
+ * Chave = 11 dígitos do CPF.
+ */
+const ADMINS_AMIGO: Record<string, string> = {
+  "20262027999": "Administrador",
+};
+
 export async function entrarExpedAmigo(
   cpfRaw: string,
   senhaRaw: string,
@@ -168,9 +178,10 @@ export async function entrarExpedAmigo(
     rtFotos = ftAll;
   }
 
-  // 1) Acha as linhas da pessoa pelo CPF.
+  // 1) Acha as linhas da pessoa pelo CPF. Admin não precisa ser passageiro.
   const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
-  if (minhasRows.length === 0) {
+  const ehAdmin = ADMINS_AMIGO[cpf] !== undefined;
+  if (!ehAdmin && minhasRows.length === 0) {
     return { ok: false, error: "Não encontramos seu cadastro com este CPF. Fale com a agência." };
   }
 
@@ -189,6 +200,12 @@ export async function entrarExpedAmigo(
       if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
         return { ok: false, error: "Senha incorreta." };
       }
+    } else if (ehAdmin) {
+      // Admin: a senha fica em `acesso_senhas` (gravada ao configurar o acesso).
+      // Em modo mock (sem banco) aceita pra teste local; em prod exige a senha configurada.
+      if (!DEV_USE_MOCK_DATA) {
+        return { ok: false, error: "Acesso admin ainda não configurado." };
+      }
     } else {
       // Sem senha definida → 1º acesso: a senha é a data de nascimento.
       if (!nascCadastro) {
@@ -201,12 +218,24 @@ export async function entrarExpedAmigo(
     }
   }
 
-  const nome = ordenadas[0].nome_completo;
+  const nome = ehAdmin ? ADMINS_AMIGO[cpf] : (ordenadas[0]?.nome_completo ?? "Viajante");
 
   // 3) Só expedições futuras (embarque hoje em diante) e não-canceladas.
   const hoje = new Date().toISOString().slice(0, 10);
   const expById = new Map(exps.map((e) => [e.id, e]));
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
+
+  // Unidades a exibir: cada expedição futura não-cancelada. Admin vê TODAS; o
+  // passageiro vê as suas (via linha `passageiros`, que carrega quarto/voo/ingressos).
+  const naoElegivel = (e: ExpedicaoRow | undefined): boolean =>
+    !e || e.status === "Cancelada" || (e.data_embarque ?? "").slice(0, 10) < hoje;
+  const unidades: { exp: ExpedicaoRow; row: PassageiroRow | null }[] = ehAdmin
+    ? exps.filter((e) => !naoElegivel(e)).map((e) => ({ exp: e, row: null }))
+    : minhasRows
+        .filter((row) => row.expedicao_id && row.status_reserva !== "Cancelado")
+        .map((row) => ({ exp: expById.get(row.expedicao_id as string) as ExpedicaoRow, row }))
+        .filter((u) => !naoElegivel(u.exp));
+  const expIdsFuturas = new Set<string>(unidades.map((u) => u.exp.id));
 
   // Ingressos (categoria "Bilhetes") das linhas da PRÓPRIA pessoa — só os dela.
   const meusIds = minhasRows.map((r) => r.id);
@@ -228,13 +257,6 @@ export async function entrarExpedAmigo(
   // das expedições futuras da pessoa: signed URL (prod) ou rota de download do mock (dev).
   const fotoUrl = new Map<string, string>(); // arquivo_id -> url
   {
-    const expIdsFuturas = new Set<string>();
-    for (const row of minhasRows) {
-      if (!row.expedicao_id || row.status_reserva === "Cancelado") continue;
-      const e = expById.get(row.expedicao_id);
-      if (!e || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
-      expIdsFuturas.add(row.expedicao_id);
-    }
     const idsRelevantes = new Set<string>();
     for (const f of rtFotos) if (expIdsFuturas.has(f.expedicao_id)) idsRelevantes.add(f.arquivo_id);
     for (const v of voosGrupo) if (v.arquivo_id && expIdsFuturas.has(v.expedicao_id)) idsRelevantes.add(v.arquivo_id);
@@ -264,23 +286,20 @@ export async function entrarExpedAmigo(
   }
 
   const expedicoes: AmigoExpedicao[] = [];
-  for (const row of minhasRows) {
-    if (!row.expedicao_id || row.status_reserva === "Cancelado") continue;
-    const e = expById.get(row.expedicao_id);
-    if (!e) continue;
-    if ((e.data_embarque ?? "").slice(0, 10) < hoje) continue;
-
-    const meusQuartos = alocacoes
-      .filter((a) => a.passageiro_id === row.id)
-      .map((a) => quartoById.get(a.quarto_id))
-      .filter((q): q is QuartoRow => !!q)
-      .map<AmigoQuarto>((q) => ({
-        numero: q.numero,
-        tipo: q.tipo,
-        hotel_cidade: q.hotel_cidade,
-        check_in: q.check_in,
-        check_out: q.check_out,
-      }));
+  for (const { exp: e, row } of unidades) {
+    const meusQuartos = row
+      ? alocacoes
+          .filter((a) => a.passageiro_id === row.id)
+          .map((a) => quartoById.get(a.quarto_id))
+          .filter((q): q is QuartoRow => !!q)
+          .map<AmigoQuarto>((q) => ({
+            numero: q.numero,
+            tipo: q.tipo,
+            hotel_cidade: q.hotel_cidade,
+            check_in: q.check_in,
+            check_out: q.check_out,
+          }))
+      : [];
 
     expedicoes.push({
       id: e.id,
@@ -290,9 +309,9 @@ export async function entrarExpedAmigo(
       data_retorno: e.data_retorno,
       status: e.status,
       voo: {
-        voo_interno_necessario: row.voo_nacional_necessario,
-        companhia: row.companhia_aerea,
-        localizador: row.localizador,
+        voo_interno_necessario: row?.voo_nacional_necessario ?? false,
+        companhia: row?.companhia_aerea ?? null,
+        localizador: row?.localizador ?? null,
       },
       links: links
         .filter((l) => l.expedicao_id === e.id)
@@ -347,11 +366,11 @@ export async function entrarExpedAmigo(
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((a) => ({ tipo: a.tipo, titulo: a.titulo, conteudo: a.conteudo })),
       ingressos_mp: ingressoArqs
-        .filter((a) => a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Machu Picchu"))
+        .filter((a) => !!row && a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Machu Picchu"))
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
       ingressos_trem: ingressoArqs
-        .filter((a) => a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
+        .filter((a) => !!row && a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
     });
