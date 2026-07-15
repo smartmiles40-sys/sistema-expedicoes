@@ -30,7 +30,12 @@ export function AppShell({
       />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header onMenu={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">{children}</main>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+          <div className="relative min-h-full">
+            <div className="incan-pattern pointer-events-none absolute inset-0 opacity-[0.35]" aria-hidden />
+            <div className="relative z-10">{children}</div>
+          </div>
+        </main>
       </div>
     </div>
   );
