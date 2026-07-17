@@ -67,14 +67,6 @@ const CAMPOS_TEXTO_VAZIO = {
   paises_visitados: "", acompanhante_nome: "",
 };
 
-// Rótulos amigáveis dos "buckets" que já temos (pra o aviso — sem mostrar valores).
-const BUCKETS: { chave: string; campos: string[] }[] = [
-  { chave: "dados de cadastro", campos: ["nome_completo", "data_nascimento", "email", "telefone"] },
-  { chave: "endereço", campos: ["endereco_cep", "endereco_rua", "endereco_numero", "endereco_cidade", "endereco_estado"] },
-  { chave: "passaporte", campos: ["passaporte", "validade_passaporte"] },
-  { chave: "contato de emergência", campos: ["contato_emergencia_nome", "contato_emergencia_fone", "contato_emergencia_vinculo"] },
-];
-
 export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) {
   const [fase, setFase] = React.useState<"identificacao" | "completar" | "conflito">("identificacao");
   const [expedicaoId, setExpedicaoId] = React.useState("");
@@ -82,6 +74,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   const [nascimento, setNascimento] = React.useState("");
   const [temos, setTemos] = React.useState<Set<string>>(new Set());
   const [temPassaporteAnexo, setTemPassaporteAnexo] = React.useState(false);
+  const [reconhecido, setReconhecido] = React.useState(false); // achamos o cadastro (pré-preenchido)
 
   const [f, setF] = React.useState({ ...CAMPOS_TEXTO_VAZIO });
   const [prefAssento, setPrefAssento] = React.useState<boolean | null>(null);
@@ -165,12 +158,33 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       const r = await identificarInscricao(expedicaoId, cpf, nascimento);
       if (!r.ok) return toast.error(r.error);
       if (r.existe && r.conflito) return setFase("conflito");
+      // Mostra TODOS os campos (temos vazio); se achamos o cadastro, pré-preenche.
+      setTemos(new Set());
       if (r.existe) {
-        setTemos(new Set(r.temos));
+        const v = r.valores;
+        setF({
+          nome_completo: v.nome_completo, email: v.email, telefone: v.telefone,
+          passaporte: v.passaporte, validade_passaporte: v.validade_passaporte,
+          endereco_cep: v.endereco_cep, endereco_rua: v.endereco_rua, endereco_numero: v.endereco_numero,
+          endereco_complemento: v.endereco_complemento, endereco_bairro: v.endereco_bairro,
+          endereco_cidade: v.endereco_cidade, endereco_estado: v.endereco_estado,
+          contato_emergencia_nome: v.contato_emergencia_nome, contato_emergencia_fone: v.contato_emergencia_fone,
+          contato_emergencia_vinculo: v.contato_emergencia_vinculo,
+          paises_visitados: v.paises_visitados, acompanhante_nome: v.acompanhante_nome,
+        });
+        setPrefAssento(v.pref_marcar_assento);
+        setPrefUpgrade(v.pref_upgrade_classe);
+        setJaViajou(v.ja_viajou_internacional);
+        setAcompanhado(v.acompanhante_nome ? true : null);
+        setDivideQuarto(v.acompanhante_divide_quarto);
+        setSaude(v.saude ?? {});
+        setPossuiPassaporte(v.passaporte || v.validade_passaporte ? true : null);
         setTemPassaporteAnexo(r.temPassaporteAnexo);
+        setReconhecido(true);
       } else {
-        setTemos(new Set());
+        setF({ ...CAMPOS_TEXTO_VAZIO });
         setTemPassaporteAnexo(false);
+        setReconhecido(false);
       }
       setPasso(0);
       setFase("completar");
@@ -214,9 +228,6 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       setBusy(false);
     }
   }
-
-  // Buckets que já temos (pra o aviso).
-  const bucketsTemos = BUCKETS.filter((b) => b.campos.some((c) => temos.has(c)) || (b.chave === "passaporte" && temPassaporteAnexo)).map((b) => b.chave);
 
   const Header = (
     <header className="bg-brand-gradient px-4 py-6 text-white">
@@ -462,11 +473,11 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
     <div className="min-h-screen bg-muted/30">
       {Header}
       <main className="mx-auto max-w-2xl space-y-4 p-4">
-        {idx === 0 && bucketsTemos.length > 0 && (
+        {idx === 0 && reconhecido && (
           <div className="flex items-start gap-2 rounded-2xl border border-vinculado-600/30 bg-vinculado-50 p-3">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-vinculado-600" />
             <p className="text-[12px] text-vinculado-700">
-              <strong>Já temos {bucketsTemos.join(", ")} na nossa base</strong> — não precisa preencher de novo. Complete só o que falta.
+              <strong>Encontramos seu cadastro!</strong> Já preenchemos com o que temos — confira e atualize o que precisar antes de enviar.
             </p>
           </div>
         )}

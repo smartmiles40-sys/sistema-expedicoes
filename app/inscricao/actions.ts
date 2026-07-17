@@ -99,11 +99,68 @@ const CAMPOS_CHECAR = [
   "contato_emergencia_nome", "contato_emergencia_fone", "contato_emergencia_vinculo",
 ] as const;
 
+/** Valores que devolvemos pra pré-preencher o formulário (só após bater o nascimento). */
+export type ValoresInscricao = {
+  nome_completo: string;
+  email: string;
+  telefone: string;
+  passaporte: string;
+  validade_passaporte: string;
+  endereco_cep: string;
+  endereco_rua: string;
+  endereco_numero: string;
+  endereco_complemento: string;
+  endereco_bairro: string;
+  endereco_cidade: string;
+  endereco_estado: string;
+  contato_emergencia_nome: string;
+  contato_emergencia_fone: string;
+  contato_emergencia_vinculo: string;
+  paises_visitados: string;
+  ja_viajou_internacional: boolean | null;
+  pref_marcar_assento: boolean | null;
+  pref_upgrade_classe: string | null;
+  acompanhante_nome: string;
+  acompanhante_divide_quarto: string | null;
+  saude: SaudePassageiro;
+};
+
+/** Monta os valores atuais da pessoa pra pré-preencher (pessoais do perfil + reserva desta expedição). */
+function montarValores(base: Partial<Pax>, existente: Pax | null): ValoresInscricao {
+  const s = (v: unknown) => (v == null ? "" : String(v));
+  const b = base as Record<string, unknown>;
+  const ex = (existente ?? {}) as Record<string, unknown>;
+  return {
+    nome_completo: s(b.nome_completo),
+    email: s(b.email),
+    telefone: s(b.telefone),
+    passaporte: s(b.passaporte),
+    validade_passaporte: s(b.validade_passaporte).slice(0, 10),
+    endereco_cep: s(b.endereco_cep),
+    endereco_rua: s(b.endereco_rua),
+    endereco_numero: s(b.endereco_numero),
+    endereco_complemento: s(b.endereco_complemento),
+    endereco_bairro: s(b.endereco_bairro),
+    endereco_cidade: s(b.endereco_cidade),
+    endereco_estado: s(b.endereco_estado),
+    contato_emergencia_nome: s(b.contato_emergencia_nome),
+    contato_emergencia_fone: s(b.contato_emergencia_fone),
+    contato_emergencia_vinculo: s(b.contato_emergencia_vinculo),
+    paises_visitados: s(b.paises_visitados),
+    ja_viajou_internacional: typeof b.ja_viajou_internacional === "boolean" ? (b.ja_viajou_internacional as boolean) : null,
+    pref_marcar_assento: typeof ex.pref_marcar_assento === "boolean" ? (ex.pref_marcar_assento as boolean) : null,
+    pref_upgrade_classe: ex.pref_upgrade_classe ? String(ex.pref_upgrade_classe) : null,
+    acompanhante_nome: s(ex.acompanhante_nome),
+    acompanhante_divide_quarto: ex.acompanhante_divide_quarto ? String(ex.acompanhante_divide_quarto) : null,
+    saude: (b.saude && typeof b.saude === "object" ? b.saude : {}) as SaudePassageiro,
+  };
+}
+
 export type Identificacao =
   | { ok: false; error: string }
   | { ok: true; existe: false }
   | { ok: true; existe: true; conflito: true }
-  | { ok: true; existe: true; conflito: false; temos: string[]; temPassaporteAnexo: boolean };
+  | { ok: true; existe: true; conflito: false; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao };
 
 /** Passo 1: identifica o passageiro pelo CPF + nascimento (na expedição OU no histórico). */
 export async function identificarInscricao(
@@ -128,7 +185,11 @@ export async function identificarInscricao(
   }
 
   const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
-  return { ok: true, existe: true, conflito: false, temos, temPassaporteAnexo: temValor(base.passaporte_arquivo_id) };
+  return {
+    ok: true, existe: true, conflito: false, temos,
+    temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
+    valores: montarValores(base, existente),
+  };
 }
 
 const dadosSchema = z.object({
@@ -232,21 +293,42 @@ function novosCampos(d: Dados, cpf: string) {
   };
 }
 
-/** Patch de MERGE: só preenche o que está vazio no existente (não sobrescreve). */
-function patchMerge(existente: Pax, d: Dados): Record<string, unknown> {
+/**
+ * Patch de ATUALIZAÇÃO: sobrescreve os dados pessoais/reserva com o que a pessoa
+ * revisou no formulário (ela VIU os valores e pôde editar). Não mexe em
+ * tipo/status_reserva/cpf; força pendente_aprovacao=true. Saúde é mesclada
+ * (preserva chaves que o form público não coleta, ex.: anexo do certificado).
+ */
+function patchAtualizar(existente: Pax, d: Dados): Record<string, unknown> {
   const novo = novosCampos(d, soDigitosCpf(d.cpf));
   const patch: Record<string, unknown> = { pendente_aprovacao: true };
   for (const [campo, valor] of Object.entries(novo)) {
     if (campo === "tipo" || campo === "status_reserva" || campo === "pendente_aprovacao" || campo === "inscricao_origem" || campo === "cpf") continue;
     if (campo === "saude") {
-      const merged = { ...((existente.saude ?? {}) as SaudePassageiro), ...(valor as SaudePassageiro) };
-      if (Object.keys(merged).length) patch.saude = merged;
+      patch.saude = { ...((existente.saude ?? {}) as SaudePassageiro), ...(valor as SaudePassageiro) };
       continue;
     }
-    const atual = (existente as Record<string, unknown>)[campo];
-    if (!temValor(atual) && temValor(valor)) patch[campo] = valor;
+    patch[campo] = valor;
   }
   return patch;
+}
+
+// Campos PESSOAIS que, ao serem editados no formulário, propagam para as OUTRAS
+// expedições da mesma pessoa (retroalimentação — igual ao operacional). Saúde e
+// anexo do passaporte ficam de fora da propagação (variam por linha).
+const CAMPOS_PROPAGAR = [
+  "nome_completo", "email", "telefone", "passaporte", "validade_passaporte",
+  "endereco_cep", "endereco_rua", "endereco_numero", "endereco_complemento",
+  "endereco_bairro", "endereco_cidade", "endereco_estado",
+  "contato_emergencia_nome", "contato_emergencia_fone", "contato_emergencia_vinculo",
+  "ja_viajou_internacional", "paises_visitados",
+] as const;
+
+function pessoaisPropagar(d: Dados): Record<string, unknown> {
+  const novo = novosCampos(d, soDigitosCpf(d.cpf)) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of CAMPOS_PROPAGAR) if (k in novo) out[k] = novo[k];
+  return out;
 }
 
 async function subirPassaporteReal(
@@ -313,12 +395,22 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     if (err) return { ok: false, error: err };
   }
 
+  // Propaga os dados pessoais editados pras OUTRAS linhas da pessoa.
+  const propagarMock = (idAtual: string) => {
+    const prop = pessoaisPropagar(d);
+    if (!Object.keys(prop).length) return;
+    for (const l of linhas) {
+      if (l.id === idAtual) continue;
+      Object.assign(l, prop, { updated_at: new Date().toISOString() });
+    }
+  };
+
   // ─── MOCK ───────────────────────────────────────────────────────────────
   if (DEV_USE_MOCK_DATA) {
     if (existente) {
-      const patch = patchMerge(existente, d);
-      Object.assign(patch, camposBackfill((c) => temValor((existente as Record<string, unknown>)[c]) || c in patch, perfil));
+      const patch = patchAtualizar(existente, d);
       Object.assign(existente, patch, { updated_at: new Date().toISOString() });
+      propagarMock(existente.id);
       if (file) {
         const arq = await addArquivoMock(
           { expedicao_id: d.expedicao_id, passageiro_id: existente.id, categoria: "Documentos pessoais", nome: file.name, descricao: "Passaporte — prontidão", mime: file.type || null, tamanho_bytes: file.size },
@@ -354,6 +446,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     const faltamMock = essenciaisFaltando(novo as unknown as Record<string, unknown>);
     if (faltamMock.length) return { ok: false, error: "Faltam dados obrigatórios: " + faltamMock.join(", ") };
     mockPassageiros.push(novo);
+    propagarMock(novo.id);
     await gerarRequisitosPadrao(d.expedicao_id);
     return { ok: true, completou: false };
   }
@@ -361,11 +454,18 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   // ─── PROD (Supabase, service role) ──────────────────────────────────────
   const sb = createServiceRoleClient();
 
+  // Propaga os dados pessoais editados pras OUTRAS linhas da pessoa (retroalimentação).
+  const propagarProd = async (idAtual: string) => {
+    const prop = pessoaisPropagar(d);
+    const ids = linhas.filter((l) => l.id !== idAtual).map((l) => l.id);
+    if (Object.keys(prop).length && ids.length) await sb.from("passageiros").update(prop).in("id", ids);
+  };
+
   if (existente) {
-    const patch = patchMerge(existente, d);
-    Object.assign(patch, camposBackfill((c) => temValor((existente as Record<string, unknown>)[c]) || c in patch, perfil));
+    const patch = patchAtualizar(existente, d);
     const upd = await sb.from("passageiros").update(patch).eq("id", existente.id);
     if (upd.error) return { ok: false, error: upd.error.message };
+    await propagarProd(existente.id);
     if (file) await subirPassaporteReal(sb, d.expedicao_id, existente.id, file);
     await gerarRequisitosPadrao(d.expedicao_id);
     return { ok: true, completou: true };
@@ -381,6 +481,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     .select("id").single();
   if (ins.error) return { ok: false, error: ins.error.message };
   const passageiroId = (ins.data as { id: string }).id;
+  await propagarProd(passageiroId);
   if (file) await subirPassaporteReal(sb, d.expedicao_id, passageiroId, file);
   await gerarRequisitosPadrao(d.expedicao_id);
   return { ok: true, completou: false };
