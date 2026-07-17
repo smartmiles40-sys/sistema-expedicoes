@@ -392,16 +392,32 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
 - **Importação inicial:** a partir de `Roteiro_Japao_China_G1_G2.xlsx` (34 dias
   G1+G2 + 7 alertas críticos), por script pontual não versionado.
 
-## 📝 Inscrição pública: auto-completar entre expedições
+## 📝 Inscrição pública: área de espera + materialização na aprovação
 
 Ao se inscrever pelo `/inscricao`, o cliente é reconhecido **em qualquer expedição**
 (não só na atual) pelo CPF — `acharLinhasPorCpf` + `agregarPerfil` (valor mais recente
-não-nulo dos `CAMPOS_PESSOAIS_CARRY`) em `app/inscricao/actions.ts`. No envio,
-`camposBackfill` completa os campos pessoais que já temos **só onde faltam** (nunca
-sobrescreve o que o passageiro digitou), e o **passaporte não é reexigido** se já temos
-o anexo da pessoa (linka `passaporte_arquivo_id`). O formulário reage sozinho aos sinais
-`temos`/`temPassaporteAnexo` do `identificarInscricao`. A fila `/inscricoes` mostra
-TODOS os dados ao aprovador (inclui restrições alimentares e condições médicas).
+não-nulo dos `CAMPOS_PESSOAIS_CARRY`). O **núcleo compartilhado** vive em
+`lib/inscricao/core.ts` (não é `use server`): schema, helpers, `montarValores` e a
+função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identificar`/`enviar`/
+`listExpedicoes`.
+
+- **Reconhecimento + edição (P):** `identificarInscricao` devolve os **valores**
+  guardados (`montarValores`), não só rótulos — o form **pré-preenche** e a pessoa
+  **edita**. Portão de privacidade = CPF + nascimento (nascimento divergente → `conflito`,
+  não revela nada). **Todos os campos são obrigatórios** (validação por etapa no client +
+  `essenciaisFaltando` no servidor pra inscrição nova).
+- **Área de espera (migration 0037):** o envio **NÃO grava mais no `passageiros`**.
+  Guarda a inscrição em `inscricoes_pendentes` (jsonb `dados` + `passaporte_arquivo_id`;
+  unique `(expedicao_id, cpf)` → reenvio substitui). O anexo do passaporte é subido na
+  hora com `passageiro_id = null` (linkado só na aprovação).
+- **Materialização na APROVAÇÃO:** `aprovarInscricao` (fila `/inscricoes`) lê a pendência
+  e chama `materializarInscricao` → cria/atualiza a linha do passageiro (**sobrescreve**
+  com os dados revisados), promove Lead→Pré-reserva, **propaga** os dados pessoais para as
+  outras expedições da pessoa (`CAMPOS_PROPAGAR` — saúde e anexo ficam por linha), linka o
+  anexo, gera requisitos e dispara o outbound Bitrix. Depois apaga a pendência.
+  `recusarInscricao` apaga a pendência + o anexo de staging (evita órfão no Storage).
+- A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`; a
+  UI `InscricoesPendentes.tsx` não mudou). Badge = `contarInscricoesPendentes`.
 
 ## 🧪 Como rodar
 

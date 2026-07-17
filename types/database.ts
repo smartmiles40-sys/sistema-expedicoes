@@ -540,6 +540,20 @@ export type AuditLogRow = {
   created_at: string;
 }
 
+/** Inscrição do formulário público aguardando aprovação (staging; migration 0037). */
+export type InscricaoPendenteRow = {
+  id: string;
+  expedicao_id: string;
+  cpf: string;
+  data_nascimento: string | null;
+  nome_completo: string | null;
+  dados: Json;
+  passaporte_arquivo_id: string | null;
+  origem: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ========== Database shape (formato esperado pelo @supabase/supabase-js) ==========
 
 export type Database = {
@@ -570,6 +584,7 @@ export type Database = {
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };
       passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };
+      inscricoes_pendentes: { Row: InscricaoPendenteRow; Insert: Partial<InscricaoPendenteRow> & Pick<InscricaoPendenteRow, "expedicao_id" | "cpf" | "dados">; Update: Partial<InscricaoPendenteRow> };
     };
     Views: {
       vw_prontidao_passageiro: { Row: ProntidaoPassageiroView };

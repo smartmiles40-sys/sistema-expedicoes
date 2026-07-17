@@ -566,6 +566,9 @@ export const mockExpedicaoInfo: Tables<"expedicao_info">[] = persist("mockExpedi
 // Fotos por dia do roteiro — vazio no mock (envie pelo editor para testar o fluxo).
 export const mockRoteiroDiaFotos: Tables<"roteiro_dia_fotos">[] = persist("mockRoteiroDiaFotos", () => []);
 
+// Área de espera das inscrições do formulário público (migration 0037).
+export const mockInscricoesPendentes: Tables<"inscricoes_pendentes">[] = persist("mockInscricoesPendentes", () => []);
+
 export const mockExpedicaoAvisos: Tables<"expedicao_avisos">[] = persist("mockExpedicaoAvisos", () => [
   { id: "av001", expedicao_id: PERU, tipo: "Aviso", titulo: "Passaporte e documentos", conteudo: "Leve o passaporte ORIGINAL no dia de Machu Picchu — é exigido na entrada. Tenha cópias digitais salvas no celular.", ordem: 0, created_at: pastDate(20), updated_at: pastDate(2) },
   { id: "av002", expedicao_id: PERU, tipo: "Boa prática", titulo: "Bagagem de mão", conteudo: "Monte uma mochila de ataque com água, protetor solar, capa de chuva e um agasalho — a temperatura varia muito no mesmo dia.", ordem: 1, created_at: pastDate(20), updated_at: pastDate(2) },
