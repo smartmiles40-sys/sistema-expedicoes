@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 import { cn, formatDate, mascaraTelefone } from "@/lib/utils";
 import { mascaraCpf } from "@/lib/cpf";
-import { SaudeCampos } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
+import { SaudeCampos, PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import type { SaudePassageiro } from "@/types/database";
 import { enviarInscricao, identificarInscricao, type ExpedicaoOpcao } from "./actions";
 
@@ -100,6 +100,61 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
     setF((p) => ({ ...p, [k]: e.target.value }));
   const mostra = (key: string) => !temos.has(key);
   const precisaAnexo = !temPassaporteAnexo;
+  const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v ?? "").trim());
+
+  // "Tudo obrigatório": lista os campos VISÍVEIS ainda não preenchidos da etapa.
+  // Só valida o que aparece — dado que já temos do cliente não é exigido de novo.
+  function faltasDoPasso(titulo: string): string[] {
+    const faltas: string[] = [];
+    const exige = (cond: boolean, label: string) => { if (cond) faltas.push(label); };
+    const digitos = (v: string) => (v ?? "").replace(/\D/g, "");
+    if (titulo === "Dados pessoais") {
+      if (mostra("nome_completo")) exige(!f.nome_completo.trim(), "Nome completo");
+      if (mostra("email")) exige(!emailOk(f.email), "E-mail válido");
+      if (mostra("telefone")) exige(digitos(f.telefone).length < 10, "Telefone");
+    } else if (titulo === "Endereço") {
+      if (mostra("endereco_cep")) exige(!f.endereco_cep.trim(), "CEP");
+      if (mostra("endereco_rua")) exige(!f.endereco_rua.trim(), "Logradouro");
+      if (mostra("endereco_numero")) exige(!f.endereco_numero.trim(), "Número");
+      exige(!f.endereco_bairro.trim(), "Bairro");
+      if (mostra("endereco_cidade")) exige(!f.endereco_cidade.trim(), "Cidade");
+      if (mostra("endereco_estado")) exige(!f.endereco_estado.trim(), "Estado (UF)");
+    } else if (titulo === "Passaporte") {
+      if (precisaAnexo) {
+        exige(possuiPassaporte === null, "Responder se possui passaporte");
+        if (possuiPassaporte === true) {
+          if (mostra("passaporte")) exige(!f.passaporte.trim(), "Número do passaporte");
+          if (mostra("validade_passaporte")) exige(!f.validade_passaporte, "Validade do passaporte");
+          exige(!passaporteFile, "Anexo do passaporte");
+        }
+      } else {
+        if (mostra("passaporte")) exige(!f.passaporte.trim(), "Número do passaporte");
+        if (mostra("validade_passaporte")) exige(!f.validade_passaporte, "Validade do passaporte");
+      }
+    } else if (titulo === "Contato de emergência") {
+      if (mostra("contato_emergencia_nome")) exige(!f.contato_emergencia_nome.trim(), "Nome do contato de emergência");
+      if (mostra("contato_emergencia_fone")) exige(digitos(f.contato_emergencia_fone).length < 10, "Telefone do contato de emergência");
+      if (mostra("contato_emergencia_vinculo")) exige(!f.contato_emergencia_vinculo.trim(), "Vínculo do contato de emergência");
+    } else if (titulo === "Sua viagem") {
+      exige(prefAssento === null, "Deseja marcar assento?");
+      exige(!prefUpgrade, "Deseja upgrade de classe?");
+      exige(jaViajou === null, "Já viajou internacionalmente?");
+      if (jaViajou === true) exige(!f.paises_visitados.trim(), "Países visitados");
+      exige(acompanhado === null, "Vai acompanhado(a)?");
+      if (acompanhado === true) {
+        exige(!f.acompanhante_nome.trim(), "Nome do acompanhante");
+        exige(!divideQuarto, "Dividir quarto");
+      }
+    } else if (titulo === "Saúde") {
+      const sv = (k: string) => ((saude as Record<string, string | undefined>)[k] ?? "").trim();
+      for (const q of PERGUNTAS_SAUDE) {
+        const v = sv(q.campo);
+        if (v !== "Sim" && v !== "Não") { faltas.push(q.pergunta); continue; }
+        if (v === "Sim" && q.detalheCampo) exige(!sv(q.detalheCampo), q.detalhePergunta ?? "Detalhe");
+      }
+    }
+    return faltas;
+  }
 
   async function identificar() {
     if (!expedicaoId) return toast.error("Selecione a expedição.");
@@ -125,7 +180,15 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   }
 
   async function enviar() {
-    if (precisaAnexo && possuiPassaporte === true && !passaporteFile) return toast.error("Anexe a foto ou PDF do seu passaporte.");
+    // "Tudo obrigatório": valida todas as etapas e pula pra primeira incompleta.
+    for (let i = 0; i < passos.length; i++) {
+      const faltas = faltasDoPasso(passos[i].titulo);
+      if (faltas.length) {
+        setPasso(i);
+        toast.error(`Complete "${passos[i].titulo}": ` + faltas.slice(0, 4).join(", ") + (faltas.length > 4 ? "…" : ""));
+        return;
+      }
+    }
     setBusy(true);
     try {
       const dados = {
@@ -382,15 +445,10 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   const pct = Math.round(((idx + 1) / passos.length) * 100);
 
   const avancar = () => {
-    if (passoAtual.titulo === "Passaporte" && precisaAnexo) {
-      if (possuiPassaporte === null) {
-        toast.error("Você possui passaporte? Responda para continuar.");
-        return;
-      }
-      if (possuiPassaporte === true && !passaporteFile) {
-        toast.error("Anexe a foto ou PDF do seu passaporte para continuar.");
-        return;
-      }
+    const faltas = faltasDoPasso(passoAtual.titulo);
+    if (faltas.length) {
+      toast.error("Falta preencher: " + faltas.slice(0, 4).join(", ") + (faltas.length > 4 ? "…" : ""));
+      return;
     }
     setPasso(Math.min(idx + 1, passos.length - 1));
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -422,6 +480,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-[var(--brand-lime-deep)] transition-all duration-300" style={{ width: `${pct}%` }} />
           </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">Todos os campos são obrigatórios.</p>
         </div>
 
         {passoAtual.node}

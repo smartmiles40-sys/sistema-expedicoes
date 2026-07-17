@@ -4,16 +4,49 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockPassageiros, mockExpedicoes } from "@/lib/mock-data";
+import { fetchAllRows } from "@/lib/data/expedicoes";
 import { enviarPassageiroParaBitrix, type PassageiroOutbound } from "@/lib/bitrix/outbound";
 import type { PassageiroRow, ExpedicaoRow, SaudePassageiro } from "@/types/database";
 
+/**
+ * Conta quantas expedições NÃO canceladas a pessoa (pelo CPF) já fez, ANTES da
+ * expedição atual. É o sinal de fidelidade que vai no card do Bitrix.
+ */
+async function expedicoesAnterioresDaPessoa(cpf: string | null, expedicaoIdAtual: string | null): Promise<number> {
+  const digitos = (cpf ?? "").replace(/\D/g, "");
+  if (digitos.length !== 11) return 0;
+  let linhas: { cpf: string | null; expedicao_id: string | null; status_reserva: string }[];
+  if (DEV_USE_MOCK_DATA) {
+    linhas = mockPassageiros.map((p) => ({ cpf: p.cpf, expedicao_id: p.expedicao_id, status_reserva: p.status_reserva }));
+  } else {
+    const sb = createServiceRoleClient();
+    linhas = await fetchAllRows((from, to) =>
+      sb.from("passageiros").select("cpf,expedicao_id,status_reserva").not("cpf", "is", null).order("id").range(from, to));
+  }
+  const exps = new Set<string>();
+  for (const l of linhas) {
+    if ((l.cpf ?? "").replace(/\D/g, "") !== digitos) continue;
+    if (l.status_reserva === "Cancelado" || !l.expedicao_id) continue;
+    if (l.expedicao_id === expedicaoIdAtual) continue; // "anteriores" exclui a atual
+    exps.add(l.expedicao_id);
+  }
+  return exps.size;
+}
+
 /** Monta a "cartinha" (payload) que o sistema manda ao n8n ao aprovar. */
-function montarOutbound(p: PassageiroRow, expedicaoCodigo: string | null): PassageiroOutbound {
+function montarOutbound(
+  p: PassageiroRow,
+  expedicaoCodigo: string | null,
+  expedicaoNome: string | null,
+  expedicoesAnteriores: number,
+): PassageiroOutbound {
   return {
     evento: "inscricao_aprovada",
     bitrix_deal_id: p.bitrix_deal_id,
     bitrix_contact_id: p.bitrix_contact_id,
     expedicao_codigo: expedicaoCodigo,
+    expedicao_nome: expedicaoNome,
+    expedicoes_anteriores: expedicoesAnteriores,
     nome_completo: p.nome_completo,
     cpf: p.cpf,
     email: p.email,
@@ -165,8 +198,9 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     p.pendente_aprovacao = false;
     if (p.status_reserva === "Lead") p.status_reserva = "Pré-reserva"; // não rebaixa quem já é Confirmado
     p.updated_at = new Date().toISOString();
-    const codigo = mockExpedicoes.find((e) => e.id === p.expedicao_id)?.codigo ?? null;
-    outbound = montarOutbound(p, codigo);
+    const exp = mockExpedicoes.find((e) => e.id === p.expedicao_id);
+    const anteriores = await expedicoesAnterioresDaPessoa(p.cpf, p.expedicao_id);
+    outbound = montarOutbound(p, exp?.codigo ?? null, exp?.nome ?? null, anteriores);
   } else {
     const sb = await getServerClient();
     // Só promove Lead → Pré-reserva; para outros status, apenas tira a flag.
@@ -182,11 +216,14 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     const p = pos as PassageiroRow | null;
     if (p) {
       let codigo: string | null = null;
+      let nome: string | null = null;
       if (p.expedicao_id) {
-        const { data: exp } = await sb.from("expedicoes").select("codigo").eq("id", p.expedicao_id).maybeSingle();
-        codigo = (exp as { codigo: string } | null)?.codigo ?? null;
+        const { data: exp } = await sb.from("expedicoes").select("codigo,nome").eq("id", p.expedicao_id).maybeSingle();
+        codigo = (exp as { codigo: string; nome: string } | null)?.codigo ?? null;
+        nome = (exp as { codigo: string; nome: string } | null)?.nome ?? null;
       }
-      outbound = montarOutbound(p, codigo);
+      const anteriores = await expedicoesAnterioresDaPessoa(p.cpf, p.expedicao_id);
+      outbound = montarOutbound(p, codigo, nome, anteriores);
 
       // Arquivo do passaporte: gera um link temporário pro n8n baixar e anexar no Bitrix.
       // Usa a SERVICE ROLE (igual /amigo e /lider): gerar signed URL no Storage exige

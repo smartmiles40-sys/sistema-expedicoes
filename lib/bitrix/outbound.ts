@@ -21,6 +21,10 @@ export type PassageiroOutbound = {
   bitrix_contact_id: string | null;
   /** Código da expedição no sistema (bate com expedicoes.codigo). */
   expedicao_codigo: string | null;
+  /** Nome da expedição (pra o título do card no Bitrix). */
+  expedicao_nome: string | null;
+  /** Quantas expedições (não canceladas) a pessoa já fez com a agência ANTES desta. */
+  expedicoes_anteriores: number;
   // Dados úteis — o n8n distribui cada um na sua gavetinha no Bitrix.
   nome_completo: string;
   cpf: string | null;

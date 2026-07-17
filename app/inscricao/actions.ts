@@ -163,6 +163,32 @@ type Dados = z.infer<typeof dadosSchema>;
 
 export type InscricaoResult = { ok: true; completou: boolean } | { ok: false; error: string };
 
+// Campos essenciais exigidos ao criar uma inscrição NOVA (rede de segurança do
+// servidor; o cliente já valida por etapa). Não roda no update de quem já existe,
+// pra não bloquear cliente recorrente cujo dado vem do histórico (backfill).
+const ESSENCIAIS: { campo: string; label: string; email?: boolean }[] = [
+  { campo: "nome_completo", label: "nome" },
+  { campo: "email", label: "e-mail", email: true },
+  { campo: "telefone", label: "telefone" },
+  { campo: "endereco_cep", label: "CEP" },
+  { campo: "endereco_rua", label: "logradouro" },
+  { campo: "endereco_numero", label: "número" },
+  { campo: "endereco_cidade", label: "cidade" },
+  { campo: "endereco_estado", label: "estado" },
+  { campo: "contato_emergencia_nome", label: "contato de emergência (nome)" },
+  { campo: "contato_emergencia_fone", label: "contato de emergência (telefone)" },
+  { campo: "contato_emergencia_vinculo", label: "contato de emergência (vínculo)" },
+];
+function essenciaisFaltando(rec: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const c of ESSENCIAIS) {
+    const v = rec[c.campo];
+    if (v == null || String(v).trim() === "") out.push(c.label);
+    else if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim())) out.push("e-mail válido");
+  }
+  return out;
+}
+
 function validarArquivo(file: File): string | null {
   if (file.size === 0) return "Arquivo do passaporte vazio.";
   if (file.size > MAX_UPLOAD_BYTES) return `O passaporte excede ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB.`;
@@ -325,6 +351,8 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     };
     // Completa com o que já temos da pessoa (só onde ela não informou).
     Object.assign(novo, camposBackfill((c) => temValor((novo as Record<string, unknown>)[c]), perfil));
+    const faltamMock = essenciaisFaltando(novo as unknown as Record<string, unknown>);
+    if (faltamMock.length) return { ok: false, error: "Faltam dados obrigatórios: " + faltamMock.join(", ") };
     mockPassageiros.push(novo);
     await gerarRequisitosPadrao(d.expedicao_id);
     return { ok: true, completou: false };
@@ -345,6 +373,8 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
 
   const novoRegistro: Record<string, unknown> = { ...novosCampos(d, cpf), expedicao_id: d.expedicao_id };
   Object.assign(novoRegistro, camposBackfill((c) => temValor(novoRegistro[c]), perfil));
+  const faltam = essenciaisFaltando(novoRegistro);
+  if (faltam.length) return { ok: false, error: "Faltam dados obrigatórios: " + faltam.join(", ") };
   const ins = await sb
     .from("passageiros")
     .insert(novoRegistro)
