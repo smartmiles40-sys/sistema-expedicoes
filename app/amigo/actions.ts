@@ -179,7 +179,16 @@ export async function entrarExpedAmigo(
   }
 
   // 1) Acha as linhas da pessoa pelo CPF. Admin não precisa ser passageiro.
-  const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+  //
+  // Linha com `pendente_aprovacao` NÃO conta: veio do formulário público e ainda
+  // não passou pela equipe, então não é passageiro. Isso também é o que impede um
+  // sequestro de portal — a inscrição pública consegue gravar a data de nascimento
+  // num cadastro que não tinha nenhuma, e essa data é a senha do 1º acesso. Como
+  // toda inscrição entra pendente, o dado só vira credencial depois que alguém da
+  // agência aprova (`aprovarInscricao`).
+  const minhasRows = pax.filter(
+    (p) => soDigitosCpf(p.cpf ?? "") === cpf && !p.pendente_aprovacao,
+  );
   const ehAdmin = ADMINS_AMIGO[cpf] !== undefined;
   if (!ehAdmin && minhasRows.length === 0) {
     return { ok: false, error: "Não encontramos seu cadastro com este CPF. Fale com a agência." };

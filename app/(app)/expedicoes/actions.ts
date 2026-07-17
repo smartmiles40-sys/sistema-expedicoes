@@ -18,10 +18,12 @@ import {
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { requisitosDoDestino } from "@/lib/prontidao/requisitos-destino";
-import { ETAPA_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
+import { ETAPA_CHECKLIST, STATUS_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
+import { getTaxaBrl } from "@/lib/data/cambios";
 import { chaveIdentidade } from "@/lib/data/pessoas";
+import { fetchAllRows } from "@/lib/data/expedicoes";
 import type { PapelUsuario, PassageiroRow, TipoRequisito, PassageiroRequisitoRow } from "@/types/database";
 import { mockPassageiroRequisitos } from "@/lib/mock-data";
 
@@ -352,8 +354,11 @@ async function propagarDadosPessoais(
   }
 
   const supabase = await getServerClient();
-  const { data } = await supabase.from("passageiros").select("*");
-  const rows = (data ?? []) as PassageiroRow[];
+  // Paginado: um `select("*")` cru era cortado em 1000 linhas SILENCIOSAMENTE pelo
+  // PostgREST — passando disso, a propagação simplesmente parava de achar os
+  // irmãos da pessoa, sem erro nenhum.
+  const rows = await fetchAllRows<PassageiroRow>((from, to) =>
+    supabase.from("passageiros").select("*").order("id").range(from, to));
   const ref = rows.find((p) => p.id === refId);
   if (!ref) return [];
   const chave = chaveIdentidade(ref);
@@ -466,11 +471,53 @@ export async function atualizarDadosPessoais(
   }
 }
 
+// Server actions são endpoints públicos: sem allowlist, qualquer coluna da tabela
+// era gravável de fora (financeiro, ids do Bitrix, expedicao_id, pendente_aprovacao...).
+// Mesma proteção que CAMPOS_EXPEDICAO_EDITAVEIS/CAMPOS_REQUISITO_EDITAVEIS já tinham.
+const CAMPOS_PASSAGEIRO_EDITAVEIS = new Set([
+  // Dados da RESERVA (ficam só nesta linha)
+  "tipo",
+  "status_reserva",
+  "observacoes",
+  "companhia_aerea",
+  "localizador",
+  "voo_nacional_necessario",
+  "contrato_assinado",
+  "checkin_online_feito",
+  // Dados PESSOAIS (propagam pra todas as linhas da pessoa — ver CAMPOS_PESSOAIS)
+  "nome_completo",
+  "cpf",
+  "passaporte",
+  "validade_passaporte",
+  "data_nascimento",
+  "email",
+  "telefone",
+]);
+
 export async function atualizarPassageiroCampo(
   passageiroId: string,
   campo: string,
   valor: unknown,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!CAMPOS_PASSAGEIRO_EDITAVEIS.has(campo)) {
+    return { ok: false, error: `Campo "${campo}" não é editável` };
+  }
+
+  // Campo pessoal editado inline (ex.: CPF/passaporte na tabela da expedição)
+  // pertence à PESSOA, não à reserva — tem que propagar pras outras expedições
+  // dela, igual ao drawer e ao perfil global. Sem isso a edição inline era o
+  // único caminho que furava a retroalimentação.
+  if ((CAMPOS_PESSOAIS as readonly string[]).includes(campo)) {
+    try {
+      const afetados = await propagarDadosPessoais(passageiroId, { [campo]: valor });
+      if (afetados.length === 0) return { ok: false, error: "Passageiro não encontrado" };
+      revalidarPessoa(afetados);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Erro ao salvar" };
+    }
+  }
+
   if (DEV_USE_MOCK_DATA) {
     const { mockPassageiros } = await import("@/lib/mock-data");
     const idx = mockPassageiros.findIndex((p) => p.id === passageiroId);
@@ -494,18 +541,37 @@ export async function atualizarPassageiroCampo(
   return { ok: true };
 }
 
+// `valor_planejado_brl` e `saldo` ficam DE FORA: são colunas geradas pelo Postgres.
+const CAMPOS_CUSTO_EDITAVEIS = new Set([
+  "categoria",
+  "servico",
+  "fornecedor_id",
+  "cidade",
+  "data_servico",
+  "moeda",
+  "valor_planejado",
+  "valor_realizado",
+  "cambio_aplicado",
+  "status",
+  "pago_por",
+  "observacoes",
+]);
+
 export async function atualizarCustoCampo(
   custoId: string,
   campo: string,
   valor: unknown,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!CAMPOS_CUSTO_EDITAVEIS.has(campo)) {
+    return { ok: false, error: `Campo "${campo}" não é editável` };
+  }
   if (DEV_USE_MOCK_DATA) {
     const { mockCustos } = await import("@/lib/mock-data");
     const idx = mockCustos.findIndex((c) => c.id === custoId);
     if (idx === -1) return { ok: false, error: "Custo não encontrado" };
     (mockCustos[idx] as unknown as Record<string, unknown>)[campo] = valor;
     mockCustos[idx].updated_at = new Date().toISOString();
-    revalidatePath("/expedicoes");
+    revalidatePath("/expedicoes", "layout");
     return { ok: true };
   }
   const supabase = await getServerClient();
@@ -514,21 +580,44 @@ export async function atualizarCustoCampo(
     .update({ [campo]: valor })
     .eq("id", custoId);
   if (error) return { ok: false, error: error.message };
+  // Faltava revalidar no caminho Supabase — só o mock revalidava, então a edição
+  // inline não aparecia até um refresh manual. Escopo "layout" pra pegar as
+  // rotas aninhadas (/expedicoes/[id]/custos) e os agregados da lista.
+  revalidatePath("/expedicoes", "layout");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
+
+// `parent_id`/`ordem` ficam de fora: mexem na árvore de subtarefas e têm caminho
+// próprio. `expedicao_id` idem — mudá-lo mudaria o item de expedição.
+const CAMPOS_CHECKLIST_EDITAVEIS = new Set([
+  "etapa",
+  "tarefa",
+  "responsavel_id",
+  "status",
+  "prazo",
+  "prioridade",
+  "observacoes",
+]);
 
 export async function atualizarChecklistCampo(
   itemId: string,
   campo: string,
   valor: unknown,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!CAMPOS_CHECKLIST_EDITAVEIS.has(campo)) {
+    return { ok: false, error: `Campo "${campo}" não é editável` };
+  }
+  if (campo === "status" && !STATUS_CHECKLIST.includes(valor as (typeof STATUS_CHECKLIST)[number])) {
+    return { ok: false, error: "Status inválido" };
+  }
   if (DEV_USE_MOCK_DATA) {
     const { mockChecklistItens } = await import("@/lib/mock-data");
     const idx = mockChecklistItens.findIndex((c) => c.id === itemId);
     if (idx === -1) return { ok: false, error: "Item não encontrado" };
     (mockChecklistItens[idx] as unknown as Record<string, unknown>)[campo] = valor;
     mockChecklistItens[idx].updated_at = new Date().toISOString();
-    revalidatePath("/expedicoes");
+    revalidatePath("/expedicoes", "layout");
     return { ok: true };
   }
   const supabase = await getServerClient();
@@ -537,6 +626,10 @@ export async function atualizarChecklistCampo(
     .update({ [campo]: valor })
     .eq("id", itemId);
   if (error) return { ok: false, error: error.message };
+  // Faltava revalidar no caminho Supabase — o checklist alimenta os agregados da
+  // lista de expedições e o card de processos do dashboard.
+  revalidatePath("/expedicoes", "layout");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -676,11 +769,15 @@ export async function criarPassageiroAvulso(
       ? mockPassageiros.some((p) => cpfDigitos(p.cpf) === cpfNovo)
       : await (async () => {
           const supabase = await getServerClient();
-          const { data } = await supabase
-            .from("passageiros")
-            .select("cpf")
-            .not("cpf", "is", null);
-          return (data ?? []).some((p) => cpfDigitos(p.cpf) === cpfNovo);
+          // Paginado: truncado em 1000, o dedup deixava passar CPF duplicado.
+          const linhas = await fetchAllRows<{ cpf: string | null }>((from, to) =>
+            supabase
+              .from("passageiros")
+              .select("cpf")
+              .not("cpf", "is", null)
+              .order("id")
+              .range(from, to));
+          return linhas.some((p) => cpfDigitos(p.cpf) === cpfNovo);
         })();
     if (jaExiste) {
       return { ok: false, error: "Já existe um passageiro com este CPF no sistema." };
@@ -956,8 +1053,9 @@ export async function criarCusto(
   const parsed = novoCustoSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
-  const cambio = d.cambio_aplicado ?? (d.moeda === "BRL" ? 1 : 1);
-  const valor_planejado_brl = d.valor_planejado * cambio;
+  // Sem câmbio informado: BRL é 1:1, moeda estrangeira busca a taxa da tabela
+  // `cambios` (getTaxaBrl cai em 1.0 se a moeda não estiver cadastrada).
+  const cambio = d.cambio_aplicado ?? (d.moeda === "BRL" ? 1 : await getTaxaBrl(d.moeda));
   const payload = {
     expedicao_id: d.expedicao_id,
     categoria: d.categoria,
@@ -968,7 +1066,6 @@ export async function criarCusto(
     moeda: d.moeda,
     valor_planejado: d.valor_planejado,
     cambio_aplicado: cambio,
-    valor_planejado_brl,
     valor_realizado: null,
     valor_realizado_brl: null,
     status: "A programar" as const,
@@ -980,6 +1077,8 @@ export async function criarCusto(
     const id = genId("c");
     mockCustos.push({
       ...payload,
+      // No Postgres essa coluna é GENERATED; no mock calculamos à mão.
+      valor_planejado_brl: d.valor_planejado * cambio,
       id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -989,6 +1088,8 @@ export async function criarCusto(
   }
 
   const supabase = await getServerClient();
+  // `valor_planejado_brl` é GENERATED ALWAYS (0001) — mandá-la no insert faz o
+  // Postgres recusar a linha inteira. Só os campos brutos vão.
   const r = await supabase.from("custos").insert(payload).select("id").single();
   if (r.error) return { ok: false, error: r.error.message };
   revalidatePath(`/expedicoes/${d.expedicao_id}/custos`);
@@ -1022,7 +1123,6 @@ export async function criarPagamento(
     moeda: d.moeda,
     valor_total: d.valor_total,
     entrada: d.entrada,
-    saldo,
     vencimento_saldo: d.vencimento_saldo || null,
     status: (saldo === 0 ? "Pago" : "Pendente") as "Pago" | "Pendente",
     observacoes: d.observacoes || null,
@@ -1032,6 +1132,8 @@ export async function criarPagamento(
     const id = genId("pg");
     mockPagamentos.push({
       ...payload,
+      // No Postgres `saldo` é GENERATED; no mock calculamos à mão.
+      saldo,
       id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1041,6 +1143,7 @@ export async function criarPagamento(
   }
 
   const supabase = await getServerClient();
+  // `saldo` é GENERATED ALWAYS (0001) — mandá-lo no insert faz o Postgres recusar.
   const r = await supabase.from("pagamentos").insert(payload).select("id").single();
   if (r.error) return { ok: false, error: r.error.message };
   revalidatePath(`/expedicoes/${d.expedicao_id}/pagamentos`);
@@ -1066,11 +1169,6 @@ export async function criarChecklistItem(
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
   const parentId = d.parent_id || null;
-  // ordem = nº de irmãos (mesmo pai, ou top-level da mesma fase) + 1
-  const irmaos = mockChecklistItens.filter((c) =>
-    c.expedicao_id === d.expedicao_id &&
-    (parentId ? c.parent_id === parentId : c.parent_id === null && c.etapa === d.etapa),
-  ).length;
   const payload = {
     expedicao_id: d.expedicao_id,
     etapa: d.etapa,
@@ -1081,16 +1179,23 @@ export async function criarChecklistItem(
     status: "Pendente" as const,
     dependencia_id: null,
     parent_id: parentId,
-    ordem: irmaos + 1,
     evidencia_url: null,
     bitrix_task_id: null,
     observacoes: d.observacoes || null,
   };
 
+  // ordem = nº de irmãos (mesmo pai, ou top-level da mesma fase) + 1.
+  // Isso era contado SEMPRE sobre `mockChecklistItens`, inclusive com Supabase
+  // conectado — a ordem de todo item novo saía errada em produção.
   if (DEV_USE_MOCK_DATA) {
+    const irmaos = mockChecklistItens.filter((c) =>
+      c.expedicao_id === d.expedicao_id &&
+      (parentId ? c.parent_id === parentId : c.parent_id === null && c.etapa === d.etapa),
+    ).length;
     const id = genId("ck");
     mockChecklistItens.push({
       ...payload,
+      ordem: irmaos + 1,
       id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1100,7 +1205,18 @@ export async function criarChecklistItem(
   }
 
   const supabase = await getServerClient();
-  const r = await supabase.from("checklist_itens").insert(payload).select("id").single();
+  const contagem = supabase
+    .from("checklist_itens")
+    .select("id", { count: "exact", head: true })
+    .eq("expedicao_id", d.expedicao_id);
+  const { count } = await (parentId
+    ? contagem.eq("parent_id", parentId)
+    : contagem.is("parent_id", null).eq("etapa", d.etapa));
+  const r = await supabase
+    .from("checklist_itens")
+    .insert({ ...payload, ordem: (count ?? 0) + 1 })
+    .select("id")
+    .single();
   if (r.error) return { ok: false, error: r.error.message };
   revalidatePath(`/expedicoes/${d.expedicao_id}/checklist`);
   revalidatePath(`/expedicoes/${d.expedicao_id}`);
@@ -1239,30 +1355,20 @@ export async function atualizarCustoLote(
   }
   const dados = { ...parsed.data };
 
-  // Recalcula BRL se valor/câmbio mudou
-  if (dados.valor_planejado != null || dados.cambio_aplicado != null) {
-    if (DEV_USE_MOCK_DATA) {
-      const existing = mockCustos.find((c) => c.id === custoId);
-      if (existing) {
-        const novoValor = dados.valor_planejado ?? existing.valor_planejado;
-        const novoCambio = dados.cambio_aplicado ?? existing.cambio_aplicado ?? 1;
-        (dados as Record<string, unknown>).valor_planejado_brl = novoValor * novoCambio;
-      }
-    }
-  }
-  if (dados.valor_realizado != null) {
-    if (DEV_USE_MOCK_DATA) {
-      const existing = mockCustos.find((c) => c.id === custoId);
-      if (existing) {
-        const cambio = dados.cambio_aplicado ?? existing.cambio_aplicado ?? 1;
-        (dados as Record<string, unknown>).valor_realizado_brl = dados.valor_realizado * cambio;
-      }
-    }
-  }
-
   if (DEV_USE_MOCK_DATA) {
     const idx = mockCustos.findIndex((c) => c.id === custoId);
     if (idx === -1) return { ok: false, error: "Custo não encontrado" };
+    const existing = mockCustos[idx];
+    // `valor_planejado_brl` é GENERATED no Postgres; aqui não há banco pra calcular.
+    if (dados.valor_planejado != null || dados.cambio_aplicado != null) {
+      const novoValor = dados.valor_planejado ?? existing.valor_planejado;
+      const novoCambio = dados.cambio_aplicado ?? existing.cambio_aplicado ?? 1;
+      (dados as Record<string, unknown>).valor_planejado_brl = novoValor * novoCambio;
+    }
+    if (dados.valor_realizado != null) {
+      const cambio = dados.cambio_aplicado ?? existing.cambio_aplicado ?? 1;
+      (dados as Record<string, unknown>).valor_realizado_brl = dados.valor_realizado * cambio;
+    }
     Object.assign(mockCustos[idx], dados, { updated_at: new Date().toISOString() });
     revalidatePath(`/expedicoes/${expedicaoId}/custos`);
     revalidatePath(`/expedicoes/${expedicaoId}`);
@@ -1270,7 +1376,21 @@ export async function atualizarCustoLote(
   }
 
   const supabase = await getServerClient();
-  // Em produção, BRL é recalculado por trigger ou view — aqui mandamos só os campos brutos
+  // `valor_planejado_brl` é GENERATED ALWAYS — o banco recalcula sozinho e não
+  // aceita receber o valor. Já `valor_realizado_brl` é coluna COMUM (0001:194):
+  // ninguém a calcula por nós, então é a aplicação que precisa fazê-lo.
+  if (dados.valor_realizado != null) {
+    let cambio = dados.cambio_aplicado;
+    if (cambio == null) {
+      const { data: atual } = await supabase
+        .from("custos")
+        .select("cambio_aplicado")
+        .eq("id", custoId)
+        .maybeSingle();
+      cambio = (atual as { cambio_aplicado: number | null } | null)?.cambio_aplicado ?? 1;
+    }
+    (dados as Record<string, unknown>).valor_realizado_brl = dados.valor_realizado * cambio;
+  }
   const { error } = await supabase.from("custos").update(dados).eq("id", custoId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/custos`);
@@ -1300,20 +1420,15 @@ export async function atualizarPagamentoLote(
   }
   const dados: Record<string, unknown> = { ...parsed.data };
 
-  // Recalcula saldo se valor/entrada mudou
-  if (dados.valor_total != null || dados.entrada != null) {
-    if (DEV_USE_MOCK_DATA) {
-      const existing = mockPagamentos.find((p) => p.id === pagamentoId);
-      if (existing) {
-        const novoTotal = (dados.valor_total as number) ?? existing.valor_total;
-        const novaEntrada = (dados.entrada as number) ?? existing.entrada;
-        dados.saldo = Math.max(0, novoTotal - novaEntrada);
-      }
-    } else {
-      // No Supabase, deixamos um saldo provisório (trigger pode recomputar)
-      const total = (dados.valor_total as number | undefined);
-      const ent = (dados.entrada as number | undefined);
-      if (total != null && ent != null) dados.saldo = Math.max(0, total - ent);
+  // `saldo` é GENERATED ALWAYS no Postgres (0001) — o banco recomputa sozinho a
+  // partir de valor_total/entrada, e mandá-lo no update faz a query falhar. Só o
+  // mock, que não tem Postgres pra calcular, precisa fazer isso à mão.
+  if (DEV_USE_MOCK_DATA && (dados.valor_total != null || dados.entrada != null)) {
+    const existing = mockPagamentos.find((p) => p.id === pagamentoId);
+    if (existing) {
+      const novoTotal = (dados.valor_total as number) ?? existing.valor_total;
+      const novaEntrada = (dados.entrada as number) ?? existing.entrada;
+      dados.saldo = Math.max(0, novoTotal - novaEntrada);
     }
   }
 
@@ -1450,10 +1565,15 @@ export async function excluirPassageiro(
     .maybeSingle();
   if (!alvo) return { ok: false, error: "Passageiro não encontrado" };
   const chave = chaveIdentidade(alvo as PassageiroRow);
-  const { data: todos } = await supabase
-    .from("passageiros")
-    .select("id, cpf, bitrix_contact_id, email, nome_completo");
-  const temOutras = ((todos ?? []) as PassageiroRow[]).some(
+  // Paginado: truncado em 1000, `temOutras` dava falso pra quem tinha irmãos
+  // depois do corte — e o passageiro virava avulso em vez de ser excluído.
+  const todos = await fetchAllRows<PassageiroRow>((from, to) =>
+    supabase
+      .from("passageiros")
+      .select("id, cpf, bitrix_contact_id, email, nome_completo")
+      .order("id")
+      .range(from, to));
+  const temOutras = todos.some(
     (p) => p.id !== passageiroId && chaveIdentidade(p) === chave,
   );
 
@@ -1515,8 +1635,10 @@ export async function excluirPessoa(
   }
 
   const supabase = await getServerClient();
-  const { data } = await supabase.from("passageiros").select("*");
-  const rows = (data ?? []) as PassageiroRow[];
+  // Paginado: sem isso, acima de 1000 passageiros o PostgREST truncava a lista e
+  // a exclusão deixava linhas da mesma pessoa pra trás, sem erro.
+  const rows = await fetchAllRows<PassageiroRow>((from, to) =>
+    supabase.from("passageiros").select("*").order("id").range(from, to));
   const ref = rows.find((p) => p.id === refId);
   if (!ref) return { ok: false, error: "Passageiro não encontrado" };
   const chave = chaveIdentidade(ref);

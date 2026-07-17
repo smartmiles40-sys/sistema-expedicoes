@@ -102,7 +102,7 @@ export default function LiderPage() {
   }
 
   async function verDoc(arq: LiderArquivo, download = false) {
-    const r = await linkAssinadoLider(cpf, arq.id, download);
+    const r = await linkAssinadoLider(cpf, senha, arq.id, download);
     if (!r.ok) {
       toast.error("Não foi possível abrir", { description: r.error });
       return;

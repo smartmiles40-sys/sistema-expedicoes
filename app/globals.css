@@ -43,22 +43,46 @@
   /* Semantic palette (UX da planilha) */
   --editavel-50: #eff6ff;
   --editavel-100: #dbeafe;
+  --editavel-300: #93c5fd;
+  --editavel-400: #60a5fa;
+  --editavel-500: #3b82f6;
   --editavel-600: #2563eb;
+  --editavel-700: #1d4ed8;
   --auto-50: #f8fafc;
   --auto-100: #f1f5f9;
+  --auto-300: #cbd5e1;
+  --auto-400: #94a3b8;
+  --auto-500: #64748b;
   --auto-600: #475569;
+  --auto-700: #334155;
   --vinculado-50: #ecfdf5;
   --vinculado-100: #d1fae5;
+  --vinculado-300: #6ee7b7;
+  --vinculado-400: #34d399;
+  --vinculado-500: #10b981;
   --vinculado-600: #059669;
+  --vinculado-700: #047857;
   --atencao-50: #fffbeb;
   --atencao-100: #fef3c7;
+  --atencao-300: #fcd34d;
+  --atencao-400: #fbbf24;
+  --atencao-500: #f59e0b;
   --atencao-600: #d97706;
+  --atencao-700: #b45309;
   --critico-50: #fef2f2;
   --critico-100: #fee2e2;
+  --critico-300: #fca5a5;
+  --critico-400: #f87171;
+  --critico-500: #ef4444;
   --critico-600: #dc2626;
+  --critico-700: #b91c1c;
   --lista-50: #f5f3ff;
   --lista-100: #ede9fe;
+  --lista-300: #c4b5fd;
+  --lista-400: #a78bfa;
+  --lista-500: #8b5cf6;
   --lista-600: #7c3aed;
+  --lista-700: #6d28d9;
 }
 
 [data-theme="dark"] {
@@ -91,24 +115,50 @@
   --portal-panel: rgba(255, 255, 255, 0.06);
   --portal-border: rgba(255, 255, 255, 0.1);
 
+  /* A rampa é INVERTIDA no escuro: -50 é o tom mais escuro e -700 o mais claro,
+     pra que `text-*-700` continue sendo o realce e `bg-*-50` o fundo discreto. */
   --editavel-50: #0c1a33;
   --editavel-100: #1e3a8a;
+  --editavel-300: #1d4ed8;
+  --editavel-400: #2563eb;
+  --editavel-500: #3b82f6;
   --editavel-600: #60a5fa;
+  --editavel-700: #93c5fd;
   --auto-50: #0f172a;
   --auto-100: #1e293b;
+  --auto-300: #334155;
+  --auto-400: #475569;
+  --auto-500: #64748b;
   --auto-600: #94a3b8;
+  --auto-700: #cbd5e1;
   --vinculado-50: #022c1e;
   --vinculado-100: #064e3b;
+  --vinculado-300: #047857;
+  --vinculado-400: #059669;
+  --vinculado-500: #10b981;
   --vinculado-600: #34d399;
+  --vinculado-700: #6ee7b7;
   --atencao-50: #1f1305;
   --atencao-100: #422006;
+  --atencao-300: #b45309;
+  --atencao-400: #d97706;
+  --atencao-500: #f59e0b;
   --atencao-600: #fbbf24;
+  --atencao-700: #fcd34d;
   --critico-50: #1f0808;
   --critico-100: #450a0a;
+  --critico-300: #b91c1c;
+  --critico-400: #dc2626;
+  --critico-500: #ef4444;
   --critico-600: #f87171;
+  --critico-700: #fca5a5;
   --lista-50: #170e2e;
   --lista-100: #312e81;
+  --lista-300: #6d28d9;
+  --lista-400: #7c3aed;
+  --lista-500: #8b5cf6;
   --lista-600: #a78bfa;
+  --lista-700: #c4b5fd;
 }
 
 @theme inline {
@@ -136,22 +186,46 @@
 
   --color-editavel-50: var(--editavel-50);
   --color-editavel-100: var(--editavel-100);
+  --color-editavel-300: var(--editavel-300);
+  --color-editavel-400: var(--editavel-400);
+  --color-editavel-500: var(--editavel-500);
   --color-editavel-600: var(--editavel-600);
+  --color-editavel-700: var(--editavel-700);
   --color-auto-50: var(--auto-50);
   --color-auto-100: var(--auto-100);
+  --color-auto-300: var(--auto-300);
+  --color-auto-400: var(--auto-400);
+  --color-auto-500: var(--auto-500);
   --color-auto-600: var(--auto-600);
+  --color-auto-700: var(--auto-700);
   --color-vinculado-50: var(--vinculado-50);
   --color-vinculado-100: var(--vinculado-100);
+  --color-vinculado-300: var(--vinculado-300);
+  --color-vinculado-400: var(--vinculado-400);
+  --color-vinculado-500: var(--vinculado-500);
   --color-vinculado-600: var(--vinculado-600);
+  --color-vinculado-700: var(--vinculado-700);
   --color-atencao-50: var(--atencao-50);
   --color-atencao-100: var(--atencao-100);
+  --color-atencao-300: var(--atencao-300);
+  --color-atencao-400: var(--atencao-400);
+  --color-atencao-500: var(--atencao-500);
   --color-atencao-600: var(--atencao-600);
+  --color-atencao-700: var(--atencao-700);
   --color-critico-50: var(--critico-50);
   --color-critico-100: var(--critico-100);
+  --color-critico-300: var(--critico-300);
+  --color-critico-400: var(--critico-400);
+  --color-critico-500: var(--critico-500);
   --color-critico-600: var(--critico-600);
+  --color-critico-700: var(--critico-700);
   --color-lista-50: var(--lista-50);
   --color-lista-100: var(--lista-100);
+  --color-lista-300: var(--lista-300);
+  --color-lista-400: var(--lista-400);
+  --color-lista-500: var(--lista-500);
   --color-lista-600: var(--lista-600);
+  --color-lista-700: var(--lista-700);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;

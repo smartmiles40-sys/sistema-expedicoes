@@ -34,6 +34,57 @@ const MASTERS: Record<string, string> = {
   "47146666816": "Beatriz Rodrigues Galvão",
 };
 
+/**
+ * Confere a senha de acesso de um CPF — a MESMA regra do login: hash salvo em
+ * `acesso_senhas` (migration 0031) ou, no 1º acesso, a data de nascimento.
+ *
+ * Fica separado porque toda action pública que devolve dado sensível precisa
+ * fazer essa checagem. `linkAssinadoLider` não fazia: bastava saber o CPF de um
+ * líder pra baixar qualquer documento da expedição dele.
+ *
+ * `rowsDaPessoa` é opcional só pra evitar refetch em quem já carregou as linhas.
+ */
+async function conferirSenhaAcesso(
+  cpf: string,
+  senha: string,
+  rowsDaPessoa?: { data_nascimento: string | null; created_at: string | null }[],
+): Promise<{ ok: true; precisaTrocar: boolean } | { ok: false; error: string }> {
+  if (DEV_USE_MOCK_DATA) return { ok: true, precisaTrocar: false };
+  if (!(senha ?? "").trim()) return { ok: false, error: "Informe sua senha." };
+
+  const sb = createServiceRoleClient();
+  const { data: cred } = await sb
+    .from("acesso_senhas")
+    .select("senha_hash")
+    .eq("cpf", cpf)
+    .maybeSingle();
+  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+
+  if (hashSalvo) {
+    if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
+      return { ok: false, error: "Senha incorreta." };
+    }
+    return { ok: true, precisaTrocar: false };
+  }
+
+  // 1º acesso: a senha é a data de nascimento do cadastro.
+  let rows = rowsDaPessoa;
+  if (!rows) {
+    const todos = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string | null }>(
+      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to));
+    rows = todos.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+  }
+  const ord = [...rows].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  const nasc = ord.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
+  if (!nasc) {
+    return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
+  }
+  if (!conferemSenhaInicial(senha, nasc)) {
+    return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
+  }
+  return { ok: true, precisaTrocar: true };
+}
+
 export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string };
 export type LiderChecagem = ChecagemProntidao & { arquivos: LiderArquivo[] };
 export type LiderPax = {
@@ -116,7 +167,12 @@ export async function buscarDadosLider(
     }
   }
 
-  const minhasRows = pax.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+  // Linha pendente de aprovação veio do formulário público e não vale como
+  // cadastro — nem pra autorizar, nem como fonte da senha do 1º acesso (a data de
+  // nascimento). Mesma trava do ExpedAmigo.
+  const minhasRows = pax.filter(
+    (p) => soDigitosCpf(p.cpf ?? "") === cpf && !p.pendente_aprovacao,
+  );
   const ehMaster = MASTERS[cpf] !== undefined;
   const ehLider = minhasRows.some((p) => p.tipo === "Líder");
   if (!ehMaster && !ehLider) {
@@ -124,26 +180,9 @@ export async function buscarDadosLider(
   }
 
   // Senha por pessoa (migration 0031). No 1º acesso a senha é a data de nascimento.
-  let precisaTrocar = false;
-  if (!DEV_USE_MOCK_DATA) {
-    const sbSenha = createServiceRoleClient();
-    const { data: cred } = await sbSenha.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
-    const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
-    const senha = senhaRaw ?? "";
-    if (hashSalvo) {
-      if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
-        return { ok: false, error: "Senha incorreta." };
-      }
-    } else {
-      const ord = [...minhasRows].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-      const nasc = ord.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
-      if (!nasc) return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
-      if (!conferemSenhaInicial(senha, nasc)) {
-        return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
-      }
-      precisaTrocar = true;
-    }
-  }
+  const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "", minhasRows);
+  if (!conf.ok) return { ok: false, error: conf.error };
+  const precisaTrocar = conf.precisaTrocar;
 
   let nome: string;
   let expIds: string[];
@@ -300,11 +339,17 @@ export async function definirSenhaLider(
 /** Gera um link de visualização do documento para o líder (sem login). */
 export async function linkAssinadoLider(
   cpfRaw: string,
+  senhaRaw: string,
   arquivoId: string,
   download = false,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const cpf = soDigitosCpf(cpfRaw ?? "");
   if (cpf.length !== 11) return { ok: false, error: "CPF inválido" };
+
+  // Sem isso, o CPF sozinho — que é dado semi-público — liberava qualquer
+  // documento da expedição (inclusive scans de passaporte) por esta action.
+  const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "");
+  if (!conf.ok) return { ok: false, error: conf.error };
 
   if (DEV_USE_MOCK_DATA) {
     const arq = (await listArquivosMock()).find((a) => a.id === arquivoId);
