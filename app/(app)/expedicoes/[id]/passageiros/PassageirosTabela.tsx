@@ -135,7 +135,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         </td>
         <td className="font-medium px-2.5">
           <div className="flex items-center gap-2">
-            <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
+            <Avatar nome={p.nome_completo} size={24} className="shrink-0" src={p.foto_arquivo_id ? `/api/arquivos/${p.foto_arquivo_id}/download?inline=1` : undefined} />
             <button
               type="button"
               onClick={() => setEditandoId(p.id)}

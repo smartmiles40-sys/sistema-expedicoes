@@ -4,11 +4,26 @@ export function Avatar({
   nome,
   size = 28,
   className,
+  src,
 }: {
   nome: string | null | undefined;
   size?: number;
   className?: string;
+  /** URL da foto; se presente, mostra a imagem no lugar das iniciais. */
+  src?: string | null;
 }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={nome ?? ""}
+        className={cn("inline-block shrink-0 rounded-full object-cover", className)}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   const initials = (nome ?? "?")
     .split(" ")
     .map((p) => p[0])

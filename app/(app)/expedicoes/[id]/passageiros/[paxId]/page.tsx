@@ -5,6 +5,7 @@ import { getPassageiro, getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosPassageiro } from "@/lib/data/arquivos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Avatar } from "@/components/ui/Avatar";
 import { Drive } from "@/components/arquivos/Drive";
 import { PassaporteAnexo } from "@/components/arquivos/PassaporteAnexo";
 import { CATEGORIA_ARQUIVO } from "@/lib/constants";
@@ -38,6 +39,9 @@ export default async function PerfilPassageiroPage({
     ? aniversarioNaViagem(passageiro.data_nascimento, expedicao.data_embarque, expedicao.data_retorno)
     : null;
 
+  const pv = passageiro.perfil_viajante ?? null;
+  const temPerfil = pv && [pv.profissao, pv.descricao_grupo, pv.anima_expedicao, pv.significado, pv.instagram, pv.camiseta, pv.musica].some((v) => v && String(v).trim());
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
@@ -48,6 +52,12 @@ export default async function PerfilPassageiroPage({
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
+        <Avatar
+          nome={passageiro.nome_completo}
+          size={44}
+          className="shrink-0"
+          src={passageiro.foto_arquivo_id ? `/api/arquivos/${passageiro.foto_arquivo_id}/download?inline=1` : undefined}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-base font-semibold truncate">{passageiro.nome_completo}</h1>
@@ -106,6 +116,23 @@ export default async function PerfilPassageiroPage({
           </CardContent>
         </Card>
       </div>
+
+      {temPerfil && pv && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Perfil &amp; conexões</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-1.5 text-[13px] sm:grid-cols-2">
+            <Linha label="Profissão" value={pv.profissao} />
+            <Linha label="Como se descreve em grupo" value={pv.descricao_grupo} />
+            <Linha label="O que mais te anima" value={pv.anima_expedicao} />
+            <Linha label="Significado da expedição" value={pv.significado} />
+            <Linha label="Instagram" value={pv.instagram} />
+            <Linha label="Camiseta" value={pv.camiseta} />
+            <Linha label="Música preferida" value={pv.musica} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
