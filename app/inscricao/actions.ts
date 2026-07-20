@@ -167,6 +167,14 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     if (err) return { ok: false, error: err };
   }
 
+  // Certificado de Febre Amarela (opcional; só quando respondeu "Sim").
+  const certRaw = formData.get("certificado");
+  const certFile = certRaw instanceof File && certRaw.size > 0 ? certRaw : null;
+  if (certFile) {
+    const err = validarArquivo(certFile);
+    if (err) return { ok: false, error: err };
+  }
+
   // Rede de segurança: campos essenciais + confirmação de veracidade.
   const faltam = essenciaisFaltando(d as unknown as Record<string, unknown>);
   if (faltam.length) return { ok: false, error: "Faltam dados obrigatórios: " + faltam.join(", ") };
@@ -189,6 +197,22 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
       fotoArqId = novo;
     }
   }
+
+  // Certificado de Febre Amarela — guardado dentro do jsonb de saúde
+  // (`saude.vacina_febre_amarela_arquivo_id`), que já flui pro pax na aprovação.
+  const saudePrev = (pendenteExistente?.dados as { saude?: Record<string, string> } | null)?.saude ?? null;
+  let certArqId = saudePrev?.vacina_febre_amarela_arquivo_id ?? null;
+  if (certFile) {
+    const novo = await subirArquivoStaging(d.expedicao_id, certFile, "Documentos pessoais", "Certificado Internacional de Vacinação — Febre Amarela");
+    if (novo) {
+      if (certArqId) await removerArquivoStaging(certArqId);
+      certArqId = novo;
+    }
+  }
+  const saudeObj = (d.saude ?? {}) as Record<string, string>;
+  if (certArqId) saudeObj.vacina_febre_amarela_arquivo_id = certArqId;
+  else delete saudeObj.vacina_febre_amarela_arquivo_id;
+  d.saude = saudeObj;
 
   const registro = {
     expedicao_id: d.expedicao_id,

@@ -317,9 +317,11 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
     const ids = linhas.filter((l) => l.id !== idAtual).map((l) => l.id);
     if (Object.keys(prop).length && ids.length) await sb.from("passageiros").update(prop).in("id", ids);
   };
+  const certId = (d.saude as Record<string, string> | undefined)?.vacina_febre_amarela_arquivo_id;
   const linkarAnexo = async (paxId: string) => {
     if (passaporte_arquivo_id) await sb.from("arquivos").update({ passageiro_id: paxId }).eq("id", passaporte_arquivo_id);
     if (foto_arquivo_id) await sb.from("arquivos").update({ passageiro_id: paxId }).eq("id", foto_arquivo_id);
+    if (certId) await sb.from("arquivos").update({ passageiro_id: paxId }).eq("id", certId);
   };
 
   let paxId: string;

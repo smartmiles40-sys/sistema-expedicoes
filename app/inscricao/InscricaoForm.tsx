@@ -94,6 +94,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   const [descricaoGrupo, setDescricaoGrupo] = React.useState<string | null>(null);
   const [animaExpedicao, setAnimaExpedicao] = React.useState<string | null>(null);
   const [fotoFile, setFotoFile] = React.useState<File | null>(null);
+  const [certificadoFile, setCertificadoFile] = React.useState<File | null>(null);
   const [confirmou, setConfirmou] = React.useState(false);
   const [passaporteFile, setPassaporteFile] = React.useState<File | null>(null);
   const [possuiPassaporte, setPossuiPassaporte] = React.useState<boolean | null>(null);
@@ -253,6 +254,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       fd.append("dados", JSON.stringify(dados));
       if (passaporteFile) fd.append("passaporte", passaporteFile);
       if (fotoFile) fd.append("foto", fotoFile);
+      if (certificadoFile) fd.append("certificado", certificadoFile);
       const r = await enviarInscricao(fd);
       if (r.ok) setOk(r.completou ? "completou" : "novo");
       else toast.error("Não foi possível enviar", { description: r.error });
@@ -512,6 +514,17 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       <Secao titulo="Saúde">
         <p className="text-[12px] text-muted-foreground">Essas informações são confidenciais e ajudam a equipe a cuidar de você na viagem.</p>
         <SaudeCampos value={saude} onChange={setSaude} expedicaoId={null} passageiroId={null} />
+        {saude.vacina_febre_amarela === "Sim" && (
+          <div className="space-y-1">
+            <Label className="text-[12px]">Comprovante do Certificado de Febre Amarela (foto ou PDF) — opcional</Label>
+            <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[13px] hover:bg-accent/40",
+              certificadoFile && "border-solid border-vinculado-600/40 bg-vinculado-50")}>
+              <Upload className="h-4 w-4 shrink-0" />
+              <span className="truncate">{certificadoFile ? certificadoFile.name : "Anexar comprovante"}</span>
+              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setCertificadoFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
+        )}
       </Secao>
     ),
   });

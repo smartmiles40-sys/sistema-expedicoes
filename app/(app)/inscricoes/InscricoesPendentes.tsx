@@ -125,6 +125,16 @@ function Detalhe({ it }: { it: InscricaoPendente }) {
         })}
         <Linha label="Restrições alimentares" valor={it.restricoes_alimentares} />
         <Linha label="Condições médicas" valor={it.condicoes_medicas} />
+        {(saude as Record<string, string>).vacina_febre_amarela_arquivo_id && (
+          <Linha
+            label="Certificado Febre Amarela"
+            valor={
+              <a href={`/api/arquivos/${(saude as Record<string, string>).vacina_febre_amarela_arquivo_id}/download?inline=1`} target="_blank" rel="noopener noreferrer" className="text-editavel-700 hover:underline">
+                Ver certificado
+              </a>
+            }
+          />
+        )}
       </Grupo>
     </div>
   );
@@ -174,7 +184,8 @@ export function InscricoesPendentes({ itens }: { itens: InscricaoPendente[] }) {
           {itens.map((it) => {
             const open = aberto.has(it.id);
             const saudeResp = (it.saude ?? {}) as Record<string, string>;
-            const temAlertaSaude = PERGUNTAS_SAUDE.some((q) => saudeResp[q.campo] === "Sim");
+            // Febre amarela fica de fora: "Sim" ali é bom (tem o certificado), não é alerta.
+            const temAlertaSaude = PERGUNTAS_SAUDE.some((q) => q.campo !== "vacina_febre_amarela" && saudeResp[q.campo] === "Sim");
             return (
               <div key={it.id} className="space-y-2 rounded-xl border border-border bg-card p-3">
                 <div className="flex items-start justify-between gap-2">
