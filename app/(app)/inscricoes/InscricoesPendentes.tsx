@@ -3,7 +3,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown } from "lucide-react";
+import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate, cn } from "@/lib/utils";
@@ -173,6 +173,8 @@ export function InscricoesPendentes({ itens }: { itens: InscricaoPendente[] }) {
         <div className="grid gap-3 lg:grid-cols-2">
           {itens.map((it) => {
             const open = aberto.has(it.id);
+            const saudeResp = (it.saude ?? {}) as Record<string, string>;
+            const temAlertaSaude = PERGUNTAS_SAUDE.some((q) => saudeResp[q.campo] === "Sim");
             return (
               <div key={it.id} className="space-y-2 rounded-xl border border-border bg-card p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -191,6 +193,13 @@ export function InscricoesPendentes({ itens }: { itens: InscricaoPendente[] }) {
                     {it.destino}{it.data_embarque && ` · embarque ${formatDate(it.data_embarque)}`}
                   </div>
                 </div>
+
+                {temAlertaSaude && (
+                  <div className="flex items-start gap-2 rounded-lg border border-atencao-600/40 bg-atencao-50 px-2.5 py-1.5 text-[12px] text-atencao-700">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Respostas de saúde marcadas com &ldquo;Sim&rdquo; — <strong>verificar com a Carol</strong> antes de aprovar.</span>
+                  </div>
+                )}
 
                 <button type="button" onClick={() => toggle(it.id)} className="flex w-full items-center gap-1 text-[12px] font-medium text-editavel-700 hover:underline">
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
