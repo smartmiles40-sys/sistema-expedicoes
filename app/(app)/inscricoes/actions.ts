@@ -109,6 +109,16 @@ export type InscricaoPendente = {
   saude: SaudePassageiro | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
+  // Perfil & conexões (migration 0038)
+  profissao: string | null;
+  instagram: string | null;
+  camiseta: string | null;
+  musica: string | null;
+  descricao_grupo: string | null;
+  anima_expedicao: string | null;
+  significado: string | null;
+  foto_arquivo_id: string | null;
+  tem_foto: boolean;
 };
 
 /** Converte uma linha do staging (com o jsonb `dados`) para o formato da fila. */
@@ -150,6 +160,15 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
     saude: (dd.saude && typeof dd.saude === "object" ? (dd.saude as SaudePassageiro) : null),
     restricoes_alimentares: null,
     condicoes_medicas: null,
+    profissao: gs("profissao"),
+    instagram: gs("instagram"),
+    camiseta: gs("camiseta"),
+    musica: gs("musica"),
+    descricao_grupo: gs("descricao_grupo"),
+    anima_expedicao: gs("anima_expedicao"),
+    significado: gs("significado"),
+    foto_arquivo_id: row.foto_arquivo_id,
+    tem_foto: Boolean(row.foto_arquivo_id),
   };
 }
 
@@ -201,6 +220,7 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
       cpf: pend.cpf,
       dados: pend.dados as unknown as Dados,
       passaporte_arquivo_id: pend.passaporte_arquivo_id,
+      foto_arquivo_id: pend.foto_arquivo_id,
     })) as PassageiroRow | null;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Falha ao gravar o passageiro." };

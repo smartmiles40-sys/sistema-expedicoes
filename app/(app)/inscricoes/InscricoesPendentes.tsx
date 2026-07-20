@@ -93,6 +93,25 @@ function Detalhe({ it }: { it: InscricaoPendente }) {
           <Linha label="Dividir quarto/cama" valor={it.acompanhante_divide_quarto} />
         </Grupo>
       )}
+      <Grupo titulo="Perfil & conexões">
+        <Linha label="Profissão" valor={it.profissao} />
+        <Linha label="Como se descreve em grupo" valor={it.descricao_grupo} />
+        <Linha label="O que mais te anima" valor={it.anima_expedicao} />
+        <Linha label="Significado especial" valor={it.significado} />
+        <Linha label="Instagram" valor={it.instagram} />
+        <Linha label="Camiseta" valor={it.camiseta} />
+        <Linha label="Música preferida" valor={it.musica} />
+        <Linha
+          label="Foto do viajante"
+          valor={
+            it.foto_arquivo_id ? (
+              <a href={`/api/arquivos/${it.foto_arquivo_id}/download?inline=1`} target="_blank" rel="noopener noreferrer" className="text-editavel-700 hover:underline">
+                Ver foto
+              </a>
+            ) : null
+          }
+        />
+      </Grupo>
       <Grupo titulo="Saúde">
         {PERGUNTAS_SAUDE.map((q) => {
           const resp = (saude as Record<string, string>)[q.campo];

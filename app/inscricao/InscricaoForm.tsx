@@ -65,7 +65,13 @@ const CAMPOS_TEXTO_VAZIO = {
   endereco_bairro: "", endereco_cidade: "", endereco_estado: "",
   contato_emergencia_nome: "", contato_emergencia_fone: "", contato_emergencia_vinculo: "",
   paises_visitados: "", acompanhante_nome: "",
+  profissao: "", instagram: "", musica: "", significado: "",
 };
+
+// Opções dos selects de perfil (ajuste à vontade).
+const CAMISETAS = ["PP", "P", "M", "G", "GG", "XG", "XXG"];
+const DESCRICOES_GRUPO = ["Extrovertido(a), puxo conversa", "Equilibrado(a)", "Mais reservado(a), observo primeiro", "Depende do momento"];
+const ANIMA_OPCOES = ["Paisagens e lugares", "Pessoas e conexões", "Gastronomia", "Cultura e história", "Aventura", "Sair da rotina / relaxar"];
 
 export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) {
   const [fase, setFase] = React.useState<"identificacao" | "completar" | "conflito">("identificacao");
@@ -83,6 +89,11 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   const [acompanhado, setAcompanhado] = React.useState<boolean | null>(null);
   const [divideQuarto, setDivideQuarto] = React.useState<string | null>(null);
   const [saude, setSaude] = React.useState<SaudePassageiro>({});
+  const [camiseta, setCamiseta] = React.useState<string | null>(null);
+  const [descricaoGrupo, setDescricaoGrupo] = React.useState<string | null>(null);
+  const [animaExpedicao, setAnimaExpedicao] = React.useState<string | null>(null);
+  const [fotoFile, setFotoFile] = React.useState<File | null>(null);
+  const [confirmou, setConfirmou] = React.useState(false);
   const [passaporteFile, setPassaporteFile] = React.useState<File | null>(null);
   const [possuiPassaporte, setPossuiPassaporte] = React.useState<boolean | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -145,6 +156,14 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         if (v !== "Sim" && v !== "Não") { faltas.push(q.pergunta); continue; }
         if (v === "Sim" && q.detalheCampo) exige(!sv(q.detalheCampo), q.detalhePergunta ?? "Detalhe");
       }
+    } else if (titulo === "Perfil & conexões") {
+      exige(!f.profissao.trim(), "Profissão");
+      exige(!descricaoGrupo, "Como você se descreve em grupo?");
+      exige(!animaExpedicao, "O que mais te anima?");
+      exige(!f.significado.trim(), "Significado da expedição");
+      exige(!f.instagram.trim(), "@ do Instagram");
+    } else if (titulo === "Próximos passos") {
+      exige(!confirmou, "Confirmação de que revisou as informações");
     }
     return faltas;
   }
@@ -171,6 +190,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
           contato_emergencia_nome: v.contato_emergencia_nome, contato_emergencia_fone: v.contato_emergencia_fone,
           contato_emergencia_vinculo: v.contato_emergencia_vinculo,
           paises_visitados: v.paises_visitados, acompanhante_nome: v.acompanhante_nome,
+          profissao: v.profissao, instagram: v.instagram, musica: v.musica, significado: v.significado,
         });
         setPrefAssento(v.pref_marcar_assento);
         setPrefUpgrade(v.pref_upgrade_classe);
@@ -178,11 +198,15 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         setAcompanhado(v.acompanhante_nome ? true : null);
         setDivideQuarto(v.acompanhante_divide_quarto);
         setSaude(v.saude ?? {});
+        setCamiseta(v.camiseta || null);
+        setDescricaoGrupo(v.descricao_grupo || null);
+        setAnimaExpedicao(v.anima_expedicao || null);
         setPossuiPassaporte(v.passaporte || v.validade_passaporte ? true : null);
         setTemPassaporteAnexo(r.temPassaporteAnexo);
         setReconhecido(true);
       } else {
         setF({ ...CAMPOS_TEXTO_VAZIO });
+        setCamiseta(null); setDescricaoGrupo(null); setAnimaExpedicao(null);
         setTemPassaporteAnexo(false);
         setReconhecido(false);
       }
@@ -215,10 +239,15 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         acompanhante_nome: acompanhado ? f.acompanhante_nome : "",
         acompanhante_divide_quarto: acompanhado ? divideQuarto : null,
         saude,
+        camiseta: camiseta ?? "",
+        descricao_grupo: descricaoGrupo ?? "",
+        anima_expedicao: animaExpedicao ?? "",
+        confirmou_veracidade: confirmou,
       };
       const fd = new FormData();
       fd.append("dados", JSON.stringify(dados));
       if (passaporteFile) fd.append("passaporte", passaporteFile);
+      if (fotoFile) fd.append("foto", fotoFile);
       const r = await enviarInscricao(fd);
       if (r.ok) setOk(r.completou ? "completou" : "novo");
       else toast.error("Não foi possível enviar", { description: r.error });
@@ -441,11 +470,56 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
   });
 
   passos.push({
+    titulo: "Perfil & conexões",
+    node: (
+      <div className="space-y-4">
+        <Secao titulo="Perfil">
+          <Campo label="Qual é a sua profissão?"><Input value={f.profissao} onChange={set("profissao")} /></Campo>
+          <Campo label="Como você se descreve em grupo?"><Opcoes opcoes={DESCRICOES_GRUPO} value={descricaoGrupo} onChange={setDescricaoGrupo} /></Campo>
+          <Campo label="O que mais te anima nessa expedição?"><Opcoes opcoes={ANIMA_OPCOES} value={animaExpedicao} onChange={setAnimaExpedicao} /></Campo>
+          <Campo label="Essa expedição tem algum significado especial para você?"><Input value={f.significado} onChange={set("significado")} /></Campo>
+        </Secao>
+        <Secao titulo="Conexão">
+          <Campo label="Qual é o seu @ no Instagram?"><Input value={f.instagram} onChange={set("instagram")} placeholder="@seuusuario" /></Campo>
+          <Campo label="Qual tamanho de camiseta/blusa você costuma usar? (opcional)"><Opcoes opcoes={CAMISETAS} value={camiseta} onChange={setCamiseta} /></Campo>
+          <Campo label="Qual a sua música preferida? (opcional)"><Input value={f.musica} onChange={set("musica")} /></Campo>
+          <div className="space-y-1">
+            <Label className="text-[12px]">Envie sua melhor foto pra gente ✨ (opcional)</Label>
+            <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[13px] hover:bg-accent/40",
+              fotoFile && "border-solid border-vinculado-600/40 bg-vinculado-50")}>
+              <Upload className="h-4 w-4 shrink-0" />
+              <span className="truncate">{fotoFile ? fotoFile.name : "Escolher foto"}</span>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
+        </Secao>
+      </div>
+    ),
+  });
+
+  passos.push({
     titulo: "Saúde",
     node: (
       <Secao titulo="Saúde">
         <p className="text-[12px] text-muted-foreground">Essas informações são confidenciais e ajudam a equipe a cuidar de você na viagem.</p>
         <SaudeCampos value={saude} onChange={setSaude} expedicaoId={null} passageiroId={null} />
+      </Secao>
+    ),
+  });
+
+  passos.push({
+    titulo: "Próximos passos",
+    node: (
+      <Secao titulo="Próximos passos">
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Você será adicionado(a) no grupo de WhatsApp cerca de 3 meses antes do embarque. Faremos uma call online para
+          apresentar o roteiro e conectar o grupo e, na semana do embarque, o alinhamento final. Se não mora em SP, vamos
+          te orientar com a passagem.
+        </p>
+        <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+          <input type="checkbox" checked={confirmou} onChange={(e) => setConfirmou(e.target.checked)} className="mt-0.5 h-4 w-4" />
+          <span>Confirmo que revisei todas as informações e que são verdadeiras.</span>
+        </label>
       </Secao>
     ),
   });

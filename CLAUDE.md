@@ -416,8 +416,15 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   outras expedições da pessoa (`CAMPOS_PROPAGAR` — saúde e anexo ficam por linha), linka o
   anexo, gera requisitos e dispara o outbound Bitrix. Depois apaga a pendência.
   `recusarInscricao` apaga a pendência + o anexo de staging (evita órfão no Storage).
-- A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`; a
-  UI `InscricoesPendentes.tsx` não mudou). Badge = `contarInscricoesPendentes`.
+- A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`).
+  Badge = `contarInscricoesPendentes`.
+- **Perfil & conexões (migration 0038):** o form ganhou 2 etapas — "Perfil & conexões"
+  (profissão, "como se descreve em grupo", "o que te anima", significado, @Instagram,
+  camiseta, música, foto opcional) e "Próximos passos" (texto + checkbox obrigatório
+  `confirmou_veracidade`). Guardados no jsonb `passageiros.perfil_viajante` (por reserva,
+  não propaga) + `passageiros.foto_arquivo_id`. A foto é subida no staging como o
+  passaporte (`inscricoes_pendentes.foto_arquivo_id`, linkada na aprovação). Selects com
+  opções fixas no `InscricaoForm`. Fila mostra tudo no grupo "Perfil & conexões".
 
 ## 🧪 Como rodar
 

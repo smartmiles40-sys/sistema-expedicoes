@@ -8,7 +8,7 @@ import { gerarRequisitosPadrao } from "@/app/(app)/expedicoes/actions";
 import { soDigitosCpf } from "@/lib/cpf";
 import { MAX_UPLOAD_BYTES, MIME_ARQUIVO_PERMITIDOS } from "@/lib/constants";
 import { mockPassageiros, PASSAGEIRO_INSCRICAO_DEFAULTS } from "@/lib/mock-data";
-import type { SaudePassageiro, Tables } from "@/types/database";
+import type { SaudePassageiro, PerfilViajante, Tables } from "@/types/database";
 
 export type Pax = Tables<"passageiros">;
 
@@ -113,6 +113,15 @@ export const dadosSchema = z.object({
   acompanhante_nome: z.string().trim().optional().default(""),
   acompanhante_divide_quarto: z.string().nullable().default(null),
   saude: z.record(z.string(), z.string()).optional().default({}),
+  // Perfil & conexões (migration 0038)
+  profissao: z.string().trim().optional().default(""),
+  instagram: z.string().trim().optional().default(""),
+  camiseta: z.string().trim().optional().default(""),
+  musica: z.string().trim().optional().default(""),
+  descricao_grupo: z.string().trim().optional().default(""),
+  anima_expedicao: z.string().trim().optional().default(""),
+  significado: z.string().trim().optional().default(""),
+  confirmou_veracidade: z.boolean().optional().default(false),
 });
 export type Dados = z.infer<typeof dadosSchema>;
 
@@ -128,12 +137,15 @@ export type ValoresInscricao = {
   pref_marcar_assento: boolean | null; pref_upgrade_classe: string | null;
   acompanhante_nome: string; acompanhante_divide_quarto: string | null;
   saude: SaudePassageiro;
+  profissao: string; instagram: string; camiseta: string; musica: string;
+  descricao_grupo: string; anima_expedicao: string; significado: string;
 };
 
 export function montarValores(base: Partial<Pax>, existente: Pax | null): ValoresInscricao {
   const s = (v: unknown) => (v == null ? "" : String(v));
   const b = base as Record<string, unknown>;
   const ex = (existente ?? {}) as Record<string, unknown>;
+  const pv = (base.perfil_viajante ?? {}) as PerfilViajante;
   return {
     nome_completo: s(b.nome_completo), email: s(b.email), telefone: s(b.telefone),
     passaporte: s(b.passaporte), validade_passaporte: s(b.validade_passaporte).slice(0, 10),
@@ -149,6 +161,8 @@ export function montarValores(base: Partial<Pax>, existente: Pax | null): Valore
     acompanhante_nome: s(ex.acompanhante_nome),
     acompanhante_divide_quarto: ex.acompanhante_divide_quarto ? String(ex.acompanhante_divide_quarto) : null,
     saude: (b.saude && typeof b.saude === "object" ? b.saude : {}) as SaudePassageiro,
+    profissao: s(pv.profissao), instagram: s(pv.instagram), camiseta: s(pv.camiseta), musica: s(pv.musica),
+    descricao_grupo: s(pv.descricao_grupo), anima_expedicao: s(pv.anima_expedicao), significado: s(pv.significado),
   };
 }
 
@@ -201,6 +215,11 @@ export function novosCampos(d: Dados, cpf: string) {
     ja_viajou_internacional: d.ja_viajou_internacional, paises_visitados: str(d.paises_visitados),
     acompanhante_nome: str(d.acompanhante_nome), acompanhante_divide_quarto: str(d.acompanhante_divide_quarto ?? ""),
     saude: (d.saude ?? {}) as SaudePassageiro,
+    perfil_viajante: {
+      profissao: str(d.profissao), instagram: str(d.instagram), camiseta: str(d.camiseta), musica: str(d.musica),
+      descricao_grupo: str(d.descricao_grupo), anima_expedicao: str(d.anima_expedicao), significado: str(d.significado),
+      confirmou_veracidade: d.confirmou_veracidade,
+    } as PerfilViajante,
     tipo: "Pagante" as const, inscricao_origem: "Formulário público",
   };
 }
@@ -232,6 +251,7 @@ export type PendenteMaterializar = {
   cpf: string;
   dados: Dados;
   passaporte_arquivo_id: string | null;
+  foto_arquivo_id: string | null;
 };
 
 /**
@@ -241,7 +261,7 @@ export type PendenteMaterializar = {
  * gera os requisitos. Retorna a linha do passageiro (para o outbound Bitrix).
  */
 export async function materializarInscricao(pend: PendenteMaterializar): Promise<Pax | null> {
-  const { expedicao_id, cpf, dados: d, passaporte_arquivo_id } = pend;
+  const { expedicao_id, cpf, dados: d, passaporte_arquivo_id, foto_arquivo_id } = pend;
   const linhas = await acharLinhasPorCpf(cpf);
   const existente = linhas.find((l) => l.expedicao_id === expedicao_id) ?? null;
   const perfil = agregarPerfil(linhas);
@@ -258,6 +278,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
       patch.pendente_aprovacao = false;
       if (existente.status_reserva === "Lead") patch.status_reserva = "Pré-reserva";
       if (passaporte_arquivo_id) patch.passaporte_arquivo_id = passaporte_arquivo_id;
+      if (foto_arquivo_id) patch.foto_arquivo_id = foto_arquivo_id;
       Object.assign(existente, patch, { updated_at: new Date().toISOString() });
       propagar(existente.id);
       await gerarRequisitosPadrao(expedicao_id);
@@ -269,7 +290,8 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
       ...PASSAGEIRO_INSCRICAO_DEFAULTS,
       ...novosCampos(d, cpf),
       expedicao_id, id, grupo_id: null, conexao_viagem_id: null, bitrix_contact_id: null, bitrix_deal_id: null,
-      passaporte_arquivo_id: passaporte_arquivo_id, voo_nacional_necessario: false, companhia_aerea: null,
+      passaporte_arquivo_id: passaporte_arquivo_id, foto_arquivo_id: foto_arquivo_id,
+      voo_nacional_necessario: false, companhia_aerea: null,
       localizador: null, quarto_id: null, valor_contratado_brl: 0, valor_pago_brl: 0, saldo_brl: 0,
       status_financeiro: "Em aberto", restricoes_alimentares: null, condicoes_medicas: null,
       contrato_assinado: false, checkin_online_feito: false, observacoes: null,
@@ -292,6 +314,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
   };
   const linkarAnexo = async (paxId: string) => {
     if (passaporte_arquivo_id) await sb.from("arquivos").update({ passageiro_id: paxId }).eq("id", passaporte_arquivo_id);
+    if (foto_arquivo_id) await sb.from("arquivos").update({ passageiro_id: paxId }).eq("id", foto_arquivo_id);
   };
 
   let paxId: string;
@@ -300,6 +323,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
     patch.pendente_aprovacao = false;
     if (existente.status_reserva === "Lead") patch.status_reserva = "Pré-reserva";
     if (passaporte_arquivo_id) patch.passaporte_arquivo_id = passaporte_arquivo_id;
+    if (foto_arquivo_id) patch.foto_arquivo_id = foto_arquivo_id;
     const upd = await sb.from("passageiros").update(patch).eq("id", existente.id);
     if (upd.error) throw new Error(upd.error.message);
     paxId = existente.id;
@@ -307,7 +331,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
     const registro: Record<string, unknown> = {
       ...novosCampos(d, cpf), expedicao_id,
       status_reserva: "Pré-reserva", pendente_aprovacao: false,
-      passaporte_arquivo_id,
+      passaporte_arquivo_id, foto_arquivo_id,
     };
     Object.assign(registro, camposBackfill((c) => temValor(registro[c]), perfil));
     const ins = await sb.from("passageiros").insert(registro).select("*").single();

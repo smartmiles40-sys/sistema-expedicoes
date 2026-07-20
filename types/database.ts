@@ -182,9 +182,27 @@ export type PassageiroRow = {
   // Acompanhante (dado da RESERVA)
   acompanhante_nome: string | null;
   acompanhante_divide_quarto: string | null;
+  // Perfil/conexão do formulário de inscrição (jsonb) + foto (migration 0038)
+  perfil_viajante?: PerfilViajante | null;
+  foto_arquivo_id?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * Perguntas de perfil/conexão do formulário de inscrição (coluna jsonb
+ * `perfil_viajante`). Guardado por RESERVA (não propaga). Migration 0038.
+ */
+export type PerfilViajante = {
+  profissao?: string;
+  instagram?: string;
+  camiseta?: string;
+  musica?: string;
+  descricao_grupo?: string;
+  anima_expedicao?: string;
+  significado?: string;
+  confirmou_veracidade?: boolean;
+};
 
 /**
  * Questionário de saúde do passageiro (coluna jsonb `saude`). Dado PESSOAL —
@@ -549,6 +567,7 @@ export type InscricaoPendenteRow = {
   nome_completo: string | null;
   dados: Json;
   passaporte_arquivo_id: string | null;
+  foto_arquivo_id: string | null;
   origem: string | null;
   created_at: string;
   updated_at: string;

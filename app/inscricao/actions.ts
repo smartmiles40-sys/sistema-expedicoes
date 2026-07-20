@@ -12,6 +12,7 @@ import {
   type Pax, type ValoresInscricao,
 } from "@/lib/inscricao/core";
 import type { ExpedicaoRow, InscricaoPendenteRow, Json } from "@/types/database";
+import type { CategoriaArquivo } from "@/lib/constants";
 
 const BUCKET = "arquivos-expedicoes";
 
@@ -81,24 +82,24 @@ async function acharPendente(expedicaoId: string, cpf: string): Promise<Inscrica
   return (data as InscricaoPendenteRow | null) ?? null;
 }
 
-/** Sobe o anexo do passaporte para o staging (arquivo sem passageiro_id ainda). */
-async function subirPassaporteStaging(expedicaoId: string, file: File): Promise<string | null> {
+/** Sobe um anexo para o staging (arquivo sem passageiro_id ainda; linkado na aprovação). */
+async function subirArquivoStaging(expedicaoId: string, file: File, categoria: CategoriaArquivo, descricao: string): Promise<string | null> {
   if (DEV_USE_MOCK_DATA) {
     const arq = await addArquivoMock(
-      { expedicao_id: expedicaoId, passageiro_id: null, categoria: "Documentos pessoais", nome: file.name, descricao: "Passaporte — prontidão", mime: file.type || null, tamanho_bytes: file.size },
+      { expedicao_id: expedicaoId, passageiro_id: null, categoria, nome: file.name, descricao, mime: file.type || null, tamanho_bytes: file.size },
       Buffer.from(await file.arrayBuffer()),
     );
     return arq.id;
   }
   const sb = createServiceRoleClient();
-  const path = `${expedicaoId}/inscricoes/${randomUUID()}/${safeName("Documentos pessoais")}/${randomUUID()}-${safeName(file.name)}`;
+  const path = `${expedicaoId}/inscricoes/${randomUUID()}/${safeName(categoria)}/${randomUUID()}-${safeName(file.name)}`;
   const up = await sb.storage.from(BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), {
     contentType: file.type || "application/octet-stream", upsert: false,
   });
   if (up.error) return null;
   const ins = await sb.from("arquivos").insert({
-    expedicao_id: expedicaoId, passageiro_id: null, categoria: "Documentos pessoais",
-    nome: file.name, descricao: "Passaporte — prontidão", mime: file.type || null,
+    expedicao_id: expedicaoId, passageiro_id: null, categoria,
+    nome: file.name, descricao, mime: file.type || null,
     tamanho_bytes: file.size, storage_path: path,
   }).select("id").single();
   if (ins.error) return null;
@@ -158,17 +159,34 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     if (err) return { ok: false, error: err };
   }
 
-  // Rede de segurança: campos essenciais preenchidos.
+  // Foto do viajante (opcional).
+  const fotoRaw = formData.get("foto");
+  const foto = fotoRaw instanceof File && fotoRaw.size > 0 ? fotoRaw : null;
+  if (foto) {
+    const err = validarArquivo(foto);
+    if (err) return { ok: false, error: err };
+  }
+
+  // Rede de segurança: campos essenciais + confirmação de veracidade.
   const faltam = essenciaisFaltando(d as unknown as Record<string, unknown>);
   if (faltam.length) return { ok: false, error: "Faltam dados obrigatórios: " + faltam.join(", ") };
+  if (!d.confirmou_veracidade) return { ok: false, error: "Confirme que revisou as informações antes de enviar." };
 
-  // Anexo: novo upload substitui o antigo do staging; sem novo upload, mantém o que já havia.
+  // Anexos: novo upload substitui o antigo do staging; sem novo upload, mantém o que já havia.
   let passaporteArqId = pendenteExistente?.passaporte_arquivo_id ?? null;
   if (file) {
-    const novo = await subirPassaporteStaging(d.expedicao_id, file);
+    const novo = await subirArquivoStaging(d.expedicao_id, file, "Documentos pessoais", "Passaporte — prontidão");
     if (novo) {
       if (passaporteArqId) await removerArquivoStaging(passaporteArqId);
       passaporteArqId = novo;
+    }
+  }
+  let fotoArqId = pendenteExistente?.foto_arquivo_id ?? null;
+  if (foto) {
+    const novo = await subirArquivoStaging(d.expedicao_id, foto, "Outros", "Foto do viajante");
+    if (novo) {
+      if (fotoArqId) await removerArquivoStaging(fotoArqId);
+      fotoArqId = novo;
     }
   }
 
@@ -179,6 +197,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     nome_completo: d.nome_completo || null,
     dados: d as unknown as Json,
     passaporte_arquivo_id: passaporteArqId,
+    foto_arquivo_id: fotoArqId,
     origem: "Formulário público",
   };
 
