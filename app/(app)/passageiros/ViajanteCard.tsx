@@ -20,7 +20,7 @@ export function ViajanteCard({ pessoa, onOpen }: { pessoa: PessoaAgregada; onOpe
     >
       {/* topo: avatar + nome + nível + nº de viagens */}
       <div className="bg-brand-gradient flex items-center gap-3 px-4 py-3 text-white">
-        <Avatar nome={pessoa.nome_completo} size={44} className="shrink-0 ring-2 ring-white/20" />
+        <Avatar nome={pessoa.nome_completo} size={44} className="shrink-0 ring-2 ring-white/20" src={pessoa.foto_arquivo_id ? `/api/arquivos/${pessoa.foto_arquivo_id}/download?inline=1` : undefined} />
         <div className="min-w-0 flex-1">
           <div className="font-display truncate text-[16px] font-semibold leading-tight">
             {pessoa.nome_completo}

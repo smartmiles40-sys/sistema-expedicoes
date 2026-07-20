@@ -384,7 +384,7 @@ export function PassageirosGlobalTabela({
                     >
                       <td className="px-2.5 font-medium whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
-                          <Avatar nome={p.nome_completo} size={24} className="shrink-0" />
+                          <Avatar nome={p.nome_completo} size={24} className="shrink-0" src={p.foto_arquivo_id ? `/api/arquivos/${p.foto_arquivo_id}/download?inline=1` : undefined} />
                           <span className="text-editavel-700 group-hover:underline">{p.nome_completo}</span>
                         </span>
                       </td>
@@ -875,6 +875,34 @@ function PessoaDrawer({
                   )}
                 </section>
 
+                {/* Perfil & conexões (do formulário de inscrição) — só leitura */}
+                {(() => {
+                  const pv = pessoa.perfil_viajante ?? null;
+                  const tem = pv && [pv.profissao, pv.descricao_grupo, pv.anima_expedicao, pv.significado, pv.instagram, pv.camiseta, pv.musica].some((v) => v && String(v).trim());
+                  const fotoUrl = pessoa.foto_arquivo_id ? `/api/arquivos/${pessoa.foto_arquivo_id}/download?inline=1` : null;
+                  if (!tem && !fotoUrl) return null;
+                  return (
+                    <section className="pt-4 border-t border-border space-y-2">
+                      <h3 className="text-sm font-semibold">Perfil &amp; conexões</h3>
+                      {fotoUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={fotoUrl} alt="Foto do viajante" className="h-24 w-24 rounded-lg object-cover" />
+                      )}
+                      {pv && (
+                        <div className="grid grid-cols-1 gap-1.5 text-[12px] sm:grid-cols-2">
+                          <PerfilLinha label="Profissão" value={pv.profissao} />
+                          <PerfilLinha label="Como se descreve em grupo" value={pv.descricao_grupo} />
+                          <PerfilLinha label="O que mais te anima" value={pv.anima_expedicao} />
+                          <PerfilLinha label="Significado" value={pv.significado} />
+                          <PerfilLinha label="Instagram" value={pv.instagram} />
+                          <PerfilLinha label="Camiseta" value={pv.camiseta} />
+                          <PerfilLinha label="Música" value={pv.musica} />
+                        </div>
+                      )}
+                    </section>
+                  );
+                })()}
+
                 {/* Acesso ao portal (ExpedAmigo / Líder) — reset da senha, só admin */}
                 {isAdmin && (
                   <section className="pt-4 border-t border-border space-y-2">
@@ -964,6 +992,17 @@ function PessoaDrawer({
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/** Linha só-leitura do bloco "Perfil & conexões" (esconde se vazia). */
+function PerfilLinha({ label, value }: { label: string; value?: string | null }) {
+  if (!value || !String(value).trim()) return null;
+  return (
+    <div className="flex flex-col">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="font-medium break-words">{value}</span>
+    </div>
   );
 }
 
