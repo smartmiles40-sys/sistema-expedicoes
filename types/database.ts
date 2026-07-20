@@ -182,6 +182,8 @@ export type PassageiroRow = {
   // Acompanhante (dado da RESERVA)
   acompanhante_nome: string | null;
   acompanhante_divide_quarto: string | null;
+  acompanhante_vinculo?: string | null;
+  acompanhante_dividir_com?: string | null;
   // Perfil/conexão do formulário de inscrição (jsonb) + foto (migration 0038)
   perfil_viajante?: PerfilViajante | null;
   foto_arquivo_id?: string | null;

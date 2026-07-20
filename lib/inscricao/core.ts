@@ -112,6 +112,8 @@ export const dadosSchema = z.object({
   paises_visitados: z.string().trim().optional().default(""),
   acompanhante_nome: z.string().trim().optional().default(""),
   acompanhante_divide_quarto: z.string().nullable().default(null),
+  acompanhante_vinculo: z.string().trim().optional().default(""),
+  acompanhante_dividir_com: z.string().trim().optional().default(""),
   saude: z.record(z.string(), z.string()).optional().default({}),
   // Perfil & conexões (migration 0038)
   profissao: z.string().trim().optional().default(""),
@@ -136,6 +138,7 @@ export type ValoresInscricao = {
   ja_viajou_internacional: boolean | null;
   pref_marcar_assento: boolean | null; pref_upgrade_classe: string | null;
   acompanhante_nome: string; acompanhante_divide_quarto: string | null;
+  acompanhante_vinculo: string; acompanhante_dividir_com: string;
   saude: SaudePassageiro;
   profissao: string; instagram: string; camiseta: string; musica: string;
   descricao_grupo: string; anima_expedicao: string; significado: string;
@@ -160,6 +163,7 @@ export function montarValores(base: Partial<Pax>, existente: Pax | null): Valore
     pref_upgrade_classe: ex.pref_upgrade_classe ? String(ex.pref_upgrade_classe) : null,
     acompanhante_nome: s(ex.acompanhante_nome),
     acompanhante_divide_quarto: ex.acompanhante_divide_quarto ? String(ex.acompanhante_divide_quarto) : null,
+    acompanhante_vinculo: s(ex.acompanhante_vinculo), acompanhante_dividir_com: s(ex.acompanhante_dividir_com),
     saude: (b.saude && typeof b.saude === "object" ? b.saude : {}) as SaudePassageiro,
     profissao: s(pv.profissao), instagram: s(pv.instagram), camiseta: s(pv.camiseta), musica: s(pv.musica),
     descricao_grupo: s(pv.descricao_grupo), anima_expedicao: s(pv.anima_expedicao), significado: s(pv.significado),
@@ -214,6 +218,7 @@ export function novosCampos(d: Dados, cpf: string) {
     pref_marcar_assento: d.pref_marcar_assento, pref_upgrade_classe: str(d.pref_upgrade_classe ?? ""),
     ja_viajou_internacional: d.ja_viajou_internacional, paises_visitados: str(d.paises_visitados),
     acompanhante_nome: str(d.acompanhante_nome), acompanhante_divide_quarto: str(d.acompanhante_divide_quarto ?? ""),
+    acompanhante_vinculo: str(d.acompanhante_vinculo), acompanhante_dividir_com: str(d.acompanhante_dividir_com),
     saude: (d.saude ?? {}) as SaudePassageiro,
     perfil_viajante: {
       profissao: str(d.profissao), instagram: str(d.instagram), camiseta: str(d.camiseta), musica: str(d.musica),

@@ -87,10 +87,12 @@ function Detalhe({ it }: { it: InscricaoPendente }) {
           <Linha label="Países visitados" valor={it.paises_visitados} />
         </Grupo>
       )}
-      {(it.acompanhante_nome || it.acompanhante_divide_quarto) && (
-        <Grupo titulo="Acompanhante">
-          <Linha label="Acompanhante" valor={it.acompanhante_nome} />
+      {(it.acompanhante_nome || it.acompanhante_divide_quarto || it.acompanhante_vinculo) && (
+        <Grupo titulo="Acompanhante(s)">
+          <Linha label="Acompanhante(s)" valor={it.acompanhante_nome} />
+          <Linha label="Vínculo" valor={it.acompanhante_vinculo} />
           <Linha label="Dividir quarto/cama" valor={it.acompanhante_divide_quarto} />
+          <Linha label="Dividir quarto com" valor={it.acompanhante_dividir_com} />
         </Grupo>
       )}
       <Grupo titulo="Perfil & conexões">

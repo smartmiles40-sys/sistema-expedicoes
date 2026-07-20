@@ -106,6 +106,8 @@ export type InscricaoPendente = {
   paises_visitados: string | null;
   acompanhante_nome: string | null;
   acompanhante_divide_quarto: string | null;
+  acompanhante_vinculo: string | null;
+  acompanhante_dividir_com: string | null;
   saude: SaudePassageiro | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
@@ -157,6 +159,8 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
     paises_visitados: gs("paises_visitados"),
     acompanhante_nome: gs("acompanhante_nome"),
     acompanhante_divide_quarto: gs("acompanhante_divide_quarto"),
+    acompanhante_vinculo: gs("acompanhante_vinculo"),
+    acompanhante_dividir_com: gs("acompanhante_dividir_com"),
     saude: (dd.saude && typeof dd.saude === "object" ? (dd.saude as SaudePassageiro) : null),
     restricoes_alimentares: null,
     condicoes_medicas: null,

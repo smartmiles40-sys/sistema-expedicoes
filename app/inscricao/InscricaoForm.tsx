@@ -65,6 +65,7 @@ const CAMPOS_TEXTO_VAZIO = {
   endereco_bairro: "", endereco_cidade: "", endereco_estado: "",
   contato_emergencia_nome: "", contato_emergencia_fone: "", contato_emergencia_vinculo: "",
   paises_visitados: "", acompanhante_nome: "",
+  acompanhante_vinculo: "", acompanhante_dividir_com: "",
   profissao: "", instagram: "", musica: "", significado: "",
 };
 
@@ -146,7 +147,8 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       if (jaViajou === true) exige(!f.paises_visitados.trim(), "Países visitados");
       exige(acompanhado === null, "Vai acompanhado(a)?");
       if (acompanhado === true) {
-        exige(!f.acompanhante_nome.trim(), "Nome do acompanhante");
+        exige(!f.acompanhante_nome.trim(), "Nome dos acompanhantes");
+        exige(!f.acompanhante_vinculo.trim(), "Vínculo com o(s) acompanhante(s)");
         exige(!divideQuarto, "Dividir quarto");
       }
     } else if (titulo === "Saúde") {
@@ -190,6 +192,7 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
           contato_emergencia_nome: v.contato_emergencia_nome, contato_emergencia_fone: v.contato_emergencia_fone,
           contato_emergencia_vinculo: v.contato_emergencia_vinculo,
           paises_visitados: v.paises_visitados, acompanhante_nome: v.acompanhante_nome,
+          acompanhante_vinculo: v.acompanhante_vinculo, acompanhante_dividir_com: v.acompanhante_dividir_com,
           profissao: v.profissao, instagram: v.instagram, musica: v.musica, significado: v.significado,
         });
         setPrefAssento(v.pref_marcar_assento);
@@ -238,6 +241,8 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         ja_viajou_internacional: jaViajou,
         acompanhante_nome: acompanhado ? f.acompanhante_nome : "",
         acompanhante_divide_quarto: acompanhado ? divideQuarto : null,
+        acompanhante_vinculo: acompanhado ? f.acompanhante_vinculo : "",
+        acompanhante_dividir_com: acompanhado ? f.acompanhante_dividir_com : "",
         saude,
         camiseta: camiseta ?? "",
         descricao_grupo: descricaoGrupo ?? "",
@@ -458,9 +463,13 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
           <Campo label="Você irá nesta expedição acompanhado(a)?"><SimNao value={acompanhado} onChange={setAcompanhado} /></Campo>
           {acompanhado && (
             <>
-              <Campo label="Nome do(a) acompanhante"><Input value={f.acompanhante_nome} onChange={set("acompanhante_nome")} /></Campo>
+              <Campo label="Nome dos acompanhantes"><Input value={f.acompanhante_nome} onChange={set("acompanhante_nome")} placeholder="Se for mais de um, separe por vírgula" /></Campo>
+              <Campo label="Qual o vínculo de vocês?"><Input value={f.acompanhante_vinculo} onChange={set("acompanhante_vinculo")} placeholder="Ex.: cônjuge, mãe e filho, amigos…" /></Campo>
               <Campo label="Vocês pretendem dividir quarto/cama?">
-                <Opcoes opcoes={["Dividir quarto e cama", "Dividir só o quarto", "Não dividir"]} value={divideQuarto} onChange={setDivideQuarto} />
+                <Opcoes opcoes={["Dividir quarto e cama", "Dividir só o quarto"]} value={divideQuarto} onChange={setDivideQuarto} />
+              </Campo>
+              <Campo label="Se você vai com mais de um acompanhante, com qual quer dividir o quarto? (opcional)">
+                <Input value={f.acompanhante_dividir_com} onChange={set("acompanhante_dividir_com")} placeholder="Nome do acompanhante" />
               </Campo>
             </>
           )}
