@@ -187,6 +187,8 @@ export type PassageiroRow = {
   // Perfil/conexão do formulário de inscrição (jsonb) + foto (migration 0038)
   perfil_viajante?: PerfilViajante | null;
   foto_arquivo_id?: string | null;
+  /** ExpedAmigo: a expedição só aparece no portal do viajante quando liberada. Migration 0040. */
+  liberado_expedamigo?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -531,7 +533,9 @@ export type RoteiroLiderDiaRow = {
 // ===== Senha de acesso por pessoa (ExpedAmigo / Líder, migration 0031) =====
 export type AcessoSenhaRow = {
   cpf: string;
-  senha_hash: string;
+  senha_hash: string | null;
+  /** Senha inicial aleatória (legível) até o viajante criar a própria. Migration 0040. */
+  senha_provisoria: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -5,7 +5,7 @@ import { mockPassageiros, mockExpedicoes, mockPassageiroRequisitos } from "@/lib
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
-import { hashSenhaAcesso, conferemSenhaInicial, senhaNovaValida } from "@/lib/acesso-senha";
+import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
@@ -36,18 +36,16 @@ const MASTERS: Record<string, string> = {
 
 /**
  * Confere a senha de acesso de um CPF — a MESMA regra do login: hash salvo em
- * `acesso_senhas` (migration 0031) ou, no 1º acesso, a data de nascimento.
+ * `acesso_senhas` ou, no 1º acesso, a senha PROVISÓRIA aleatória (migration 0040;
+ * a data de nascimento foi removida). Sem senha/provisória → acesso não liberado.
  *
  * Fica separado porque toda action pública que devolve dado sensível precisa
  * fazer essa checagem. `linkAssinadoLider` não fazia: bastava saber o CPF de um
  * líder pra baixar qualquer documento da expedição dele.
- *
- * `rowsDaPessoa` é opcional só pra evitar refetch em quem já carregou as linhas.
  */
 async function conferirSenhaAcesso(
   cpf: string,
   senha: string,
-  rowsDaPessoa?: { data_nascimento: string | null; created_at: string | null }[],
 ): Promise<{ ok: true; precisaTrocar: boolean } | { ok: false; error: string }> {
   if (DEV_USE_MOCK_DATA) return { ok: true, precisaTrocar: false };
   if (!(senha ?? "").trim()) return { ok: false, error: "Informe sua senha." };
@@ -55,10 +53,11 @@ async function conferirSenhaAcesso(
   const sb = createServiceRoleClient();
   const { data: cred } = await sb
     .from("acesso_senhas")
-    .select("senha_hash")
+    .select("senha_hash,senha_provisoria")
     .eq("cpf", cpf)
     .maybeSingle();
-  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+  const hashSalvo = (cred as { senha_hash: string | null } | null)?.senha_hash ?? null;
+  const provisoria = (cred as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
 
   if (hashSalvo) {
     if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
@@ -66,23 +65,11 @@ async function conferirSenhaAcesso(
     }
     return { ok: true, precisaTrocar: false };
   }
-
-  // 1º acesso: a senha é a data de nascimento do cadastro.
-  let rows = rowsDaPessoa;
-  if (!rows) {
-    const todos = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string | null }>(
-      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to));
-    rows = todos.filter((p) => soDigitosCpf(p.cpf ?? "") === cpf);
+  if (provisoria) {
+    if (senha !== provisoria) return { ok: false, error: "Senha incorreta." };
+    return { ok: true, precisaTrocar: true };
   }
-  const ord = [...rows].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-  const nasc = ord.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
-  if (!nasc) {
-    return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
-  }
-  if (!conferemSenhaInicial(senha, nasc)) {
-    return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
-  }
-  return { ok: true, precisaTrocar: true };
+  return { ok: false, error: "Seu acesso ainda não foi liberado. Fale com a agência." };
 }
 
 export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string };
@@ -180,7 +167,7 @@ export async function buscarDadosLider(
   }
 
   // Senha por pessoa (migration 0031). No 1º acesso a senha é a data de nascimento.
-  const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "", minhasRows);
+  const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "");
   if (!conf.ok) return { ok: false, error: conf.error };
   const precisaTrocar = conf.precisaTrocar;
 
@@ -311,27 +298,21 @@ export async function definirSenhaLider(
   if (DEV_USE_MOCK_DATA) return { ok: true };
 
   const sb = createServiceRoleClient();
-  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
-  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+  const hashSalvo = (cred as { senha_hash: string | null } | null)?.senha_hash ?? null;
+  const provisoria = (cred as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
   if (hashSalvo) {
     if ((await hashSenhaAcesso(cpf, senhaAtual)) !== hashSalvo) {
       return { ok: false, error: "Senha atual incorreta." };
     }
+  } else if (provisoria) {
+    if (senhaAtual !== provisoria) return { ok: false, error: "Senha atual incorreta." };
   } else {
-    const paxAll = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string }>(
-      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to),
-    );
-    const minhas = paxAll
-      .filter((p) => soDigitosCpf(p.cpf ?? "") === cpf)
-      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-    const nasc = minhas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
-    if (!conferemSenhaInicial(senhaAtual, nasc)) {
-      return { ok: false, error: "Senha atual incorreta." };
-    }
+    return { ok: false, error: "Seu acesso ainda não foi liberado. Fale com a agência." };
   }
   const up = await sb
     .from("acesso_senhas")
-    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha) }, { onConflict: "cpf" });
+    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha), senha_provisoria: null }, { onConflict: "cpf" });
   if (up.error) return { ok: false, error: up.error.message };
   return { ok: true };
 }

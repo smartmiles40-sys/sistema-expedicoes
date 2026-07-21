@@ -312,6 +312,10 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
 
   // ── PROD ──
   const sb = createServiceRoleClient();
+  // Auto-libera o ExpedAmigo se a pessoa JÁ tem acesso (onboarded): novas
+  // expedições dela aparecem sozinhas no portal, sem liberar de novo (migration 0040).
+  const { data: cred } = await sb.from("acesso_senhas").select("cpf").eq("cpf", cpf).maybeSingle();
+  const jaOnboarded = !!cred;
   const propagarProd = async (idAtual: string) => {
     const prop = pessoaisPropagar(d);
     const ids = linhas.filter((l) => l.id !== idAtual).map((l) => l.id);
@@ -331,6 +335,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
     if (existente.status_reserva === "Lead") patch.status_reserva = "Pré-reserva";
     if (passaporte_arquivo_id) patch.passaporte_arquivo_id = passaporte_arquivo_id;
     if (foto_arquivo_id) patch.foto_arquivo_id = foto_arquivo_id;
+    if (jaOnboarded) patch.liberado_expedamigo = true;
     const upd = await sb.from("passageiros").update(patch).eq("id", existente.id);
     if (upd.error) throw new Error(upd.error.message);
     paxId = existente.id;
@@ -339,6 +344,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
       ...novosCampos(d, cpf), expedicao_id,
       status_reserva: "Pré-reserva", pendente_aprovacao: false,
       passaporte_arquivo_id, foto_arquivo_id,
+      liberado_expedamigo: jaOnboarded,
     };
     Object.assign(registro, camposBackfill((c) => temValor(registro[c]), perfil));
     const ins = await sb.from("passageiros").insert(registro).select("*").single();

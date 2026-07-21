@@ -322,10 +322,18 @@ internas, identidade de marca "Se Tu For, Eu Vou", cara de produto do viajante).
 Espelha tecnicamente a Área do Líder: rota pública, server actions com **service
 role**, **só leitura**.
 
-- **Acesso (`/amigo`):** login por **CPF + data de nascimento**
-  (`entrarExpedAmigo` em `app/amigo/actions.ts`). Casa na `passageiros` por CPF e
-  confere o nascimento; **bloqueia com aviso** quem não tiver CPF *ou* nascimento.
-  Mostra **apenas expedições futuras** (embarque ≥ hoje) e não-canceladas.
+- **Acesso (`/amigo`):** login por **CPF + senha**. A **1ª senha é ALEATÓRIA**
+  (`senha_provisoria` em `acesso_senhas`, guardada legível), gerada quando o operacional
+  **libera** o passageiro; no 1º acesso o viajante troca por uma própria (vira hash e a
+  provisória some). **A data de nascimento como senha foi REMOVIDA** (migration 0040).
+  Sem senha/provisória → "acesso não liberado".
+- **Liberação por expedição (migration 0040):** `passageiros.liberado_expedamigo` — a
+  expedição só aparece no portal quando o operacional libera. Botão **"Liberar ExpedAmigo"**
+  no card admin da **página do passageiro** (`ExpedamigoPainel` + `expedamigo-actions.ts`):
+  marca a linha e **gera/mostra a senha** da pessoa (só admin: `getCurrentUser().papel`).
+  A 1ª liberação é o **onboarding** da pessoa; depois disso, novas expedições dela entram
+  **auto-liberadas** (`jaOnboarded` em `materializarInscricao`). O portal filtra por
+  `liberado_expedamigo` (mostra as liberadas, inclusive antigas; não-canceladas).
 - **Card recolhível:** cada viagem abre **recolhida** (igual à Área do Líder);
   clica no hero pra expandir. Dentro: **Roteiro dia a dia (previsto)** — cada dia
   também é recolhível, com fotos; **Vouchers** (item único que agrupa Voos de grupo +

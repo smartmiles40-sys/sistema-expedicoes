@@ -44,3 +44,13 @@ export function senhaNovaValida(s: string): string | null {
   if (v.length < 6) return "A senha precisa ter pelo menos 6 caracteres.";
   return null;
 }
+
+/**
+ * Senha inicial ALEATÓRIA (migration 0040). 8 caracteres, sem os ambíguos
+ * (0/O, 1/l/I) pra facilitar ditar/digitar. Guardada legível até o viajante trocar.
+ */
+export function gerarSenhaAleatoria(): string {
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join("");
+}

@@ -9,7 +9,7 @@ import {
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
-import { hashSenhaAcesso, conferemSenhaInicial, senhaNovaValida } from "@/lib/acesso-senha";
+import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
@@ -194,56 +194,54 @@ export async function entrarExpedAmigo(
     return { ok: false, error: "Não encontramos seu cadastro com este CPF. Fale com a agência." };
   }
 
-  // 2) Senha por pessoa (migration 0031). No 1º acesso a senha é a data de nascimento.
+  // 2) Senha por pessoa (migration 0031/0040). 1º acesso: senha ALEATÓRIA provisória
+  //    gerada quando o operacional libera o ExpedAmigo (não é mais a data de nascimento).
   const ordenadas = [...minhasRows].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const nascCadastro = ordenadas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
 
   let precisaTrocar = false;
   {
     let hashSalvo: string | null = null;
+    let provisoria: string | null = null;
     if (sb) {
-      const { data } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
-      hashSalvo = (data as { senha_hash: string } | null)?.senha_hash ?? null;
+      const { data } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+      hashSalvo = (data as { senha_hash: string | null } | null)?.senha_hash ?? null;
+      provisoria = (data as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
     }
     if (hashSalvo) {
       if ((await hashSenhaAcesso(cpf, senha)) !== hashSalvo) {
         return { ok: false, error: "Senha incorreta." };
       }
+    } else if (provisoria) {
+      // Ainda com a senha provisória (não trocou): confere e força criar uma nova.
+      if (senha !== provisoria) return { ok: false, error: "Senha incorreta." };
+      precisaTrocar = true;
     } else if (ehAdmin) {
-      // Admin: a senha fica em `acesso_senhas` (gravada ao configurar o acesso).
-      // Em modo mock (sem banco) aceita pra teste local; em prod exige a senha configurada.
+      // Admin master: em mock aceita pra teste; em prod exige senha configurada.
       if (!DEV_USE_MOCK_DATA) {
         return { ok: false, error: "Acesso admin ainda não configurado." };
       }
     } else {
-      // Sem senha definida → 1º acesso: a senha é a data de nascimento.
-      if (!nascCadastro) {
-        return { ok: false, error: "Seu cadastro está sem data de nascimento. Fale com a agência para liberar seu acesso." };
-      }
-      if (!conferemSenhaInicial(senha, nascCadastro)) {
-        return { ok: false, error: "Senha incorreta. No primeiro acesso, use sua data de nascimento (dd/mm/aaaa)." };
-      }
-      precisaTrocar = true;
+      return { ok: false, error: "Seu acesso ainda não foi liberado. Fale com a agência." };
     }
   }
 
   const nome = ehAdmin ? ADMINS_AMIGO[cpf] : (ordenadas[0]?.nome_completo ?? "Viajante");
 
-  // 3) Só expedições futuras (embarque hoje em diante) e não-canceladas.
+  // 3) Passageiro vê só as expedições LIBERADAS pelo operacional (`liberado_expedamigo`),
+  //    inclusive as antigas. Admin master continua vendo as futuras não-canceladas.
   const hoje = new Date().toISOString().slice(0, 10);
   const expById = new Map(exps.map((e) => [e.id, e]));
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
 
-  // Unidades a exibir: cada expedição futura não-cancelada. Admin vê TODAS; o
-  // passageiro vê as suas (via linha `passageiros`, que carrega quarto/voo/ingressos).
-  const naoElegivel = (e: ExpedicaoRow | undefined): boolean =>
-    !e || e.status === "Cancelada" || (e.data_embarque ?? "").slice(0, 10) < hoje;
+  const cancelada = (e: ExpedicaoRow | undefined): boolean => !e || e.status === "Cancelada";
   const unidades: { exp: ExpedicaoRow; row: PassageiroRow | null }[] = ehAdmin
-    ? exps.filter((e) => !naoElegivel(e)).map((e) => ({ exp: e, row: null }))
+    ? exps
+        .filter((e) => !cancelada(e) && (e.data_embarque ?? "").slice(0, 10) >= hoje)
+        .map((e) => ({ exp: e, row: null }))
     : minhasRows
-        .filter((row) => row.expedicao_id && row.status_reserva !== "Cancelado")
+        .filter((row) => row.expedicao_id && row.status_reserva !== "Cancelado" && row.liberado_expedamigo === true)
         .map((row) => ({ exp: expById.get(row.expedicao_id as string) as ExpedicaoRow, row }))
-        .filter((u) => !naoElegivel(u.exp));
+        .filter((u) => !cancelada(u.exp));
   const expIdsFuturas = new Set<string>(unidades.map((u) => u.exp.id));
 
   // Ingressos (categoria "Bilhetes") das linhas da PRÓPRIA pessoa — só os dela.
@@ -412,30 +410,25 @@ export async function definirSenhaExpedAmigo(
   if (DEV_USE_MOCK_DATA) return { ok: true };
 
   const sb = createServiceRoleClient();
-  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
-  const hashSalvo = (cred as { senha_hash: string } | null)?.senha_hash ?? null;
+  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+  const hashSalvo = (cred as { senha_hash: string | null } | null)?.senha_hash ?? null;
+  const provisoria = (cred as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
 
   if (hashSalvo) {
     if ((await hashSenhaAcesso(cpf, senhaAtual)) !== hashSalvo) {
       return { ok: false, error: "Senha atual incorreta." };
     }
+  } else if (provisoria) {
+    // 1º acesso: a senha atual é a provisória (aleatória, gerada na liberação).
+    if (senhaAtual !== provisoria) return { ok: false, error: "Senha atual incorreta." };
   } else {
-    // 1º acesso: a senha atual é a data de nascimento.
-    const paxAll = await fetchAllRows<{ cpf: string | null; data_nascimento: string | null; created_at: string }>(
-      (from, to) => sb.from("passageiros").select("cpf,data_nascimento,created_at").order("id").range(from, to),
-    );
-    const minhas = paxAll
-      .filter((p) => soDigitosCpf(p.cpf ?? "") === cpf)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at));
-    const nasc = minhas.find((p) => p.data_nascimento)?.data_nascimento?.slice(0, 10) ?? null;
-    if (!conferemSenhaInicial(senhaAtual, nasc)) {
-      return { ok: false, error: "Senha atual incorreta." };
-    }
+    return { ok: false, error: "Seu acesso ainda não foi liberado. Fale com a agência." };
   }
 
+  // Cria o hash e ZERA a provisória (não é mais necessária/visível).
   const up = await sb
     .from("acesso_senhas")
-    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha) }, { onConflict: "cpf" });
+    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha), senha_provisoria: null }, { onConflict: "cpf" });
   if (up.error) return { ok: false, error: up.error.message };
   return { ok: true };
 }
