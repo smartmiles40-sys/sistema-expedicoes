@@ -45,7 +45,11 @@ export function SenhaExpedamigoPessoa({ cpf }: { cpf: string | null }) {
         <KeyRound className="h-3.5 w-3.5" /> Senha do ExpedAmigo
       </div>
       {temHash ? (
-        <p className="text-muted-foreground">O viajante já criou a própria senha.</p>
+        <div className="space-y-1.5">
+          <p className="text-muted-foreground">O viajante já criou a própria senha.</p>
+          <Button variant="outline" size="sm" onClick={novaSenha} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Resetar senha</Button>
+          <p className="text-[11px] text-muted-foreground">Gera uma nova senha provisória e faz a pessoa voltar ao 1º acesso.</p>
+        </div>
       ) : prov ? (
         <>
           <div className="space-y-0.5 font-mono text-[13px]">
