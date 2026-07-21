@@ -48,9 +48,15 @@ const CAPACIDADE = CAPACIDADE_QUARTO;
 /** Cores estáveis por conexão (dot ao lado do pax / na lista de conexões). */
 const CORES_CONEXAO = ["#2563eb", "#16a34a", "#db2777", "#d97706", "#7c3aed", "#0891b2", "#ca8a04", "#e11d48"];
 
-/** Chave do hotel/trecho: mesmo hotel/cidade + mesmas datas de check-in/out. */
+/**
+ * Chave do hotel/trecho: mesmo hotel/cidade + mesmas datas de check-in/out.
+ * Normaliza o nome do hotel (trim + colapsa espaços) e as datas (só AAAA-MM-DD)
+ * pra diferenças bobas (espaço no fim, "Hungharda " vs "Hungharda") NÃO separarem
+ * o mesmo hotel em dois trechos — o que fazia um quarto editado "pular" de seção.
+ */
 function trechoKey(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
-  return `${q.hotel_cidade ?? ""}|${q.check_in ?? ""}|${q.check_out ?? ""}`;
+  const hotel = (q.hotel_cidade ?? "").trim().replace(/\s+/g, " ");
+  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
 }
 
 /** Normaliza nome pra casar acompanhante (minúsculas, sem acento, espaços colapsados). */
