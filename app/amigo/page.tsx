@@ -221,14 +221,14 @@ export default function AmigoPage() {
                 placeholder="Sua senha"
                 className="border-[var(--portal-border)] bg-[var(--portal-panel)] text-[var(--portal-fg)] placeholder:text-[var(--portal-fg-soft)]"
               />
-              <p className="text-[11px] text-[var(--portal-fg-soft)]">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
+              <p className="text-[11px] text-[var(--portal-fg-soft)]">Primeiro acesso? Use a senha que a Se Tu For, Eu Vou te enviou pelo WhatsApp.</p>
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
             <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
               {loading ? "Entrando..." : "Acessar minha viagem"}
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              É o mesmo CPF da sua reserva. No primeiro acesso a senha é a sua data de nascimento.
+              É o mesmo CPF da sua reserva. No primeiro acesso, use a senha que a agência te enviou pelo WhatsApp.
               Algum dado não confere? Fale com a agência.
             </p>
           </form>

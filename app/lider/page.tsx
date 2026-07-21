@@ -177,14 +177,14 @@ export default function LiderPage() {
             <div className="space-y-1">
               <Label htmlFor="lider-senha">Senha</Label>
               <Input id="lider-senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Sua senha" />
-              <p className="text-[11px] text-muted-foreground">Primeiro acesso? Use sua data de nascimento (dd/mm/aaaa).</p>
+              <p className="text-[11px] text-muted-foreground">Primeiro acesso? Use a senha que a Se Tu For, Eu Vou te enviou pelo WhatsApp.</p>
             </div>
             {erro && <p className="text-[12px] font-medium text-critico-600">{erro}</p>}
             <Button type="submit" variant="brand" size="lg" className="w-full" disabled={loading}>
               {loading ? "Buscando..." : "Entrar"}
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              É o CPF cadastrado como líder. No primeiro acesso a senha é a sua data de nascimento. Só leitura.
+              É o CPF cadastrado como líder. No primeiro acesso, use a senha que a agência te enviou pelo WhatsApp. Só leitura.
             </p>
           </form>
         </div>
