@@ -50,8 +50,8 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
   },
   "Ingresso Machu Picchu": {
     categoria: "Bilhetes",
-    label: "Anexar ingresso de Machu Picchu",
-    dica: "Opcional — anexe o ingresso (imagem ou PDF).",
+    label: "Anexar ingressos de Machu Picchu",
+    dica: "Opcional — pode anexar mais de um (imagem ou PDF).",
   },
   "Ingresso Trem Machu Picchu": {
     categoria: "Bilhetes",
@@ -416,13 +416,14 @@ function RequisitoDrawer({
   const mostraComprado = ehAereo;
   // Questionário (perguntas Sim/Não + anexo): aéreos, vacina e seguro.
   const ehQuestionario = ehAereo || ehVacina || ehSeguro;
-  // Ingresso do trem = ida e volta → vários anexos, sem perguntas.
+  // Ingresso do trem (ida/volta) e Ingresso Machu Picchu → vários anexos, sem perguntas.
   const ehIngressoTrem = req.tipo === "Ingresso Trem Machu Picchu";
-  const soAnexoMultiplo = ehIngressoTrem;
-  // "Só anexo" = sem perguntas, só o arquivo (único): Passaporte, Ingresso Machu Picchu
-  // (no Passaporte a validade vem dos dados cadastrados; o anexo é 1 por pessoa).
+  const ehIngressoMachu = req.tipo === "Ingresso Machu Picchu";
+  const soAnexoMultiplo = ehIngressoTrem || ehIngressoMachu;
+  // "Só anexo" = sem perguntas, só o arquivo ÚNICO: Passaporte (a validade vem dos
+  // dados cadastrados; o anexo é 1 por pessoa).
   const ehPassaporte = req.tipo === "Passaporte";
-  const soAnexo = ehPassaporte || req.tipo === "Ingresso Machu Picchu";
+  const soAnexo = ehPassaporte;
   // Perguntas Sim/Não.
   const [necessario, setNecessario] = React.useState(!(temNecessario && req.status === "Dispensado"));
   const [comprado, setComprado] = React.useState<boolean | null>(
@@ -484,9 +485,9 @@ function RequisitoDrawer({
     (a) =>
       a.passageiro_id === req.passageiro_id &&
       a.categoria === (anexoCfg?.categoria ?? "Outros") &&
-      // Tipos que dividem a mesma categoria (aéreos em "Aéreos"; ingressos em
-      // "Bilhetes") se separam pela descrição (gravada como "<tipo> — prontidão").
-      (!(ehAereo || ehIngressoTrem) || (a.descricao ?? "").startsWith(req.tipo)),
+      // Tipos que dividem a mesma categoria (aéreos em "Aéreos"; ingressos de MP e do
+      // trem em "Bilhetes") se separam pela descrição (gravada como "<tipo> — prontidão").
+      (!(ehAereo || ehIngressoTrem || ehIngressoMachu) || (a.descricao ?? "").startsWith(req.tipo)),
   );
 
   async function anexarMultiplos(files: FileList) {
