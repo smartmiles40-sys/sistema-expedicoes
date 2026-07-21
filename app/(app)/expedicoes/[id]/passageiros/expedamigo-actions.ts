@@ -63,7 +63,7 @@ export async function bloquearExpedamigo(passageiroId: string, expedicaoId: stri
 }
 
 /** Gera uma NOVA senha provisória (admin) — o viajante volta ao 1º acesso. */
-export async function gerarNovaSenhaProvisoria(cpfRaw: string, passageiroId: string, expedicaoId: string): Promise<{ ok: boolean; error?: string; senhaProvisoria?: string }> {
+export async function gerarNovaSenhaCpf(cpfRaw: string): Promise<{ ok: boolean; error?: string; senhaProvisoria?: string }> {
   if (!(await exigirAdmin())) return { ok: false, error: "Apenas admin." };
   const cpf = soDigitosCpf(cpfRaw ?? "");
   if (cpf.length !== 11) return { ok: false, error: "Passageiro sem CPF válido." };
@@ -72,6 +72,40 @@ export async function gerarNovaSenhaProvisoria(cpfRaw: string, passageiroId: str
   const sb = createServiceRoleClient();
   const up = await sb.from("acesso_senhas").upsert({ cpf, senha_provisoria: senha, senha_hash: null }, { onConflict: "cpf" });
   if (up.error) return { ok: false, error: up.error.message };
-  revalidatePath(`/expedicoes/${expedicaoId}/passageiros/${passageiroId}`);
+  revalidatePath("/passageiros");
   return { ok: true, senhaProvisoria: senha };
+}
+
+/** Estado do ExpedAmigo desta linha (admin): liberação da expedição + senha da pessoa. */
+export async function estadoExpedamigoPax(passageiroId: string): Promise<{ admin: boolean; cpf: string | null; liberado: boolean; temHash: boolean; senhaProvisoria: string | null }> {
+  const vazio = { admin: false, cpf: null, liberado: false, temHash: false, senhaProvisoria: null };
+  if (!(await exigirAdmin())) return vazio;
+  if (DEV_USE_MOCK_DATA) return { admin: true, cpf: null, liberado: false, temHash: false, senhaProvisoria: null };
+  const sb = createServiceRoleClient();
+  const { data: pax } = await sb.from("passageiros").select("cpf,liberado_expedamigo").eq("id", passageiroId).maybeSingle();
+  const cpfRaw = (pax as { cpf: string | null } | null)?.cpf ?? null;
+  const liberado = !!(pax as { liberado_expedamigo: boolean } | null)?.liberado_expedamigo;
+  const cpf = soDigitosCpf(cpfRaw ?? "");
+  let temHash = false;
+  let senhaProvisoria: string | null = null;
+  if (cpf.length === 11) {
+    const { data: cred } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+    temHash = !!(cred as { senha_hash: string | null } | null)?.senha_hash;
+    senhaProvisoria = (cred as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
+  }
+  return { admin: true, cpf: cpfRaw, liberado, temHash, senhaProvisoria };
+}
+
+/** Só a senha da pessoa (por CPF) — usado no perfil global (admin). */
+export async function estadoSenhaCpf(cpfRaw: string): Promise<{ admin: boolean; temHash: boolean; senhaProvisoria: string | null }> {
+  if (!(await exigirAdmin())) return { admin: false, temHash: false, senhaProvisoria: null };
+  const cpf = soDigitosCpf(cpfRaw ?? "");
+  if (cpf.length !== 11 || DEV_USE_MOCK_DATA) return { admin: true, temHash: false, senhaProvisoria: null };
+  const sb = createServiceRoleClient();
+  const { data: cred } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+  return {
+    admin: true,
+    temHash: !!(cred as { senha_hash: string | null } | null)?.senha_hash,
+    senhaProvisoria: (cred as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null,
+  };
 }

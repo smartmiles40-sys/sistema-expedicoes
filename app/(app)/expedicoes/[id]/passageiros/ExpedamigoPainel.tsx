@@ -3,27 +3,41 @@ import * as React from "react";
 import { toast } from "sonner";
 import { KeyRound, Lock, Unlock, RefreshCw, Copy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { liberarExpedamigo, bloquearExpedamigo, gerarNovaSenhaProvisoria } from "./expedamigo-actions";
+import { mascaraCpf } from "@/lib/cpf";
+import {
+  liberarExpedamigo,
+  bloquearExpedamigo,
+  gerarNovaSenhaCpf,
+  estadoExpedamigoPax,
+} from "./expedamigo-actions";
 
-export function ExpedamigoPainel({
-  passageiroId,
-  expedicaoId,
-  cpf,
-  liberado: liberadoInicial,
-  temHash: temHashInicial,
-  senhaProvisoria: provInicial,
-}: {
-  passageiroId: string;
-  expedicaoId: string;
-  cpf: string | null;
-  liberado: boolean;
-  temHash: boolean;
-  senhaProvisoria: string | null;
-}) {
-  const [liberado, setLiberado] = React.useState(liberadoInicial);
-  const [temHash, setTemHash] = React.useState(temHashInicial);
-  const [prov, setProv] = React.useState<string | null>(provInicial);
+/** Copia "Login: <cpf>\nSenha: <senha>" pra área de transferência. */
+export function copiarLoginSenha(cpf: string | null, senha: string) {
+  const texto = `Login: ${cpf ? mascaraCpf(cpf) : "—"}\nSenha: ${senha}`;
+  navigator.clipboard?.writeText(texto);
+  toast.success("Login e senha copiados");
+}
+
+export function ExpedamigoPainel({ passageiroId, expedicaoId }: { passageiroId: string; expedicaoId: string }) {
+  const [carregando, setCarregando] = React.useState(true);
+  const [admin, setAdmin] = React.useState(false);
+  const [cpf, setCpf] = React.useState<string | null>(null);
+  const [liberado, setLiberado] = React.useState(false);
+  const [temHash, setTemHash] = React.useState(false);
+  const [prov, setProv] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let vivo = true;
+    estadoExpedamigoPax(passageiroId).then((s) => {
+      if (!vivo) return;
+      setAdmin(s.admin); setCpf(s.cpf); setLiberado(s.liberado); setTemHash(s.temHash); setProv(s.senhaProvisoria);
+      setCarregando(false);
+    });
+    return () => { vivo = false; };
+  }, [passageiroId]);
+
+  if (carregando || !admin) return null;
 
   async function liberar() {
     setBusy(true);
@@ -46,20 +60,18 @@ export function ExpedamigoPainel({
   async function novaSenha() {
     if (!cpf) return;
     setBusy(true);
-    const r = await gerarNovaSenhaProvisoria(cpf, passageiroId, expedicaoId);
+    const r = await gerarNovaSenhaCpf(cpf);
     setBusy(false);
     if (!r.ok) return toast.error("Erro ao gerar senha", { description: r.error });
     setTemHash(false);
     setProv(r.senhaProvisoria ?? null);
     toast.success("Nova senha provisória gerada");
   }
-  function copiar() {
-    if (prov) { navigator.clipboard?.writeText(prov); toast.success("Senha copiada"); }
-  }
 
   return (
-    <div className="space-y-3 text-[13px]">
-      {/* Liberação desta expedição */}
+    <div className="space-y-3 rounded-2xl border border-border bg-card p-4 text-[13px]">
+      <h3 className="text-sm font-semibold">ExpedAmigo (portal do viajante)</h3>
+
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5">
           {liberado ? <Unlock className="h-4 w-4 text-vinculado-600" /> : <Lock className="h-4 w-4 text-muted-foreground" />}
@@ -72,7 +84,6 @@ export function ExpedamigoPainel({
         )}
       </div>
 
-      {/* Senha da pessoa (por CPF) */}
       <div className="rounded-md border border-border bg-muted/20 p-2.5">
         <div className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <KeyRound className="h-3.5 w-3.5" /> Senha do ExpedAmigo
@@ -80,18 +91,19 @@ export function ExpedamigoPainel({
         {temHash ? (
           <p className="text-muted-foreground">O viajante já criou a própria senha.</p>
         ) : prov ? (
-          <div className="flex items-center gap-2">
-            <code className="rounded bg-background px-2 py-1 font-mono text-[14px] tracking-wider">{prov}</code>
-            <Button variant="outline" size="sm" onClick={copiar}><Copy className="h-3.5 w-3.5" /> Copiar</Button>
-            <Button variant="ghost" size="sm" onClick={novaSenha} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Nova</Button>
-          </div>
+          <>
+            <div className="space-y-0.5 font-mono text-[13px]">
+              <div>Login: <span className="tracking-wider">{cpf ? mascaraCpf(cpf) : "—"}</span></div>
+              <div>Senha: <span className="tracking-wider">{prov}</span></div>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => copiarLoginSenha(cpf, prov)}><Copy className="h-3.5 w-3.5" /> Copiar login e senha</Button>
+              <Button variant="ghost" size="sm" onClick={novaSenha} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Nova</Button>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">Repasse ao viajante. No 1º acesso ele troca por uma senha própria e esta some.</p>
+          </>
         ) : (
           <p className="text-muted-foreground">A senha é gerada automaticamente ao liberar.</p>
-        )}
-        {!temHash && (
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Repasse ao viajante. No 1º acesso ele troca por uma senha própria e esta some.
-          </p>
         )}
       </div>
     </div>

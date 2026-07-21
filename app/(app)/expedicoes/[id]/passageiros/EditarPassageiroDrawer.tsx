@@ -37,6 +37,7 @@ import { Drive } from "@/components/arquivos/Drive";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
 import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
+import { ExpedamigoPainel } from "./ExpedamigoPainel";
 import type { ArquivoRow, PassageiroRow, Tables, SaudePassageiro } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { SaudeCampos } from "./SaudeCampos";
@@ -329,6 +330,9 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                     </div>
                   );
                 })()}
+
+                {/* ExpedAmigo (só admin — o painel se auto-esconde) */}
+                {passageiro && <ExpedamigoPainel passageiroId={passageiro.id} expedicaoId={expedicaoId} />}
               </div>
 
               {/* ABA: Prontidão */}

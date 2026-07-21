@@ -13,10 +13,6 @@ import { CATEGORIA_ARQUIVO } from "@/lib/constants";
 /** Pastas do Drive no perfil, sem "Documentos pessoais" (o passaporte tem item próprio). */
 const CATEGORIAS_SEM_DOC_PESSOAL = CATEGORIA_ARQUIVO.filter((c) => c !== "Documentos pessoais");
 import { formatDate, aniversarioNaViagem } from "@/lib/utils";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
-import { soDigitosCpf } from "@/lib/cpf";
 import { ExpedamigoPainel } from "../ExpedamigoPainel";
 import type { StatusReserva } from "@/types/database";
 
@@ -47,19 +43,6 @@ export default async function PerfilPassageiroPage({
   const pv = passageiro.perfil_viajante ?? null;
   const temPerfil = pv && [pv.profissao, pv.descricao_grupo, pv.anima_expedicao, pv.significado, pv.instagram, pv.camiseta, pv.musica].some((v) => v && String(v).trim());
 
-  // ExpedAmigo (só admin): estado de liberação + senha da pessoa.
-  const currentUser = await getCurrentUser();
-  const isAdmin = currentUser?.papel === "admin";
-  let acesso: { temHash: boolean; senhaProvisoria: string | null } = { temHash: false, senhaProvisoria: null };
-  if (isAdmin && !DEV_USE_MOCK_DATA && passageiro.cpf) {
-    const sb = createServiceRoleClient();
-    const { data } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", soDigitosCpf(passageiro.cpf)).maybeSingle();
-    acesso = {
-      temHash: !!(data as { senha_hash: string | null } | null)?.senha_hash,
-      senhaProvisoria: (data as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null,
-    };
-  }
-
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
@@ -87,23 +70,7 @@ export default async function PerfilPassageiroPage({
         </div>
       </div>
 
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>ExpedAmigo (portal do viajante)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ExpedamigoPainel
-              passageiroId={paxId}
-              expedicaoId={id}
-              cpf={passageiro.cpf}
-              liberado={!!passageiro.liberado_expedamigo}
-              temHash={acesso.temHash}
-              senhaProvisoria={acesso.senhaProvisoria}
-            />
-          </CardContent>
-        </Card>
-      )}
+      <ExpedamigoPainel passageiroId={paxId} expedicaoId={id} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card>

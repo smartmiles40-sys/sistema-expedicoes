@@ -25,7 +25,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
 import { atualizarDadosPessoais, criarPassageiroAvulso, excluirPessoa } from "@/app/(app)/expedicoes/actions";
-import { ResetarSenhaPortalBtn } from "./ResetarSenhaPortalBtn";
+import { SenhaExpedamigoPessoa } from "./SenhaExpedamigoPessoa";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import type { StatusReserva, ArquivoRow, SaudePassageiro } from "@/types/database";
@@ -903,17 +903,17 @@ function PessoaDrawer({
                   );
                 })()}
 
-                {/* Acesso ao portal (ExpedAmigo / Líder) — reset da senha, só admin */}
+                {/* Acesso ao portal (ExpedAmigo / Líder) — senha por CPF, só admin */}
                 {isAdmin && (
                   <section className="pt-4 border-t border-border space-y-2">
                     <div>
                       <h3 className="text-sm font-semibold">Acesso ao portal</h3>
                       <p className="text-[11px] text-muted-foreground">
-                        Senha do ExpedAmigo e da Área do Líder (por CPF). Resetar faz a pessoa voltar
-                        ao 1º acesso: entra com a data de nascimento e cria uma nova senha.
+                        Senha do ExpedAmigo e da Área do Líder (por CPF). &ldquo;Nova&rdquo; gera uma senha
+                        provisória e faz a pessoa voltar ao 1º acesso.
                       </p>
                     </div>
-                    <ResetarSenhaPortalBtn cpf={pessoa.cpf} nome={pessoa.nome_completo} />
+                    <SenhaExpedamigoPessoa cpf={pessoa.cpf} />
                   </section>
                 )}
               </div>
