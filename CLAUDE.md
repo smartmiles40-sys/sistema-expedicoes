@@ -217,12 +217,13 @@ de processos do P8 (catálogo + instâncias + status):
   da pessoa; migration `0026`). O drawer (modo `soAnexo`) grava via `atualizarAnexoPassaporte`
   (não na instância). O **item "Documento Pessoal" foi REMOVIDO** (migration `0026` apaga
   instâncias + arquivos "Documento Pessoal — prontidão"; enum mantém o valor, inofensivo).
-- **Ingressos Machu Picchu (só Peru):** requisitos "Ingresso Machu Picchu" e
-  "Ingresso Trem Machu Picchu" — **ambos aceitam VÁRIOS anexos** (`soAnexoMultiplo` no
-  `ProntidaoPaxDrawer`); só entram no template de Peru; OPCIONAIS e só-anexo (conjunto
-  `ANEXO_OPCIONAL` em `regras.ts`; clicáveis mesmo com semáforo "na"). Categoria de arquivo
-  "Bilhetes"; os dois se separam pela **descrição** (`"<tipo> — prontidão"`), já que dividem
-  a categoria. Migration `0025` só faz `ALTER TYPE tipo_requisito ADD VALUE` (sem backfill).
+- **Ingressos Machu Picchu (só Peru):** requisitos "Ingresso Machu Picchu" (**até 2 anexos**
+  — `maxAnexos`) e "Ingresso Trem Machu Picchu" (**vários** — ida/volta), ambos no fluxo
+  `soAnexoMultiplo` do `ProntidaoPaxDrawer`; só entram no template de Peru; OPCIONAIS e
+  só-anexo (conjunto `ANEXO_OPCIONAL` em `regras.ts`; clicáveis mesmo com semáforo "na").
+  Categoria de arquivo "Bilhetes"; os dois se separam pela **descrição** (`"<tipo> —
+  prontidão"`), já que dividem a categoria. Migration `0025` só faz `ALTER TYPE
+  tipo_requisito ADD VALUE` (sem backfill).
 - **Anexos OPCIONAIS:** o **Contrato** é opcional (assinado = ok; senão "na", não
   bloqueia — `checarContrato`). Os **Ingressos Machu Picchu** também (conjunto
   `ANEXO_OPCIONAL`). Ficam em `REQUISITOS_COM_ANEXO_OBRIGATORIO` só p/ o drawer mostrar

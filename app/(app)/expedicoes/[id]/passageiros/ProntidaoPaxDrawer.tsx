@@ -51,7 +51,7 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
   "Ingresso Machu Picchu": {
     categoria: "Bilhetes",
     label: "Anexar ingressos de Machu Picchu",
-    dica: "Opcional — pode anexar mais de um (imagem ou PDF).",
+    dica: "Opcional — até 2 arquivos (imagem ou PDF).",
   },
   "Ingresso Trem Machu Picchu": {
     categoria: "Bilhetes",
@@ -489,11 +489,23 @@ function RequisitoDrawer({
       // trem em "Bilhetes") se separam pela descrição (gravada como "<tipo> — prontidão").
       (!(ehAereo || ehIngressoTrem || ehIngressoMachu) || (a.descricao ?? "").startsWith(req.tipo)),
   );
+  // Ingresso Machu Picchu é limitado a 2 anexos (trem e aéreos ficam ilimitados).
+  const maxAnexos = ehIngressoMachu ? 2 : null;
+  const atingiuMax = maxAnexos != null && arquivosDaCategoria.length >= maxAnexos;
 
   async function anexarMultiplos(files: FileList) {
+    let lista = Array.from(files);
+    if (maxAnexos != null) {
+      const restantes = Math.max(0, maxAnexos - arquivosDaCategoria.length);
+      if (lista.length > restantes) {
+        toast.error(`Máximo de ${maxAnexos} arquivos`, { description: `Cabem só mais ${restantes}.` });
+        lista = lista.slice(0, restantes);
+      }
+    }
+    if (!lista.length) return;
     setAnexando(true);
     let primeiroId: string | null = null;
-    for (const f of Array.from(files)) {
+    for (const f of lista) {
       const fd = new FormData();
       fd.append("file", f);
       fd.append("expedicao_id", expedicaoId);
@@ -674,7 +686,7 @@ function RequisitoDrawer({
       <label
         className={cn(
           "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-4 text-[13px] cursor-pointer hover:bg-accent/40",
-          anexando && "opacity-60 pointer-events-none",
+          (anexando || atingiuMax) && "opacity-60 pointer-events-none",
         )}
       >
         <input
@@ -682,7 +694,7 @@ function RequisitoDrawer({
           accept="image/*,application/pdf"
           multiple
           className="hidden"
-          disabled={anexando}
+          disabled={anexando || atingiuMax}
           onChange={(e) => {
             if (e.target.files?.length) anexarMultiplos(e.target.files);
             e.target.value = "";
@@ -690,9 +702,13 @@ function RequisitoDrawer({
         />
         <Paperclip className="h-5 w-5 text-muted-foreground" />
         <span className="font-medium">
-          {anexando ? "Anexando..." : arquivosDaCategoria.length ? "Anexar mais" : (anexoCfg?.label ?? "Anexar arquivo")}
+          {anexando ? "Anexando..." : atingiuMax ? `Limite de ${maxAnexos} arquivos atingido` : arquivosDaCategoria.length ? "Anexar mais" : (anexoCfg?.label ?? "Anexar arquivo")}
         </span>
-        <span className="text-[11px] text-muted-foreground">pode selecionar vários · imagem ou PDF</span>
+        {!atingiuMax && (
+          <span className="text-[11px] text-muted-foreground">
+            {maxAnexos ? `até ${maxAnexos} arquivos · imagem ou PDF` : "pode selecionar vários · imagem ou PDF"}
+          </span>
+        )}
       </label>
       <p className="text-[11px] text-muted-foreground">{anexoCfg?.dica ?? "Anexar o voucher já deixa aprovado."}</p>
     </div>
