@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -19,6 +19,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import {
   excluirQuarto,
+  excluirTrechoRooming,
   alocarPassageiro,
   desalocarPassageiro,
   desfazerConexao,
@@ -85,6 +86,14 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   const [duplicarOrigem, setDuplicarOrigem] = React.useState<{ quartoIds: string[]; hotelOrigem: string | null } | null>(null);
   // null = fechado; { membros } = aberto (vazio cria, preenchido edita).
   const [conexaoDrawer, setConexaoDrawer] = React.useState<{ membros: string[] } | null>(null);
+  // Trechos (hotéis) recolhidos — guarda as chaves recolhidas (expandido por padrão).
+  const [trechosRecolhidos, setTrechosRecolhidos] = React.useState<Set<string>>(new Set());
+  const toggleTrecho = (key: string) =>
+    setTrechosRecolhidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
   // Cópia local das alocações pra atualização otimista do drag.
@@ -608,16 +617,27 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
         ) : (
           trechos.map((t) => {
             const sem = semQuartoNoTrecho(t);
+            const recolhido = trechosRecolhidos.has(t.key);
             return (
               <section key={t.key} className="rounded-md border border-border">
-                <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2 flex-wrap">
-                  <div className="flex items-center gap-2 min-w-0">
+                <header className={`flex items-center justify-between gap-2 bg-muted/30 px-3 py-2 flex-wrap${recolhido ? "" : " border-b border-border"}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleTrecho(t.key)}
+                    title={recolhido ? "Expandir hotel" : "Recolher hotel"}
+                    aria-expanded={!recolhido}
+                    className="flex items-center gap-2 min-w-0 text-left rounded-md hover:bg-muted/50 -mx-1 px-1 py-0.5 transition-colors"
+                  >
+                    {recolhido ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
                     <Building className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="font-semibold text-[13px] truncate">{t.hotel_cidade ?? "Hotel"}</span>
                     <span className="text-[11px] text-muted-foreground">
                       {t.check_in ? formatDate(t.check_in) : "?"} → {t.check_out ? formatDate(t.check_out) : "?"}
                     </span>
-                  </div>
+                    {recolhido && (
+                      <span className="text-[11px] text-muted-foreground">· {t.quartos.length} quarto(s)</span>
+                    )}
+                  </button>
                   <div className="flex items-center gap-2">
                     <Badge variant={sem.length === 0 ? "vinculado" : "atencao"}>
                       {paxAtivos.length - sem.length}/{paxAtivos.length} alocados
@@ -647,9 +667,22 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                         <Copy className="h-3 w-3" /> Duplicar hotel
                       </button>
                     )}
+                    {t.quartos.length > 0 && (
+                      <ConfirmDeleteButton
+                        ariaLabel="Excluir reserva do hotel"
+                        triggerLabel="Excluir hotel"
+                        triggerClassName="border border-border bg-background text-[11px] font-medium"
+                        title={`Excluir a reserva de "${t.hotel_cidade ?? "Hotel"}"?`}
+                        description={`Serão excluídos os ${t.quartos.length} quarto(s) deste hotel e todas as alocações de passageiros neles. Esta ação não pode ser desfeita.`}
+                        successMessage="Reserva do hotel excluída"
+                        onConfirm={() => excluirTrechoRooming(expedicaoId, t.quartos.map((q) => q.id))}
+                      />
+                    )}
                   </div>
                 </header>
 
+                {!recolhido && (
+                <>
                 {/* Status das conexões neste hotel */}
                 {conexoes.length > 0 && (
                   <div className="border-b border-border bg-background px-3 py-2 space-y-1">
@@ -729,6 +762,15 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => setDuplicarOrigem({ quartoIds: [q.id], hotelOrigem: q.hotel_cidade })}
+                                aria-label="Duplicar quarto"
+                                title="Duplicar este quarto (com os mesmos pax) para outro hotel"
+                                className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
                               <ConfirmDeleteButton
                                 ariaLabel="Excluir quarto"
                                 title={`Excluir quarto ${q.numero}?`}
@@ -759,6 +801,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                     })}
                   </div>
                 </div>
+                </>
+                )}
               </section>
             );
           })

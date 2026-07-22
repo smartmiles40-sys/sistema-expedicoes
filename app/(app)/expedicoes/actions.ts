@@ -1686,6 +1686,45 @@ export async function excluirQuarto(
   return { ok: true };
 }
 
+/**
+ * Exclui a reserva inteira de um hotel/trecho: apaga TODOS os quartos informados
+ * (e as alocações dos passageiros neles). Contrapartida do "duplicar hotel" —
+ * quando o grupo desiste de um hotel e você quer limpar tudo de uma vez.
+ */
+export async function excluirTrechoRooming(
+  expedicaoId: string,
+  quartoIds: string[],
+): Promise<{ ok: boolean; error?: string; removidos?: number }> {
+  const ids = [...new Set(quartoIds)];
+  if (!ids.length) return { ok: false, error: "Nenhum quarto para excluir." };
+
+  if (DEV_USE_MOCK_DATA) {
+    let removidos = 0;
+    for (const quartoId of ids) {
+      const idx = mockQuartos.findIndex((q) => q.id === quartoId);
+      if (idx === -1) continue;
+      mockQuartos.splice(idx, 1);
+      removidos++;
+      for (const p of mockPassageiros) {
+        if (p.quarto_id === quartoId) p.quarto_id = null;
+      }
+      for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
+        if (mockAlocacoes[i].quarto_id === quartoId) mockAlocacoes.splice(i, 1);
+      }
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true, removidos };
+  }
+
+  const supabase = await getServerClient();
+  await supabase.from("passageiros").update({ quarto_id: null }).in("quarto_id", ids);
+  await supabase.from("passageiro_quarto").delete().in("quarto_id", ids);
+  const { error } = await supabase.from("quartos").delete().eq("expedicao_id", expedicaoId).in("id", ids);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true, removidos: ids.length };
+}
+
 // --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
 type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null };
 /** Chave do "trecho/hotel": normaliza hotel (trim + colapsa espaços) e datas (AAAA-MM-DD)

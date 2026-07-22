@@ -33,6 +33,8 @@ export function DuplicarHotelDrawer({
     if (origem) reset({ hotel_cidade: "", check_in: "", check_out: "" });
   }, [origem, reset]);
 
+  const umQuarto = (origem?.quartoIds.length ?? 0) === 1;
+
   async function onSubmit(data: FormData) {
     if (!origem) return;
     const r = await duplicarHotelRooming(expedicaoId, origem.quartoIds, {
@@ -41,7 +43,11 @@ export function DuplicarHotelDrawer({
       check_out: data.check_out || null,
     });
     if (r.ok) {
-      toast.success(`Hotel duplicado — ${r.criados ?? 0} quarto(s) com os mesmos passageiros`);
+      toast.success(
+        umQuarto
+          ? "Quarto duplicado com os mesmos passageiros"
+          : `Hotel duplicado — ${r.criados ?? 0} quarto(s) com os mesmos passageiros`,
+      );
       onOpenChange(false);
       router.refresh();
     } else {
@@ -54,10 +60,11 @@ export function DuplicarHotelDrawer({
       <DrawerContent>
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <DrawerHeader>
-            <DrawerTitle className="flex items-center gap-2"><Copy className="h-4 w-4" /> Duplicar hotel</DrawerTitle>
+            <DrawerTitle className="flex items-center gap-2"><Copy className="h-4 w-4" /> {umQuarto ? "Duplicar quarto" : "Duplicar hotel"}</DrawerTitle>
             <DrawerDescription>
-              Copia os {origem?.quartoIds.length ?? 0} quarto(s){origem?.hotelOrigem ? ` de "${origem.hotelOrigem}"` : ""} para um novo hotel,
-              com os mesmos passageiros alocados. Não muda nada no hotel de origem.
+              {umQuarto
+                ? <>Copia este quarto{origem?.hotelOrigem ? ` de "${origem.hotelOrigem}"` : ""} para um novo hotel, com o(s) mesmo(s) passageiro(s) alocado(s). Não muda nada na origem.</>
+                : <>Copia os {origem?.quartoIds.length ?? 0} quarto(s){origem?.hotelOrigem ? ` de "${origem.hotelOrigem}"` : ""} para um novo hotel, com os mesmos passageiros alocados. Não muda nada no hotel de origem.</>}
             </DrawerDescription>
           </DrawerHeader>
           <DrawerBody>
