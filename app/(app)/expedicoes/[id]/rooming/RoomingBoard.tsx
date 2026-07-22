@@ -37,6 +37,7 @@ import { DuplicarHotelDrawer } from "./DuplicarHotelDrawer";
 import { ConexaoViagemDrawer } from "./ConexaoViagemDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { grupoEgito, type GrupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 
 interface Props {
   expedicaoId: string;
@@ -94,6 +95,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  // ⚠️ local/temporário: grupo (G1/G2) de cada pax, pra separar o rooming em seções.
+  const grupoDoPax = React.useCallback((p: PassageiroRow) => grupoEgito(p.nome_completo), []);
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
   // Cópia local das alocações pra atualização otimista do drag.
@@ -116,6 +119,9 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     [passageiros],
   );
   const paxById = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p])), [passageiros]);
+
+  // ⚠️ local/temporário: há passageiros mapeados a G1/G2? (liga as seções por grupo)
+  const temGrupos = React.useMemo(() => paxAtivos.some((p) => grupoDoPax(p)), [paxAtivos, grupoDoPax]);
 
   // Conexões "viajam juntas": grupos de pax (≥2) com o mesmo conexao_viagem_id.
   const conexoes = React.useMemo(() => {
@@ -216,6 +222,41 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   function semQuartoNoTrecho(trecho: Trecho): PassageiroRow[] {
     return paxAtivos.filter((p) => !quartoDoPaxNoTrecho(p.id, trecho));
   }
+
+  /** ⚠️ local/temporário: grupo "dominante" de um hotel/trecho, pelos hóspedes alocados.
+   *  Retorna "G1"/"G2" se todos são do mesmo grupo, "misto" se há dos dois, null se nenhum mapeado. */
+  function grupoDoTrecho(trecho: Trecho): GrupoEgito | "misto" | null {
+    const ids = new Set(trecho.quartos.map((q) => q.id));
+    const grupos = new Set<GrupoEgito>();
+    for (const a of localAloc) {
+      if (!ids.has(a.quarto_id)) continue;
+      const p = paxById.get(a.passageiro_id);
+      const g = p ? grupoDoPax(p) : null;
+      if (g) grupos.add(g);
+    }
+    if (grupos.size === 0) return null;
+    if (grupos.size > 1) return "misto";
+    return [...grupos][0];
+  }
+
+  /** ⚠️ local/temporário: grupo de um quarto pelos hóspedes alocados. G1 tem
+   *  precedência (quarto com qualquer pax do G1 conta como G1); senão G2; senão null. */
+  function grupoDoQuarto(q: QuartoRow): GrupoEgito | null {
+    const ocup = ocupantesPorQuarto.get(q.id) ?? [];
+    let temG2 = false;
+    for (const id of ocup) {
+      const p = paxById.get(id);
+      const g = p ? grupoDoPax(p) : null;
+      if (g === "G1") return "G1";
+      if (g === "G2") temG2 = true;
+    }
+    return temG2 ? "G2" : null;
+  }
+  /** Ordem de exibição: G1 (0) → G2 (1) → sem grupo (2). */
+  const prioridadeQuarto = (q: QuartoRow) => {
+    const g = grupoDoQuarto(q);
+    return g === "G1" ? 0 : g === "G2" ? 1 : 2;
+  };
 
   /** Onde os membros de uma conexão estão dentro de um trecho. */
   function conexaoNoTrecho(membros: PassageiroRow[], trecho: Trecho) {
@@ -444,6 +485,34 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
     toast.success("Rooming exportado (.xlsx)");
   }
 
+  // ⚠️ local/temporário: ordena os hotéis por grupo (G1 em cima, G2 embaixo) e injeta
+  // um cabeçalho "Grupo 1"/"Grupo 2" antes do primeiro hotel de cada grupo. Sem grupos
+  // mapeados, cai no fluxo normal (uma lista só, por check-in).
+  const prioridadeGrupo = (g: GrupoEgito | "misto" | null) =>
+    g === "G1" ? 0 : g === "G2" ? 1 : g === "misto" ? 2 : 3;
+  type ItemRender =
+    | { tipo: "cabecalho"; key: string; grupo: GrupoEgito | "misto" }
+    | { tipo: "trecho"; t: Trecho };
+  const itensComGrupo: ItemRender[] = (() => {
+    if (!temGrupos) return trechos.map((t) => ({ tipo: "trecho", t }) as ItemRender);
+    const comGrupo = trechos.map((t) => ({ t, g: grupoDoTrecho(t) }));
+    comGrupo.sort((a, b) => {
+      const d = prioridadeGrupo(a.g) - prioridadeGrupo(b.g);
+      return d !== 0 ? d : (a.t.check_in ?? "").localeCompare(b.t.check_in ?? "");
+    });
+    const itens: ItemRender[] = [];
+    let ultimaPrioridade: number | null = null;
+    for (const { t, g } of comGrupo) {
+      const pr = prioridadeGrupo(g);
+      if (pr !== ultimaPrioridade) {
+        if (g) itens.push({ tipo: "cabecalho", key: `head-${pr}`, grupo: g });
+        ultimaPrioridade = pr;
+      }
+      itens.push({ tipo: "trecho", t });
+    }
+    return itens;
+  })();
+
   return (
     <DndContext id={dndId} sensors={sensors} onDragEnd={onDragEnd}>
       <div className="space-y-4">
@@ -615,7 +684,28 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
             />
           </div>
         ) : (
-          trechos.map((t) => {
+          itensComGrupo.map((item) => {
+            if (item.tipo === "cabecalho") {
+              return (
+                <div key={item.key} className="flex items-center gap-2 pt-2 first:pt-0">
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-bold",
+                      item.grupo === "G1"
+                        ? "bg-editavel-100 text-editavel-700"
+                        : item.grupo === "G2"
+                          ? "bg-lista-100 text-lista-600"
+                          : "bg-atencao-100 text-atencao-700",
+                    )}
+                  >
+                    {item.grupo === "G1" ? "Grupo 1" : item.grupo === "G2" ? "Grupo 2" : "Ambos os grupos"}
+                  </span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              );
+            }
+            const t = item.t;
+            const grupoTrecho = grupoDoTrecho(t);
             const sem = semQuartoNoTrecho(t);
             const recolhido = trechosRecolhidos.has(t.key);
             return (
@@ -636,6 +726,21 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                     </span>
                     {recolhido && (
                       <span className="text-[11px] text-muted-foreground">· {t.quartos.length} quarto(s)</span>
+                    )}
+                    {grupoTrecho && (
+                      <span
+                        title={grupoTrecho === "misto" ? "Hotel com pax dos dois grupos" : `Hotel do ${grupoTrecho === "G1" ? "Grupo 1" : "Grupo 2"}`}
+                        className={cn(
+                          "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                          grupoTrecho === "G1"
+                            ? "bg-editavel-100 text-editavel-700"
+                            : grupoTrecho === "G2"
+                              ? "bg-lista-100 text-lista-600"
+                              : "bg-atencao-100 text-atencao-700",
+                        )}
+                      >
+                        {grupoTrecho === "misto" ? "G1+G2" : grupoTrecho}
+                      </span>
                     )}
                   </button>
                   <div className="flex items-center gap-2">
@@ -736,18 +841,30 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                     </div>
                   </Dropzone>
 
-                  {/* Quartos do hotel */}
+                  {/* Quartos do hotel — G1 em cima, depois G2, depois sem grupo */}
                   <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {t.quartos.map((q) => {
+                    {[...t.quartos].sort((a, b) => prioridadeQuarto(a) - prioridadeQuarto(b)).map((q) => {
                       const ocupIds = ocupantesPorQuarto.get(q.id) ?? [];
                       const cap = CAPACIDADE[q.tipo] ?? 1;
                       const cheio = ocupIds.length >= cap;
+                      const grupoQuarto = grupoDoQuarto(q);
                       return (
                         <Dropzone key={q.id} id={q.id} className="rounded-md border border-border bg-background p-3">
                           <div className="flex items-center justify-between mb-2 gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="font-semibold text-[13px] truncate">Quarto {q.numero}</span>
                               <Badge variant="lista">{q.tipo}</Badge>
+                              {grupoQuarto && (
+                                <span
+                                  title={grupoQuarto === "G1" ? "Quarto do Grupo 1" : "Quarto do Grupo 2"}
+                                  className={cn(
+                                    "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                                    grupoQuarto === "G1" ? "bg-editavel-100 text-editavel-700" : "bg-lista-100 text-lista-600",
+                                  )}
+                                >
+                                  {grupoQuarto}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-0.5">
                               <Badge variant={cheio ? "vinculado" : ocupIds.length > 0 ? "atencao" : "auto"}>
@@ -857,6 +974,7 @@ function PaxCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `${trechoKey}::${p.id}` });
   const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 50 } : undefined;
+  const grupo = grupoEgito(p.nome_completo); // ⚠️ local/temporário (G1/G2 Egito)
   return (
     <div
       ref={setNodeRef}
@@ -881,6 +999,17 @@ function PaxCard({
         <div className="text-[12px] font-medium truncate">{p.nome_completo}</div>
         <div className="text-[10px] text-muted-foreground">{p.tipo}</div>
       </div>
+      {grupo && (
+        <span
+          title={grupo === "G1" ? "Grupo 1" : "Grupo 2"}
+          className={cn(
+            "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+            grupo === "G1" ? "bg-editavel-100 text-editavel-700" : "bg-lista-100 text-lista-600",
+          )}
+        >
+          {grupo}
+        </span>
+      )}
     </div>
   );
 }

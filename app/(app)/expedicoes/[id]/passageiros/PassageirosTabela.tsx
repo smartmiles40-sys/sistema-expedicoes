@@ -25,6 +25,7 @@ import { AdicionarExistenteDrawer } from "./AdicionarExistenteDrawer";
 import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
+import { grupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -144,6 +145,23 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             >
               {p.nome_completo}
             </button>
+            {(() => {
+              const g = grupoEgito(p.nome_completo);
+              if (!g) return null;
+              return (
+                <span
+                  title={g === "G1" ? "Grupo 1" : "Grupo 2"}
+                  className={cn(
+                    "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    g === "G1"
+                      ? "bg-editavel-100 text-editavel-700"
+                      : "bg-lista-100 text-lista-600",
+                  )}
+                >
+                  {g}
+                </span>
+              );
+            })()}
             <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
             {aniv && (
               <span
