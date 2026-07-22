@@ -77,6 +77,12 @@ const POR_NOME: { fragmento: string; grupo: GrupoEgito }[] = [
 // que também casaria com um mais específico.
 const ORDENADO = [...POR_NOME].sort((a, b) => b.fragmento.length - a.fragmento.length);
 
+/** Só a Expedição do Egito usa o indicativo G1/G2 (as outras expedições dos
+ *  mesmos pax NÃO devem mostrar). Casa pelo destino da expedição. */
+export function ehExpedicaoEgito(destino: string | null | undefined): boolean {
+  return normNome(destino).includes("egito");
+}
+
 /** Retorna "G1"/"G2" do passageiro pelo nome, ou null se não mapeado. */
 export function grupoEgito(nomeCompleto: string | null | undefined): GrupoEgito | null {
   const nome = normNome(nomeCompleto);

@@ -25,7 +25,7 @@ import { AdicionarExistenteDrawer } from "./AdicionarExistenteDrawer";
 import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
-import { grupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
+import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -82,6 +82,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     [passageiros],
   );
   const passageiroEditando = editandoId ? passageiros.find((p) => p.id === editandoId) ?? null : null;
+  // ⚠️ local/temporário: G1/G2 só na Expedição do Egito (não nas outras dos pax).
+  const mostrarGrupos = ehExpedicaoEgito(destino);
 
   const realtimeStatus = useRealtimeRefresh({
     subscriptions: [
@@ -146,7 +148,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
               {p.nome_completo}
             </button>
             {(() => {
-              const g = grupoEgito(p.nome_completo);
+              const g = mostrarGrupos ? grupoEgito(p.nome_completo) : null;
               if (!g) return null;
               return (
                 <span

@@ -37,13 +37,15 @@ import { DuplicarHotelDrawer } from "./DuplicarHotelDrawer";
 import { ConexaoViagemDrawer } from "./ConexaoViagemDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
-import { grupoEgito, type GrupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
+import { grupoEgito, ehExpedicaoEgito, type GrupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 
 interface Props {
   expedicaoId: string;
   passageiros: PassageiroRow[];
   quartos: QuartoRow[];
   alocacoes: AlocacaoQuartoRow[];
+  /** Destino da expedição — G1/G2 só aparece na do Egito. */
+  destino?: string | null;
 }
 
 const CAPACIDADE = CAPACIDADE_QUARTO;
@@ -75,7 +77,7 @@ type Trecho = {
   quartos: QuartoRow[];
 };
 
-export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: Props) {
+export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino }: Props) {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [autoOpen, setAutoOpen] = React.useState(false);
@@ -95,8 +97,12 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
-  // ⚠️ local/temporário: grupo (G1/G2) de cada pax, pra separar o rooming em seções.
-  const grupoDoPax = React.useCallback((p: PassageiroRow) => grupoEgito(p.nome_completo), []);
+  // ⚠️ local/temporário: grupo (G1/G2) de cada pax — só na Expedição do Egito.
+  const ehEgito = ehExpedicaoEgito(destino);
+  const grupoDoPax = React.useCallback(
+    (p: PassageiroRow) => (ehEgito ? grupoEgito(p.nome_completo) : null),
+    [ehEgito],
+  );
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
   // Cópia local das alocações pra atualização otimista do drag.
@@ -836,7 +842,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                       {sem.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground py-2">Todos alocados neste hotel 👌</p>
                       ) : (
-                        sem.map((p) => <PaxCard key={p.id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} />)
+                        sem.map((p) => <PaxCard key={p.id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} grupo={grupoDoPax(p)} />)
                       )}
                     </div>
                   </Dropzone>
@@ -909,7 +915,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                             ) : (
                               ocupIds.map((id) => {
                                 const p = paxById.get(id);
-                                return p ? <PaxCard key={id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} /> : null;
+                                return p ? <PaxCard key={id} p={p} trechoKey={t.key} conexao={conexaoByPax.get(p.id)} grupo={grupoDoPax(p)} /> : null;
                               })
                             )}
                           </div>
@@ -967,14 +973,15 @@ function PaxCard({
   p,
   trechoKey,
   conexao,
+  grupo,
 }: {
   p: PassageiroRow;
   trechoKey: string;
   conexao?: { cor: string; companheiros: string };
+  grupo?: GrupoEgito | null; // ⚠️ local/temporário (G1/G2 Egito) — null fora do Egito
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `${trechoKey}::${p.id}` });
   const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 50 } : undefined;
-  const grupo = grupoEgito(p.nome_completo); // ⚠️ local/temporário (G1/G2 Egito)
   return (
     <div
       ref={setNodeRef}
