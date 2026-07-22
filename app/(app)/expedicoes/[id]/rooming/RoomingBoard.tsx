@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { NovoQuartoDrawer } from "./NovoQuartoDrawer";
 import { QuartosAutomaticosDrawer } from "./QuartosAutomaticosDrawer";
 import { EditarQuartoDrawer } from "./EditarQuartoDrawer";
+import { DuplicarHotelDrawer } from "./DuplicarHotelDrawer";
 import { ConexaoViagemDrawer } from "./ConexaoViagemDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
@@ -80,6 +81,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
   // (botão "Adicionar quarto" numa seção/hotel existente). null = criar do zero.
   const [autoPrefill, setAutoPrefill] = React.useState<{ hotel_cidade: string; check_in: string; check_out: string } | null>(null);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  // Duplicar um hotel inteiro (quartos + pax) para um novo hotel/datas.
+  const [duplicarOrigem, setDuplicarOrigem] = React.useState<{ quartoIds: string[]; hotelOrigem: string | null } | null>(null);
   // null = fechado; { membros } = aberto (vazio cria, preenchido edita).
   const [conexaoDrawer, setConexaoDrawer] = React.useState<{ membros: string[] } | null>(null);
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
@@ -634,6 +637,16 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
                     >
                       <Plus className="h-3 w-3" /> Adicionar quarto
                     </button>
+                    {t.quartos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDuplicarOrigem({ quartoIds: t.quartos.map((q) => q.id), hotelOrigem: t.hotel_cidade })}
+                        title="Duplicar todos os quartos deste hotel (com os mesmos pax) para outro hotel"
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium hover:bg-accent"
+                      >
+                        <Copy className="h-3 w-3" /> Duplicar hotel
+                      </button>
+                    )}
                   </div>
                 </header>
 
@@ -762,6 +775,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes }: P
           expedicaoId={expedicaoId}
           quarto={quartoEditando}
           onOpenChange={(open) => !open && setEditandoId(null)}
+        />
+        <DuplicarHotelDrawer
+          expedicaoId={expedicaoId}
+          origem={duplicarOrigem}
+          onOpenChange={(open) => !open && setDuplicarOrigem(null)}
         />
         <ConexaoViagemDrawer
           expedicaoId={expedicaoId}

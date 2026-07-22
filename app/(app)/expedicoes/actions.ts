@@ -1688,9 +1688,11 @@ export async function excluirQuarto(
 
 // --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
 type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null };
-/** Chave do "trecho/hotel": mesmo hotel/cidade + mesmas datas. */
+/** Chave do "trecho/hotel": normaliza hotel (trim + colapsa espaços) e datas (AAAA-MM-DD)
+ *  pra diferenças bobas de espaço não separarem o mesmo hotel (igual ao RoomingBoard). */
 function trechoKey(q: QuartoTrecho): string {
-  return `${q.hotel_cidade ?? ""}|${q.check_in ?? ""}|${q.check_out ?? ""}`;
+  const hotel = (q.hotel_cidade ?? "").trim().replace(/\s+/g, " ");
+  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
 }
 
 /**
@@ -1759,6 +1761,76 @@ export async function desalocarPassageiro(
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
   return { ok: true };
+}
+
+const duplicarHotelSchema = z.object({
+  hotel_cidade: z.string().trim().min(1, "Informe o hotel de destino"),
+  check_in: z.string().optional().nullable(),
+  check_out: z.string().optional().nullable(),
+});
+
+/**
+ * Duplica TODOS os quartos de um hotel/trecho para um novo hotel (com novas datas),
+ * copiando os passageiros alocados em cada quarto. Uso: o grupo fica em mais de um
+ * hotel com os mesmos pax — monta um e replica pro próximo. Não move nada da origem.
+ */
+export async function duplicarHotelRooming(
+  expedicaoId: string,
+  quartoIds: string[],
+  input: z.infer<typeof duplicarHotelSchema>,
+): Promise<{ ok: boolean; error?: string; criados?: number }> {
+  const parsed = duplicarHotelSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
+  const { hotel_cidade, check_in, check_out } = parsed.data;
+  const ids = [...new Set(quartoIds)];
+  if (!ids.length) return { ok: false, error: "Nenhum quarto para duplicar." };
+
+  if (DEV_USE_MOCK_DATA) {
+    const origem = mockQuartos.filter((q) => q.expedicao_id === expedicaoId && ids.includes(q.id));
+    let criados = 0;
+    for (const src of origem) {
+      const novoId = genId("q");
+      const now = new Date().toISOString();
+      mockQuartos.push({ ...src, id: novoId, hotel_cidade, check_in: check_in || null, check_out: check_out || null, created_at: now, updated_at: now });
+      for (const a of mockAlocacoes.filter((al) => al.quarto_id === src.id)) {
+        mockAlocacoes.push({ id: genId("al"), passageiro_id: a.passageiro_id, quarto_id: novoId, created_at: now });
+      }
+      criados++;
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true, criados };
+  }
+
+  const supabase = await getServerClient();
+  const { data } = await supabase.from("quartos").select("*").eq("expedicao_id", expedicaoId).in("id", ids);
+  const origem = (data ?? []) as { id: string; numero: string; tipo: string; status: string; observacoes: string | null }[];
+  if (!origem.length) return { ok: false, error: "Quartos de origem não encontrados." };
+
+  let criados = 0;
+  for (const q of origem) {
+    const ins = await supabase.from("quartos").insert({
+      expedicao_id: expedicaoId,
+      numero: q.numero,
+      tipo: q.tipo,
+      hotel_cidade,
+      check_in: check_in || null,
+      check_out: check_out || null,
+      status: q.status,
+      observacoes: q.observacoes,
+    }).select("id").single();
+    if (ins.error) return { ok: false, error: ins.error.message };
+    const novoId = (ins.data as { id: string }).id;
+
+    const { data: aloc } = await supabase.from("passageiro_quarto").select("passageiro_id").eq("quarto_id", q.id);
+    const rows = ((aloc ?? []) as { passageiro_id: string }[]).map((a) => ({ passageiro_id: a.passageiro_id, quarto_id: novoId }));
+    if (rows.length) {
+      const { error } = await supabase.from("passageiro_quarto").insert(rows);
+      if (error) return { ok: false, error: error.message };
+    }
+    criados++;
+  }
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true, criados };
 }
 
 // --- Conexão "viajam juntas" (mesmo quarto no rooming) -----------------------
