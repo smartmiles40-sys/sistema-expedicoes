@@ -449,11 +449,11 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   opções fixas no `InscricaoForm`. Fila mostra tudo no grupo "Perfil & conexões".
   - **Pré-preenchimento seletivo (só no form, via `agregarPerfil`/`montarValores`):**
     ao reconhecer a pessoa numa nova inscrição, **profissão**, **"como se descreve em
-    grupo"**, **@Instagram**, **camiseta** e **música** (`CAMPOS_PERFIL_CARRY`) + a
-    **Conexão/acompanhante** (`CAMPOS_CONEXAO_CARRY`) vêm pré-preenchidos do histórico;
-    **"o que te anima"** e **"significado especial"** voltam SEMPRE em branco (respondidos
-    a cada expedição). Isso é só UX de pré-preencher — o `perfil_viajante` continua salvo
-    por reserva e NÃO propaga na aprovação.
+    grupo"**, **@Instagram**, **camiseta** e **música** (`CAMPOS_PERFIL_CARRY`) vêm
+    pré-preenchidos do histórico; **"o que te anima"**, **"significado especial"** e a
+    **Conexão/acompanhante** voltam SEMPRE em branco (respondidos a cada expedição). Isso
+    é só UX de pré-preencher — o `perfil_viajante` continua salvo por reserva e NÃO propaga
+    na aprovação.
 
 ## 🧪 Como rodar
 

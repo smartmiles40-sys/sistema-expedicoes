@@ -31,12 +31,9 @@ export const CAMPOS_PESSOAIS_CARRY = [
   "ja_viajou_internacional", "paises_visitados",
 ] as const;
 
-// Conexão (acompanhante) — pré-preenche em QUALQUER nova inscrição da pessoa.
-const CAMPOS_CONEXAO_CARRY = [
-  "acompanhante_nome", "acompanhante_vinculo", "acompanhante_dividir_com", "acompanhante_divide_quarto",
-] as const;
-// Campos do Perfil que "seguem a pessoa" (pré-preenchem). "o que te anima" e
-// "significado especial" ficam de fora — são respondidos a CADA expedição.
+// Campos do Perfil que "seguem a pessoa" (pré-preenchem). "o que te anima",
+// "significado especial" e a Conexão (acompanhante) ficam de fora — são
+// respondidos a CADA expedição.
 const CAMPOS_PERFIL_CARRY = ["profissao", "descricao_grupo", "instagram", "camiseta", "musica"] as const;
 
 // Campos checados pra dizer "já temos" (rótulos).
@@ -78,14 +75,7 @@ export function agregarPerfil(linhas: Pax[]): Partial<Pax> | null {
       if (campo === "saude" ? temSaude(v) : temValor(v)) perfil[campo] = v;
     }
   }
-  // Conexão (acompanhante): pré-preenche sempre com o valor mais recente não-vazio.
-  for (const campo of CAMPOS_CONEXAO_CARRY) {
-    for (const r of ord) {
-      const v = (r as Record<string, unknown>)[campo];
-      if (temValor(v)) perfil[campo] = v;
-    }
-  }
-  // Perfil do viajante: só "profissão" e "como se descreve em grupo" seguem a pessoa.
+  // Perfil do viajante: campos de CAMPOS_PERFIL_CARRY seguem a pessoa.
   const pv: Record<string, unknown> = {};
   for (const campo of CAMPOS_PERFIL_CARRY) {
     for (const r of ord) {
@@ -185,10 +175,10 @@ export function montarValores(base: Partial<Pax>, existente: Pax | null): Valore
     ja_viajou_internacional: typeof b.ja_viajou_internacional === "boolean" ? (b.ja_viajou_internacional as boolean) : null,
     pref_marcar_assento: typeof ex.pref_marcar_assento === "boolean" ? (ex.pref_marcar_assento as boolean) : null,
     pref_upgrade_classe: ex.pref_upgrade_classe ? String(ex.pref_upgrade_classe) : null,
-    // Conexão (acompanhante): sempre pré-preenchida a partir do histórico da pessoa.
-    acompanhante_nome: s(b.acompanhante_nome),
-    acompanhante_divide_quarto: b.acompanhante_divide_quarto ? String(b.acompanhante_divide_quarto) : null,
-    acompanhante_vinculo: s(b.acompanhante_vinculo), acompanhante_dividir_com: s(b.acompanhante_dividir_com),
+    // Conexão (acompanhante): sempre em branco — respondida a cada expedição.
+    acompanhante_nome: "",
+    acompanhante_divide_quarto: null,
+    acompanhante_vinculo: "", acompanhante_dividir_com: "",
     saude: (b.saude && typeof b.saude === "object" ? b.saude : {}) as SaudePassageiro,
     profissao: s(pv.profissao), instagram: s(pv.instagram), camiseta: s(pv.camiseta), musica: s(pv.musica),
     // "Profissão" e "como se descreve em grupo" seguem a pessoa; "o que te anima" e
