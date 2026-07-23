@@ -3,9 +3,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown, AlertTriangle, RotateCcw, Trash2, Archive } from "lucide-react";
+import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown, AlertTriangle, RotateCcw, Trash2, Archive, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/Dialog";
 import { formatDate, cn } from "@/lib/utils";
 import { PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, type InscricaoPendente } from "./actions";
@@ -189,6 +190,18 @@ function CardInscricao({
         </div>
       )}
 
+      {recusada && (it.motivo_recusa || it.recusa_arquivo_id) && (
+        <div className="space-y-1 rounded-lg border border-critico-600/30 bg-critico-50 px-2.5 py-1.5 text-[12px] text-critico-700">
+          <div className="text-[11px] font-semibold uppercase tracking-wide">Motivo da recusa</div>
+          {it.motivo_recusa && <div className="whitespace-pre-wrap break-words text-foreground/80">{it.motivo_recusa}</div>}
+          {it.recusa_arquivo_id && (
+            <a href={`/api/arquivos/${it.recusa_arquivo_id}/download?inline=1`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-editavel-700 hover:underline">
+              <Paperclip className="h-3 w-3" /> Ver anexo do motivo
+            </a>
+          )}
+        </div>
+      )}
+
       <button type="button" onClick={onToggle} className="flex w-full items-center gap-1 text-[12px] font-medium text-editavel-700 hover:underline">
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
         {open ? "Ocultar dados" : "Ver todos os dados"}
@@ -205,6 +218,12 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
   const [busy, setBusy] = React.useState<string | null>(null);
   const [aberto, setAberto] = React.useState<Set<string>>(new Set());
   const [verRecusadas, setVerRecusadas] = React.useState(false);
+  // Pop-up de recusa (motivo + anexo opcional).
+  const [recusando, setRecusando] = React.useState<InscricaoPendente | null>(null);
+  const [motivo, setMotivo] = React.useState("");
+  const [arquivo, setArquivo] = React.useState<File | null>(null);
+  const [enviandoRecusa, setEnviandoRecusa] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   const toggle = (id: string) =>
     setAberto((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -217,13 +236,37 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
     else toast.error("Erro ao aprovar", { description: r.error });
   }
 
-  async function recusar(it: InscricaoPendente) {
-    if (!confirm(`Recusar a inscrição de ${it.nome_completo}? Ela vai para "Recusadas" e pode ser restaurada depois.`)) return;
-    setBusy(it.id);
-    const r = await recusarInscricao(it.id);
-    setBusy(null);
-    if (r.ok) { toast.success("Inscrição movida para Recusadas"); router.refresh(); }
-    else toast.error("Erro ao recusar", { description: r.error });
+  function abrirRecusa(it: InscricaoPendente) {
+    setRecusando(it);
+    setMotivo("");
+    setArquivo(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function confirmarRecusa() {
+    const it = recusando;
+    if (!it) return;
+    if (!motivo.trim()) { toast.error("Informe o motivo da recusa."); return; }
+    setEnviandoRecusa(true);
+    try {
+      let arquivoId: string | null = null;
+      if (arquivo && it.expedicao_id) {
+        const fd = new FormData();
+        fd.append("file", arquivo);
+        fd.append("expedicao_id", it.expedicao_id);
+        fd.append("categoria", "Outros");
+        fd.append("descricao", "Motivo da recusa — inscrição");
+        const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+        const json = await res.json();
+        if (!json.ok) { toast.error("Falha no upload do anexo", { description: json.error }); return; }
+        arquivoId = json.id;
+      }
+      const r = await recusarInscricao(it.id, motivo, arquivoId);
+      if (r.ok) { toast.success("Inscrição movida para Recusadas"); setRecusando(null); router.refresh(); }
+      else toast.error("Erro ao recusar", { description: r.error });
+    } finally {
+      setEnviandoRecusa(false);
+    }
   }
 
   async function restaurar(it: InscricaoPendente) {
@@ -271,7 +314,7 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
                     <Button size="sm" variant="brand" onClick={() => aprovar(it)} disabled={busy === it.id} className="flex-1">
                       <Check className="h-3.5 w-3.5" /> Aprovar
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => recusar(it)} disabled={busy === it.id}>
+                    <Button size="sm" variant="outline" onClick={() => abrirRecusa(it)} disabled={busy === it.id}>
                       <X className="h-3.5 w-3.5" /> Recusar
                     </Button>
                     {it.expedicao_id && (
@@ -328,6 +371,54 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
           )}
         </div>
       )}
+
+      <Dialog open={recusando !== null} onOpenChange={(v) => { if (!v && !enviandoRecusa) setRecusando(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recusar inscrição</DialogTitle>
+            <DialogDescription>
+              {recusando?.nome_completo} · {recusando?.expedicao_nome}. Ela vai para &ldquo;Recusadas&rdquo; (pode restaurar depois).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1">
+            <label htmlFor="motivo-recusa" className="text-[12px] font-medium">Motivo da recusa <span className="text-critico-600">*</span></label>
+            <textarea
+              id="motivo-recusa"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={4}
+              autoFocus
+              placeholder="Ex.: passaporte vencido, vaga preenchida, dados inconsistentes…"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[12px] font-medium">Anexo técnico (opcional)</span>
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={enviandoRecusa}>
+                <Paperclip className="h-3.5 w-3.5" /> {arquivo ? "Trocar arquivo" : "Anexar arquivo"}
+              </Button>
+              {arquivo && (
+                <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <span className="max-w-[180px] truncate">{arquivo.name}</span>
+                  <button type="button" onClick={() => { setArquivo(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-critico-600 hover:underline">remover</button>
+                </span>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
+            <p className="text-[11px] text-muted-foreground">Foto ou PDF explicando tecnicamente o motivo. Fica guardado junto da inscrição recusada.</p>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRecusando(null)} disabled={enviandoRecusa}>Cancelar</Button>
+            <Button type="button" variant="destructive" onClick={confirmarRecusa} disabled={enviandoRecusa || !motivo.trim()}>
+              {enviandoRecusa ? "Recusando…" : "Confirmar recusa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

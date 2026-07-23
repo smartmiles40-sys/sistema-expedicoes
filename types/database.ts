@@ -578,6 +578,9 @@ export type InscricaoPendenteRow = {
   /** 'pendente' (fila) | 'recusada' (aguardando à parte). Migration 0041. */
   status: string;
   recusada_em: string | null;
+  /** Motivo da recusa + anexo técnico opcional (migration 0042). */
+  motivo_recusa: string | null;
+  recusa_arquivo_id: string | null;
   created_at: string;
   updated_at: string;
 }

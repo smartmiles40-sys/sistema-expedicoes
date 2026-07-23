@@ -426,10 +426,15 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   outras expedições da pessoa (`CAMPOS_PROPAGAR` — saúde e anexo ficam por linha), linka o
   anexo, gera requisitos e dispara o outbound Bitrix. Depois apaga a pendência.
 - **Recusar NÃO apaga (migration 0041):** `inscricoes_pendentes.status` (`pendente` |
-  `recusada`) + `recusada_em`. `recusarInscricao` só marca `status='recusada'` (mantém
-  tudo, inclusive anexos) → a inscrição fica numa seção **"Recusadas"** da fila, de onde
+  `recusada`) + `recusada_em`. `recusarInscricao(id, motivo, recusaArquivoId?)` marca
+  `status='recusada'` (mantém tudo, inclusive anexos) e registra **motivo** (obrigatório)
+  + **anexo técnico opcional** (`motivo_recusa`, `recusa_arquivo_id` — migration 0042; o
+  anexo é subido pelo cliente via `/api/arquivos/upload`, categoria "Outros"). Um **pop-up**
+  (`Dialog` em `InscricoesPendentes.tsx`) coleta motivo + arquivo antes de confirmar. A
+  inscrição fica numa seção **"Recusadas"** da fila (mostra motivo + link do anexo), de onde
   dá pra `restaurarInscricao` (volta a `pendente`) ou `excluirInscricaoDefinitivo` (aí sim
-  apaga a linha + anexos de staging: passaporte, foto e certificado de febre amarela).
+  apaga a linha + anexos de staging: passaporte, foto, **anexo do motivo** e certificado de
+  febre amarela).
   Reenvio pelo form revive como `pendente` (o `registro` do `enviarInscricao` seta
   `status:'pendente'`). `listInscricoesPendentes`/`listInscricoesRecusadas` filtram por
   status; `contarInscricoesPendentes` (badge) só conta `pendente`.

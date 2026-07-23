@@ -226,6 +226,8 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     // Reenvio de quem tinha sido recusado volta pra fila como pendente.
     status: "pendente",
     recusada_em: null,
+    motivo_recusa: null,
+    recusa_arquivo_id: null,
   };
 
   if (DEV_USE_MOCK_DATA) {
