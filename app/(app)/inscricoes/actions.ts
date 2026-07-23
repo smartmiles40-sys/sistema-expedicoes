@@ -203,12 +203,12 @@ async function listPorStatus(status: "pendente" | "recusada"): Promise<Inscricao
     .sort((a, b) => (b.recusada_em ?? b.created_at).localeCompare(a.recusada_em ?? a.created_at));
 }
 
-export function listInscricoesPendentes(): Promise<InscricaoPendente[]> {
+export async function listInscricoesPendentes(): Promise<InscricaoPendente[]> {
   return listPorStatus("pendente");
 }
 
 /** Inscrições recusadas — ficam guardadas aqui (com anexos) até restaurar/excluir. */
-export function listInscricoesRecusadas(): Promise<InscricaoPendente[]> {
+export async function listInscricoesRecusadas(): Promise<InscricaoPendente[]> {
   return listPorStatus("recusada");
 }
 
