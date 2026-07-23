@@ -425,9 +425,16 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   com os dados revisados), promove Lead→Pré-reserva, **propaga** os dados pessoais para as
   outras expedições da pessoa (`CAMPOS_PROPAGAR` — saúde e anexo ficam por linha), linka o
   anexo, gera requisitos e dispara o outbound Bitrix. Depois apaga a pendência.
-  `recusarInscricao` apaga a pendência + o anexo de staging (evita órfão no Storage).
-- A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`).
-  Badge = `contarInscricoesPendentes`.
+- **Recusar NÃO apaga (migration 0041):** `inscricoes_pendentes.status` (`pendente` |
+  `recusada`) + `recusada_em`. `recusarInscricao` só marca `status='recusada'` (mantém
+  tudo, inclusive anexos) → a inscrição fica numa seção **"Recusadas"** da fila, de onde
+  dá pra `restaurarInscricao` (volta a `pendente`) ou `excluirInscricaoDefinitivo` (aí sim
+  apaga a linha + anexos de staging: passaporte, foto e certificado de febre amarela).
+  Reenvio pelo form revive como `pendente` (o `registro` do `enviarInscricao` seta
+  `status:'pendente'`). `listInscricoesPendentes`/`listInscricoesRecusadas` filtram por
+  status; `contarInscricoesPendentes` (badge) só conta `pendente`.
+- A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`,
+  com `situacao`/`recusada_em`). Badge = `contarInscricoesPendentes`.
 - **Perfil & conexões (migration 0038):** o form ganhou 2 etapas — "Perfil & conexões"
   (profissão, "como se descreve em grupo", "o que te anima", significado, @Instagram,
   camiseta, música, foto opcional) e "Próximos passos" (texto + checkbox obrigatório

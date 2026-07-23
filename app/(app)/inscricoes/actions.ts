@@ -87,6 +87,9 @@ export type InscricaoPendente = {
   created_at: string;
   origem: string | null;
   status_reserva: string;
+  /** 'pendente' (fila) | 'recusada' (aguardando à parte). */
+  situacao: "pendente" | "recusada";
+  recusada_em: string | null;
   nome_completo: string;
   cpf: string | null;
   data_nascimento: string | null;
@@ -136,7 +139,9 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
     data_embarque: e?.data_embarque ?? null,
     created_at: row.created_at,
     origem: row.origem,
-    status_reserva: "Aguardando aprovação",
+    status_reserva: row.status === "recusada" ? "Recusada" : "Aguardando aprovação",
+    situacao: row.status === "recusada" ? "recusada" : "pendente",
+    recusada_em: row.recusada_em ?? null,
     nome_completo: row.nome_completo ?? gs("nome_completo") ?? "—",
     cpf: row.cpf,
     data_nascimento: row.data_nascimento ?? gs("data_nascimento"),
@@ -176,16 +181,17 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
   };
 }
 
-export async function listInscricoesPendentes(): Promise<InscricaoPendente[]> {
+/** Lista inscrições por situação ('pendente' = fila; 'recusada' = aguardando à parte). */
+async function listPorStatus(status: "pendente" | "recusada"): Promise<InscricaoPendente[]> {
   let rows: InscricaoPendenteRow[];
   let exps: ExpedicaoRow[];
   if (DEV_USE_MOCK_DATA) {
-    rows = mockInscricoesPendentes;
+    rows = mockInscricoesPendentes.filter((r) => (r.status ?? "pendente") === status);
     exps = mockExpedicoes;
   } else {
     const sb = await getServerClient();
     const [{ data: r }, { data: e }] = await Promise.all([
-      sb.from("inscricoes_pendentes").select("*"),
+      sb.from("inscricoes_pendentes").select("*").eq("status", status),
       sb.from("expedicoes").select("*"),
     ]);
     rows = (r ?? []) as InscricaoPendenteRow[];
@@ -194,13 +200,23 @@ export async function listInscricoesPendentes(): Promise<InscricaoPendente[]> {
   const expById = new Map(exps.map((e) => [e.id, e]));
   return rows
     .map((row) => montar(row, expById.get(row.expedicao_id)))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    .sort((a, b) => (b.recusada_em ?? b.created_at).localeCompare(a.recusada_em ?? a.created_at));
+}
+
+export function listInscricoesPendentes(): Promise<InscricaoPendente[]> {
+  return listPorStatus("pendente");
+}
+
+/** Inscrições recusadas — ficam guardadas aqui (com anexos) até restaurar/excluir. */
+export function listInscricoesRecusadas(): Promise<InscricaoPendente[]> {
+  return listPorStatus("recusada");
 }
 
 export async function contarInscricoesPendentes(): Promise<number> {
-  if (DEV_USE_MOCK_DATA) return mockInscricoesPendentes.length;
+  if (DEV_USE_MOCK_DATA) return mockInscricoesPendentes.filter((r) => (r.status ?? "pendente") === "pendente").length;
   const sb = await getServerClient();
-  const { count } = await sb.from("inscricoes_pendentes").select("id", { count: "exact", head: true });
+  const { count } = await sb
+    .from("inscricoes_pendentes").select("id", { count: "exact", head: true }).eq("status", "pendente");
   return count ?? 0;
 }
 
@@ -278,7 +294,48 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
   return { ok: true };
 }
 
+/**
+ * Recusa uma inscrição SEM apagar: marca como 'recusada' e guarda (com anexos)
+ * numa aba à parte, de onde dá pra restaurar ou excluir de vez. Assim nada se perde.
+ */
 export async function recusarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
+  const agora = new Date().toISOString();
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockInscricoesPendentes.find((p) => p.id === id);
+    if (p) { p.status = "recusada"; p.recusada_em = agora; p.updated_at = agora; }
+    revalidatePath("/inscricoes");
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { error } = await sb
+    .from("inscricoes_pendentes").update({ status: "recusada", recusada_em: agora }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/inscricoes");
+  return { ok: true };
+}
+
+/** Restaura uma inscrição recusada de volta pra fila de pendentes. */
+export async function restaurarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockInscricoesPendentes.find((p) => p.id === id);
+    if (p) { p.status = "pendente"; p.recusada_em = null; p.updated_at = new Date().toISOString(); }
+    revalidatePath("/inscricoes");
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { error } = await sb
+    .from("inscricoes_pendentes").update({ status: "pendente", recusada_em: null }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/inscricoes");
+  return { ok: true };
+}
+
+/**
+ * Exclui uma inscrição DE VEZ (só do estado recusada) — aí sim apaga a linha e os
+ * anexos de staging (passaporte, foto, certificado de febre amarela) pra não deixar
+ * órfão no Storage. Ação irreversível.
+ */
+export async function excluirInscricaoDefinitivo(id: string): Promise<{ ok: boolean; error?: string }> {
   if (DEV_USE_MOCK_DATA) {
     const i = mockInscricoesPendentes.findIndex((p) => p.id === id);
     if (i >= 0) mockInscricoesPendentes.splice(i, 1);
@@ -286,10 +343,13 @@ export async function recusarInscricao(id: string): Promise<{ ok: boolean; error
     return { ok: true };
   }
   const sb = createServiceRoleClient();
-  const { data } = await sb.from("inscricoes_pendentes").select("passaporte_arquivo_id").eq("id", id).maybeSingle();
-  const arqId = (data as { passaporte_arquivo_id: string | null } | null)?.passaporte_arquivo_id ?? null;
-  // Remove o anexo de staging junto (evita órfão no Storage).
-  if (arqId) {
+  const { data } = await sb
+    .from("inscricoes_pendentes").select("passaporte_arquivo_id, foto_arquivo_id, dados").eq("id", id).maybeSingle();
+  const row = data as { passaporte_arquivo_id: string | null; foto_arquivo_id: string | null; dados: Record<string, unknown> | null } | null;
+  const saude = (row?.dados?.saude ?? null) as Record<string, unknown> | null;
+  const certId = saude && typeof saude.vacina_febre_amarela_arquivo_id === "string" ? saude.vacina_febre_amarela_arquivo_id : null;
+  const arqIds = [row?.passaporte_arquivo_id, row?.foto_arquivo_id, certId].filter((x): x is string => Boolean(x));
+  for (const arqId of arqIds) {
     const { data: arq } = await sb.from("arquivos").select("storage_path").eq("id", arqId).maybeSingle();
     const sp = (arq as { storage_path: string } | null)?.storage_path;
     if (sp) await sb.storage.from(BUCKET_ARQUIVOS).remove([sp]);

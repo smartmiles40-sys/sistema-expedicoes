@@ -223,6 +223,9 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     passaporte_arquivo_id: passaporteArqId,
     foto_arquivo_id: fotoArqId,
     origem: "Formulário público",
+    // Reenvio de quem tinha sido recusado volta pra fila como pendente.
+    status: "pendente",
+    recusada_em: null,
   };
 
   if (DEV_USE_MOCK_DATA) {

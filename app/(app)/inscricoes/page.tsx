@@ -1,13 +1,16 @@
-import { listInscricoesPendentes } from "./actions";
+import { listInscricoesPendentes, listInscricoesRecusadas } from "./actions";
 import { InscricoesPendentes } from "./InscricoesPendentes";
 
 export const metadata = { title: "Inscrições pendentes" };
 
 export default async function InscricoesPage() {
-  const itens = await listInscricoesPendentes();
+  const [itens, recusadas] = await Promise.all([
+    listInscricoesPendentes(),
+    listInscricoesRecusadas(),
+  ]);
   return (
     <div className="p-4">
-      <InscricoesPendentes itens={itens} />
+      <InscricoesPendentes itens={itens} recusadas={recusadas} />
     </div>
   );
 }

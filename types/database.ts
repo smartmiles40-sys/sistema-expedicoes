@@ -575,6 +575,9 @@ export type InscricaoPendenteRow = {
   passaporte_arquivo_id: string | null;
   foto_arquivo_id: string | null;
   origem: string | null;
+  /** 'pendente' (fila) | 'recusada' (aguardando à parte). Migration 0041. */
+  status: string;
+  recusada_em: string | null;
   created_at: string;
   updated_at: string;
 }
