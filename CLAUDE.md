@@ -156,6 +156,19 @@ Mapeamento de estágios: `lib/bitrix/stage-mapping.ts`. Campos custom (UF_CRM_CP
 
 Detalhes: `docs/N8N_INTEGRATION.md`.
 
+**Botão "Atualizar do Bitrix" (aba Passageiros, por expedição):** a server action
+`sincronizarExpedicaoBitrix(expedicaoId)` (`.../passageiros/bitrix-sync-actions.ts`)
+NÃO fala com o Bitrix direto — faz `fetch` num **webhook do n8n** (`N8N_SYNC_URL` +
+header `x-sync-secret` = `N8N_SYNC_SECRET`) passando o `codigo` da expedição. O n8n (só
+com nós HTTP Request, sem Code) puxa os deals daquela coluna, pega cada contato e manda o
+**contato cru** pro endpoint **`/api/bitrix/sync-contato`**, que TRADUZ os campos (CPF 2,
+passaporte, datas, telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime)
+atualiza sozinha. Fire-and-forget (webhook do n8n responde na hora). Botão reaproveita o
+placeholder antigo no `PassageirosTabela.tsx`; qualquer usuário logado usa.
+- **`lib/bitrix/upsert-passageiro.ts`** (`upsertPassageiroBitrix`): grava/atualiza o
+  passageiro (upsert por `bitrix_deal_id`); compartilhado por `/api/bitrix/passageiro-sync`
+  (payload pronto) e `/api/bitrix/sync-contato` (traduz o contato cru antes).
+
 ## 🚦 Estado atual
 
 | Prompt | O que entrega | Estado |

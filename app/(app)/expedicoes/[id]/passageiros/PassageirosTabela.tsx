@@ -26,6 +26,7 @@ import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
+import { sincronizarExpedicaoBitrix } from "./bitrix-sync-actions";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -84,6 +85,15 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
   const passageiroEditando = editandoId ? passageiros.find((p) => p.id === editandoId) ?? null : null;
   // ⚠️ local/temporário: G1/G2 só na Expedição do Egito (não nas outras dos pax).
   const mostrarGrupos = ehExpedicaoEgito(destino);
+  const [sincronizando, setSincronizando] = React.useState(false);
+
+  async function sincronizarBitrix() {
+    setSincronizando(true);
+    const r = await sincronizarExpedicaoBitrix(expedicaoId);
+    setSincronizando(false);
+    if (r.ok) toast.success("Sincronização iniciada", { description: "Os passageiros vão aparecer/atualizar em instantes." });
+    else toast.error("Não foi possível sincronizar", { description: r.error });
+  }
 
   const realtimeStatus = useRealtimeRefresh({
     subscriptions: [
@@ -310,9 +320,11 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
           <Button
             variant="outline"
             size="sm"
-            onClick={() => toast.info("Sync Bitrix será implementado em P7")}
+            onClick={sincronizarBitrix}
+            disabled={sincronizando}
+            title="Puxa/atualiza os passageiros desta expedição a partir do Bitrix"
           >
-            <RefreshCw className="h-3 w-3" /> Importar Bitrix
+            <RefreshCw className={cn("h-3 w-3", sincronizando && "animate-spin")} /> {sincronizando ? "Sincronizando…" : "Atualizar do Bitrix"}
           </Button>
           <Button variant="outline" size="sm" onClick={exportarCSV}>
             <Download className="h-3 w-3" /> Exportar
