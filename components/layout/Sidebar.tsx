@@ -10,6 +10,7 @@ import {
   Coins,
   Settings,
   LayoutDashboard,
+  ScrollText,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/expedicoes", label: "Expedições", icon: Map },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
   { href: "/cambios", label: "Câmbios", icon: Coins },
+  { href: "/acessos-expedamigo", label: "Acessos ExpedAmigo", icon: ScrollText },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 

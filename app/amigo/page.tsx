@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import {
-  entrarExpedAmigo, definirSenhaExpedAmigo,
+  entrarExpedAmigo, definirSenhaExpedAmigo, registrarAcessoExpedamigo,
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
 import { Logo } from "@/components/ui/Logo";
@@ -68,7 +68,7 @@ export default function AmigoPage() {
       if (saved?.cpf && senhaSalva) {
         setCpf(mascaraCpf(saved.cpf));
         setSenha(senhaSalva);
-        entrarExpedAmigo(saved.cpf, senhaSalva)
+        entrarExpedAmigo(saved.cpf, senhaSalva, false)
           .then((r) => {
             if (!ativo) return;
             if (r.ok) { setDados(r.dados); setPrecisaTrocar(r.precisaTrocar); }
@@ -281,7 +281,7 @@ export default function AmigoPage() {
 
       {selecionada ? (
         <main>
-          <ViagemExperiencia exp={selecionada} nome={dados.nome} />
+          <ViagemExperiencia exp={selecionada} nome={dados.nome} cpf={cpf} />
           <footer className="bg-brand-gradient px-4 py-12 text-center text-white">
             <p className="font-display text-2xl font-semibold">Nós cuidamos de tudo. Você só embarca.</p>
             <p className="mx-auto mt-2 max-w-md text-[13px] text-white/70">
@@ -290,13 +290,16 @@ export default function AmigoPage() {
           </footer>
         </main>
       ) : (
-        <HomeExpedicoes dados={dados} onAbrir={setSelecionadaId} />
+        <HomeExpedicoes
+          dados={dados}
+          onAbrir={(id) => { setSelecionadaId(id); void registrarAcessoExpedamigo(cpf, "viagem_aberta", id); }}
+        />
       )}
     </div>
   );
 }
 
-function ViagemExperiencia({ exp, nome }: { exp: AmigoExpedicao; nome: string }) {
+function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: string; cpf: string }) {
   const [gerandoPdf, setGerandoPdf] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
   // Foto de capa do header: a imagem icônica do destino (Machu Picchu, no Peru);
@@ -310,6 +313,7 @@ function ViagemExperiencia({ exp, nome }: { exp: AmigoExpedicao; nome: string })
     try {
       const { gerarPdfViagem } = await import("./ViagemPDF");
       const blob = await gerarPdfViagem(exp, nome);
+      void registrarAcessoExpedamigo(cpf, "download_pdf", exp.id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

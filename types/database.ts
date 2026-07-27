@@ -585,6 +585,15 @@ export type InscricaoPendenteRow = {
   updated_at: string;
 }
 
+/** Log de acesso ao portal ExpedAmigo (migration 0043). */
+export type ExpedamigoAcessoRow = {
+  id: string;
+  cpf: string;
+  evento: "login" | "download_pdf" | "viagem_aberta";
+  expedicao_id: string | null;
+  created_at: string;
+}
+
 // ========== Database shape (formato esperado pelo @supabase/supabase-js) ==========
 
 export type Database = {
@@ -616,6 +625,7 @@ export type Database = {
       passageiro_requisitos: { Row: PassageiroRequisitoRow; Insert: Partial<PassageiroRequisitoRow> & Pick<PassageiroRequisitoRow, "passageiro_id" | "tipo" | "descricao">; Update: Partial<PassageiroRequisitoRow> };
       audit_log: { Row: AuditLogRow; Insert: Partial<AuditLogRow> & Pick<AuditLogRow, "tabela" | "registro_id" | "acao">; Update: Partial<AuditLogRow> };
       inscricoes_pendentes: { Row: InscricaoPendenteRow; Insert: Partial<InscricaoPendenteRow> & Pick<InscricaoPendenteRow, "expedicao_id" | "cpf" | "dados">; Update: Partial<InscricaoPendenteRow> };
+      expedamigo_acessos: { Row: ExpedamigoAcessoRow; Insert: Partial<ExpedamigoAcessoRow> & Pick<ExpedamigoAcessoRow, "cpf" | "evento">; Update: Partial<ExpedamigoAcessoRow> };
     };
     Views: {
       vw_prontidao_passageiro: { Row: ProntidaoPassageiroView };

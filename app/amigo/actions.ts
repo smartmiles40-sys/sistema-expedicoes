@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import {
   mockPassageiros, mockExpedicoes, mockLinksExpedicao, mockQuartos, mockAlocacoes,
   mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
-  mockRoteiroDiaFotos, mockExpedicaoAvisos,
+  mockRoteiroDiaFotos, mockExpedicaoAvisos, mockExpedamigoAcessos,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
@@ -118,6 +118,7 @@ const ADMINS_AMIGO: Record<string, string> = {
 export async function entrarExpedAmigo(
   cpfRaw: string,
   senhaRaw: string,
+  registrarLogin: boolean = true,
 ): Promise<{ ok: true; dados: AmigoDados; precisaTrocar: boolean } | { ok: false; error: string }> {
   const cpf = soDigitosCpf(cpfRaw ?? "");
   const senha = senhaRaw ?? "";
@@ -390,11 +391,42 @@ export async function entrarExpedAmigo(
   // Mais próxima primeiro.
   expedicoes.sort((a, b) => (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""));
 
+  // Log de acesso (só em logins explícitos; auto-restore de sessão passa false).
+  if (registrarLogin) await registrarAcessoExpedamigo(cpf, "login");
+
   return {
     ok: true,
     dados: { nome, primeiro_nome: nome.split(" ")[0], expedicoes },
     precisaTrocar,
   };
+}
+
+/**
+ * Registra um acesso no log do ExpedAmigo (best-effort — nunca interrompe o portal).
+ * Só CPF + evento + expedição + data/hora (sem IP/dispositivo). Migration 0043.
+ */
+export async function registrarAcessoExpedamigo(
+  cpfRaw: string,
+  evento: "login" | "download_pdf" | "viagem_aberta",
+  expedicaoId?: string | null,
+): Promise<void> {
+  try {
+    const cpf = soDigitosCpf(cpfRaw ?? "");
+    if (cpf.length !== 11) return;
+    if (!["login", "download_pdf", "viagem_aberta"].includes(evento)) return;
+    const expId = expedicaoId || null;
+    if (DEV_USE_MOCK_DATA) {
+      mockExpedamigoAcessos.push({
+        id: `acc${Math.random().toString(36).slice(2, 12)}`,
+        cpf, evento, expedicao_id: expId, created_at: new Date().toISOString(),
+      });
+      return;
+    }
+    const sb = createServiceRoleClient();
+    await sb.from("expedamigo_acessos").insert({ cpf, evento, expedicao_id: expId });
+  } catch {
+    /* best-effort */
+  }
 }
 
 /** Define/troca a senha da pessoa (por CPF). Confere a senha atual antes. */
