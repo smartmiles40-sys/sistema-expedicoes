@@ -166,8 +166,12 @@ passaporte, datas, telefone/e-mail) e faz o upsert. A tabela de passageiros (rea
 atualiza sozinha. Fire-and-forget (webhook do n8n responde na hora). Botão reaproveita o
 placeholder antigo no `PassageirosTabela.tsx`; qualquer usuário logado usa.
 - **`lib/bitrix/upsert-passageiro.ts`** (`upsertPassageiroBitrix`): grava/atualiza o
-  passageiro (upsert por `bitrix_deal_id`); compartilhado por `/api/bitrix/passageiro-sync`
-  (payload pronto) e `/api/bitrix/sync-contato` (traduz o contato cru antes).
+  passageiro (chave `bitrix_deal_id`); compartilhado por `/api/bitrix/passageiro-sync`
+  (payload pronto) e `/api/bitrix/sync-contato` (traduz o contato cru + endereço).
+  **Política "SÓ PREENCHE VAZIO":** passageiro novo é criado completo; num que JÁ existe,
+  só grava os campos que estão **vazios** no sistema — NUNCA sobrescreve dado já preenchido
+  (protege edição manual do operacional). Correção feita no Bitrix num campo já preenchido
+  NÃO flui sozinha (de propósito). `status_reserva` só é setado na criação.
 
 ## 🚦 Estado atual
 
