@@ -18,19 +18,20 @@ export type UpsertPassageiroResult =
 const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
 /**
- * Cria/atualiza um passageiro a partir do payload do Bitrix (chave `bitrix_deal_id`).
+ * Cria/atualiza um passageiro a partir do payload do Bitrix.
  *
- * ⚠️ Política "SÓ PREENCHE O QUE ESTÁ VAZIO": passageiro NOVO é criado com tudo; num
- * passageiro que JÁ EXISTE, só grava os campos que estão vazios no sistema — NUNCA
- * sobrescreve um dado já preenchido (protege edições manuais do operacional). Se um
- * campo já tiver valor, uma correção feita no Bitrix não flui sozinha (é de propósito).
+ * Casa o passageiro existente por `bitrix_deal_id` OU por `(expedicao_id, cpf)` — assim
+ * não duplica quem já entrou por inscrição/manual (respeita a unique de CPF por expedição)
+ * e ainda vincula o deal na linha existente.
  *
- * Compartilhado por `/api/bitrix/passageiro-sync` (payload pronto) e
- * `/api/bitrix/sync-contato` (traduz o contato cru + endereço).
+ * ⚠️ Política "SÓ PREENCHE O QUE ESTÁ VAZIO": passageiro NOVO é criado com tudo; num que
+ * JÁ EXISTE, só grava os campos vazios no sistema — NUNCA sobrescreve dado já preenchido
+ * (protege edições manuais). `status_reserva` só é setado na criação.
+ *
+ * Compartilhado por `/api/bitrix/passageiro-sync` e `/api/bitrix/sync-contato`.
  */
 export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync): Promise<UpsertPassageiroResult> {
   const status_reserva = mapBitrixStage(data.estagio_deal);
-  // Campos "de dado" que seguem a política de só-preenche-vazio (ordem: campo → valor recebido).
   const campos: [string, unknown][] = [
     ["nome_completo", data.nome_completo],
     ["cpf", data.cpf ?? null],
@@ -41,10 +42,11 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
     ["telefone", data.telefone ?? null],
     ["observacoes", data.observacoes ?? null],
     ["bitrix_contact_id", data.bitrix_contact_id ?? null],
+    ["bitrix_deal_id", data.bitrix_deal_id],
     ["endereco_cep", extra?.endereco_cep ?? null],
     ["endereco_rua", extra?.endereco_rua ?? null],
   ];
-  /** Monta o patch só com o que veio preenchido E está vazio no existente. */
+  /** Patch só com o que veio preenchido E está vazio no existente. */
   const patchVazios = (ex: Record<string, unknown>): Record<string, unknown> => {
     const patch: Record<string, unknown> = {};
     for (const [campo, valor] of campos) if (!vazio(valor) && vazio(ex[campo])) patch[campo] = valor;
@@ -56,7 +58,10 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
     const expedicao = mockExpedicoes.find((e) => e.codigo === data.expedicao_codigo);
     if (!expedicao) return { ok: false, status: 404, error: `Expedição ${data.expedicao_codigo} não encontrada` };
 
-    const existente = mockPassageiros.find((p) => p.bitrix_deal_id === data.bitrix_deal_id);
+    let existente = mockPassageiros.find((p) => p.bitrix_deal_id === data.bitrix_deal_id);
+    if (!existente && data.cpf) {
+      existente = mockPassageiros.find((p) => p.expedicao_id === expedicao.id && p.cpf === data.cpf);
+    }
     if (existente) {
       const patch = patchVazios(existente as unknown as Record<string, unknown>);
       if (Object.keys(patch).length) Object.assign(existente, patch, { updated_at: new Date().toISOString() });
@@ -117,25 +122,34 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
   }
   const exp = expRes.data as { id: string };
 
-  // Já existe (pela chave do deal)? Puxa os campos pra decidir o que está vazio.
-  const { data: existing } = await supabase
-    .from("passageiros")
-    .select("id, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, endereco_cep, endereco_rua")
-    .eq("bitrix_deal_id", data.bitrix_deal_id)
-    .maybeSingle();
+  const cols =
+    "id, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, bitrix_deal_id, endereco_cep, endereco_rua";
+
+  // Casa por bitrix_deal_id; se não achar, por (expedição, CPF) — evita duplicar quem
+  // já entrou por inscrição/manual (respeita a unique ux_passageiros_expedicao_cpf).
+  let existing: Record<string, unknown> | null = null;
+  {
+    const { data: byDeal } = await supabase
+      .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
+    existing = (byDeal as Record<string, unknown> | null) ?? null;
+  }
+  if (!existing && data.cpf) {
+    const { data: byCpf } = await supabase
+      .from("passageiros").select(cols).eq("expedicao_id", exp.id).eq("cpf", data.cpf).maybeSingle();
+    existing = (byCpf as Record<string, unknown> | null) ?? null;
+  }
 
   if (existing) {
-    const ex = existing as Record<string, unknown>;
-    const patch = patchVazios(ex);
+    const patch = patchVazios(existing);
     if (Object.keys(patch).length) {
-      const { error } = await supabase.from("passageiros").update(patch).eq("id", ex.id as string);
+      const { error } = await supabase.from("passageiros").update(patch).eq("id", existing.id as string);
       if (error) return { ok: false, status: 500, error: error.message };
       await supabase.from("audit_log").insert({
-        tabela: "passageiros", registro_id: ex.id as string, acao: "update",
+        tabela: "passageiros", registro_id: existing.id as string, acao: "update",
         dados_depois: patch, origem: "bitrix-webhook",
       });
     }
-    return { ok: true, passageiro_id: ex.id as string, action: "updated" };
+    return { ok: true, passageiro_id: existing.id as string, action: "updated" };
   }
 
   // Novo → insere completo.
