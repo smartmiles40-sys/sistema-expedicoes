@@ -59,6 +59,13 @@ const schema = z.object({
   contrato_assinado: z.boolean().optional(),
   checkin_online_feito: z.boolean().optional(),
   observacoes: z.string().optional(),
+  endereco_cep: z.string().optional(),
+  endereco_rua: z.string().optional(),
+  endereco_numero: z.string().optional(),
+  endereco_complemento: z.string().optional(),
+  endereco_bairro: z.string().optional(),
+  endereco_cidade: z.string().optional(),
+  endereco_estado: z.string().optional(),
   saude: z.record(z.string(), z.string()).optional(),
 });
 type FormData = z.infer<typeof schema>;
@@ -104,6 +111,13 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
       contrato_assinado: passageiro.contrato_assinado ?? false,
       checkin_online_feito: passageiro.checkin_online_feito ?? false,
       observacoes: passageiro.observacoes ?? "",
+      endereco_cep: passageiro.endereco_cep ?? "",
+      endereco_rua: passageiro.endereco_rua ?? "",
+      endereco_numero: passageiro.endereco_numero ?? "",
+      endereco_complemento: passageiro.endereco_complemento ?? "",
+      endereco_bairro: passageiro.endereco_bairro ?? "",
+      endereco_cidade: passageiro.endereco_cidade ?? "",
+      endereco_estado: passageiro.endereco_estado ?? "",
       saude: (passageiro.saude as Record<string, string>) ?? {},
     });
   }, [passageiro, reset]);
@@ -121,6 +135,13 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
       companhia_aerea: data.companhia_aerea?.trim() || null,
       localizador: data.localizador?.trim() || null,
       observacoes: data.observacoes?.trim() || null,
+      endereco_cep: data.endereco_cep?.trim() || null,
+      endereco_rua: data.endereco_rua?.trim() || null,
+      endereco_numero: data.endereco_numero?.trim() || null,
+      endereco_complemento: data.endereco_complemento?.trim() || null,
+      endereco_bairro: data.endereco_bairro?.trim() || null,
+      endereco_cidade: data.endereco_cidade?.trim() || null,
+      endereco_estado: data.endereco_estado?.trim() || null,
       saude: Object.fromEntries(
         Object.entries(data.saude ?? {}).filter(([, v]) => v != null && String(v).trim() !== ""),
       ),
@@ -277,6 +298,45 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                 rows={2}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
               />
+            </div>
+
+            {/* Endereço (dado pessoal — propaga entre as expedições da pessoa) */}
+            <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Endereço</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ep-cep">CEP</Label>
+                  <Input id="ep-cep" {...register("endereco_cep")} />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="ep-rua">Rua / Logradouro</Label>
+                  <Input id="ep-rua" {...register("endereco_rua")} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ep-num">Número</Label>
+                  <Input id="ep-num" {...register("endereco_numero")} />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="ep-compl">Complemento</Label>
+                  <Input id="ep-compl" {...register("endereco_complemento")} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ep-bairro">Bairro</Label>
+                  <Input id="ep-bairro" {...register("endereco_bairro")} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ep-cidade">Cidade</Label>
+                  <Input id="ep-cidade" {...register("endereco_cidade")} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ep-uf">Estado (UF)</Label>
+                  <Input id="ep-uf" {...register("endereco_estado")} />
+                </div>
+              </div>
             </div>
           </form>
 
