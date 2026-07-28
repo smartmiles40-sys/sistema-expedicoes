@@ -124,35 +124,43 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
 
   const cols =
     "id, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, bitrix_deal_id, endereco_cep, endereco_rua";
+  const cpfDig = data.cpf ? data.cpf.replace(/\D/g, "") : null;
 
-  // Casa por bitrix_deal_id; se não achar, por (expedição, CPF) — evita duplicar quem
-  // já entrou por inscrição/manual (respeita a unique ux_passageiros_expedicao_cpf).
-  let existing: Record<string, unknown> | null = null;
-  {
-    const { data: byDeal } = await supabase
-      .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
-    existing = (byDeal as Record<string, unknown> | null) ?? null;
-  }
-  if (!existing && data.cpf) {
-    const { data: byCpf } = await supabase
-      .from("passageiros").select(cols).eq("expedicao_id", exp.id).eq("cpf", data.cpf).maybeSingle();
-    existing = (byCpf as Record<string, unknown> | null) ?? null;
-  }
-
-  if (existing) {
-    const patch = patchVazios(existing);
+  /** Aplica o patch "só-vazio" numa linha existente e devolve o resultado. */
+  const atualizar = async (ex: Record<string, unknown>): Promise<UpsertPassageiroResult> => {
+    const patch = patchVazios(ex);
     if (Object.keys(patch).length) {
-      const { error } = await supabase.from("passageiros").update(patch).eq("id", existing.id as string);
+      const { error } = await supabase.from("passageiros").update(patch).eq("id", ex.id as string);
       if (error) return { ok: false, status: 500, error: error.message };
       await supabase.from("audit_log").insert({
-        tabela: "passageiros", registro_id: existing.id as string, acao: "update",
+        tabela: "passageiros", registro_id: ex.id as string, acao: "update",
         dados_depois: patch, origem: "bitrix-webhook",
       });
     }
-    return { ok: true, passageiro_id: existing.id as string, action: "updated" };
-  }
+    return { ok: true, passageiro_id: ex.id as string, action: "updated" };
+  };
 
-  // Novo → insere completo.
+  /** Acha na expedição a linha cujo CPF (só dígitos) bate com o recebido. */
+  const acharPorCpf = async (): Promise<Record<string, unknown> | null> => {
+    if (!cpfDig) return null;
+    const { data: rows } = await supabase.from("passageiros").select(cols).eq("expedicao_id", exp.id);
+    return (
+      ((rows ?? []) as Record<string, unknown>[]).find(
+        (r) => String(r.cpf ?? "").replace(/\D/g, "") === cpfDig,
+      ) ?? null
+    );
+  };
+
+  // 1) Casa por bitrix_deal_id.
+  const { data: byDeal } = await supabase
+    .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
+  if (byDeal) return atualizar(byDeal as Record<string, unknown>);
+
+  // 2) Não achou pelo deal → tenta pelo CPF (comparando por dígitos, tolerante a formato).
+  const porCpf = await acharPorCpf();
+  if (porCpf) return atualizar(porCpf);
+
+  // 3) Novo → insere completo.
   const registro = {
     expedicao_id: exp.id,
     bitrix_contact_id: data.bitrix_contact_id ?? null,
@@ -172,7 +180,13 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
   };
   const { data: result, error } = await supabase
     .from("passageiros").insert(registro).select("id").single();
-  if (error) return { ok: false, status: 500, error: error.message };
+  if (error) {
+    // Corrida / conflito de CPF: alguém já existe nessa expedição com esse CPF.
+    // Re-acha e faz o update "só-vazio" em vez de quebrar.
+    const conflito = await acharPorCpf();
+    if (conflito) return atualizar(conflito);
+    return { ok: false, status: 500, error: error.message };
+  }
   const r = result as { id: string };
 
   await supabase.from("audit_log").insert({
