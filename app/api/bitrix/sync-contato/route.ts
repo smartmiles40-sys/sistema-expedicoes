@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { passageiroSyncSchema } from "@/lib/bitrix/validators";
 import { upsertPassageiroBitrix } from "@/lib/bitrix/upsert-passageiro";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
+import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { mockPassageiros } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
  * Recebe do n8n o CONTATO CRU do Bitrix (objeto do crm.contact.get) + o código da
- * expedição + o id do deal, TRADUZ os campos custom aqui (CPF, passaporte, datas,
- * telefone/e-mail) e faz o upsert do passageiro. Assim o n8n vira só HTTP Request
- * (sem Code node). Estágio é sempre "WON" (só entram vendidos/confirmados).
+ * expedição + o id do deal + o endereço do deal, TRADUZ os campos custom aqui
+ * (CPF, passaporte, datas, telefone/e-mail, endereço) e faz o upsert do passageiro.
+ * Assim o n8n vira só HTTP Request (sem Code node). Estágio é sempre "WON".
  */
 
 // Campos custom do contato no Bitrix (ver docs/N8N_INTEGRATION.md).
@@ -32,12 +35,31 @@ function toISO(v: unknown): string | null {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
+/**
+ * Endereço vem do DEAL (campo "Endereço de entrega") no formato
+ * "<endereço>|<lat>;<lng>|<locId>". Pega o texto antes do "|", extrai o CEP e
+ * devolve o resto como "rua" (o operacional refina depois, se quiser).
+ */
+function parseEndereco(raw: unknown): { cep: string | null; rua: string | null } {
+  const s0 = String(raw ?? "").split("|")[0].trim();
+  if (!s0) return { cep: null, rua: null };
+  const m = s0.match(/(\d{5}-?\d{3})/);
+  const cep = m ? m[1] : null;
+  const rua = s0.replace(/[-,\s]*cep[:\s]*\d{5}-?\d{3}\s*$/i, "").replace(/[-,\s]+$/, "").trim() || null;
+  return { cep, rua };
+}
+
 export async function POST(req: NextRequest) {
   if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { expedicao_codigo?: string; bitrix_deal_id?: string | number; contato?: Record<string, unknown> };
+  let body: {
+    expedicao_codigo?: string;
+    bitrix_deal_id?: string | number;
+    contato?: Record<string, unknown>;
+    endereco?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -82,6 +104,22 @@ export async function POST(req: NextRequest) {
   try {
     const r = await upsertPassageiroBitrix(parsed.data);
     if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
+
+    // Endereço (vem do DEAL). Só grava o que veio — não sobrescreve com vazio.
+    const end = parseEndereco(body.endereco);
+    if (end.cep || end.rua) {
+      const patch: { endereco_cep?: string; endereco_rua?: string } = {};
+      if (end.cep) patch.endereco_cep = end.cep;
+      if (end.rua) patch.endereco_rua = end.rua;
+      if (DEV_USE_MOCK_DATA) {
+        const p = mockPassageiros.find((x) => x.id === r.passageiro_id);
+        if (p) Object.assign(p, patch);
+      } else {
+        const sb = createServiceRoleClient();
+        await sb.from("passageiros").update(patch).eq("id", r.passageiro_id);
+      }
+    }
+
     return NextResponse.json({ ok: true, passageiro_id: r.passageiro_id, action: r.action, nome: payload.nome_completo });
   } catch (err) {
     return NextResponse.json(
