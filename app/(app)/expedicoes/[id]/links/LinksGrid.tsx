@@ -22,6 +22,7 @@ import { excluirLink } from "@/app/(app)/expedicoes/actions";
 import { cn } from "@/lib/utils";
 import type { LinkExpedicaoRow } from "@/types/database";
 import { LinkDrawer } from "./LinkDrawer";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 interface Props {
   expedicaoId: string;
@@ -51,6 +52,7 @@ function prettyUrl(url: string): string {
 }
 
 export function LinksGrid({ expedicaoId, links }: Props) {
+  const somenteLeitura = useSomenteLeitura();
   const [novoOpen, setNovoOpen] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
   const linkEditando = editandoId ? links.find((l) => l.id === editandoId) ?? null : null;
@@ -84,13 +86,15 @@ export function LinksGrid({ expedicaoId, links }: Props) {
               : `${links.length} link${links.length === 1 ? "" : "s"} cadastrado${links.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Button size="sm" onClick={() => setNovoOpen(true)}>
-          <Plus className="h-3 w-3" /> Novo link
-        </Button>
+        {!somenteLeitura && (
+          <Button size="sm" onClick={() => setNovoOpen(true)}>
+            <Plus className="h-3 w-3" /> Novo link
+          </Button>
+        )}
       </div>
 
       {links.length === 0 ? (
-        <EmptyState onCreate={() => setNovoOpen(true)} />
+        <EmptyState onCreate={somenteLeitura ? undefined : () => setNovoOpen(true)} />
       ) : (
         <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {links.map((l) => {
@@ -133,15 +137,17 @@ export function LinksGrid({ expedicaoId, links }: Props) {
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditandoId(l.id)}
-                    aria-label="Editar link"
-                    title="Editar"
-                    className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  {!somenteLeitura && (
+                    <button
+                      type="button"
+                      onClick={() => setEditandoId(l.id)}
+                      aria-label="Editar link"
+                      title="Editar"
+                      className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <ConfirmDeleteButton
                     ariaLabel="Excluir link"
                     title={`Excluir "${l.label}"?`}
@@ -171,7 +177,7 @@ export function LinksGrid({ expedicaoId, links }: Props) {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({ onCreate }: { onCreate?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 border border-dashed border-border rounded-md bg-muted/20">
       <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-2">
@@ -182,9 +188,11 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         Cole aqui apresentação, landing page, planilha financeira, drive, grupo do WhatsApp — qualquer
         URL relevante pra essa expedição.
       </p>
-      <Button size="sm" onClick={onCreate} className="mt-3">
-        <Plus className="h-3 w-3" /> Adicionar primeiro link
-      </Button>
+      {onCreate && (
+        <Button size="sm" onClick={onCreate} className="mt-3">
+          <Plus className="h-3 w-3" /> Adicionar primeiro link
+        </Button>
+      )}
     </div>
   );
 }

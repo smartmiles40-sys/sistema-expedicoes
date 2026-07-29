@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { formatDate, cn } from "@/lib/utils";
 import { PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, type InscricaoPendente } from "./actions";
+import { useSomenteLeitura, usePodeDecidirInscricao } from "@/components/layout/PermissoesContext";
 
 function Linha({ label, valor }: { label: string; valor: React.ReactNode }) {
   if (valor === null || valor === undefined || valor === "") return null;
@@ -215,6 +216,8 @@ function CardInscricao({
 
 export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPendente[]; recusadas: InscricaoPendente[] }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
+  const podeDecidir = usePodeDecidirInscricao();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [aberto, setAberto] = React.useState<Set<string>>(new Set());
   const [verRecusadas, setVerRecusadas] = React.useState(false);
@@ -311,12 +314,16 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
                 onToggle={() => toggle(it.id)}
                 acoes={
                   <>
-                    <Button size="sm" variant="brand" onClick={() => aprovar(it)} disabled={busy === it.id} className="flex-1">
-                      <Check className="h-3.5 w-3.5" /> Aprovar
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => abrirRecusa(it)} disabled={busy === it.id}>
-                      <X className="h-3.5 w-3.5" /> Recusar
-                    </Button>
+                    {podeDecidir && (
+                      <>
+                        <Button size="sm" variant="brand" onClick={() => aprovar(it)} disabled={busy === it.id} className="flex-1">
+                          <Check className="h-3.5 w-3.5" /> Aprovar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => abrirRecusa(it)} disabled={busy === it.id}>
+                          <X className="h-3.5 w-3.5" /> Recusar
+                        </Button>
+                      </>
+                    )}
                     {it.expedicao_id && (
                       <Link href={`/expedicoes/${it.expedicao_id}/passageiros`} className="inline-flex h-8 items-center rounded-md border border-border px-2 text-[12px] hover:bg-accent" title="Ver na expedição">
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -355,14 +362,16 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
                     open={aberto.has(it.id)}
                     onToggle={() => toggle(it.id)}
                     acoes={
-                      <>
-                        <Button size="sm" variant="brand" onClick={() => restaurar(it)} disabled={busy === it.id} className="flex-1">
-                          <RotateCcw className="h-3.5 w-3.5" /> Restaurar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => excluir(it)} disabled={busy === it.id} className="text-critico-600 hover:bg-critico-50 hover:text-critico-700">
-                          <Trash2 className="h-3.5 w-3.5" /> Excluir
-                        </Button>
-                      </>
+                      somenteLeitura ? null : (
+                        <>
+                          <Button size="sm" variant="brand" onClick={() => restaurar(it)} disabled={busy === it.id} className="flex-1">
+                            <RotateCcw className="h-3.5 w-3.5" /> Restaurar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => excluir(it)} disabled={busy === it.id} className="text-critico-600 hover:bg-critico-50 hover:text-critico-700">
+                            <Trash2 className="h-3.5 w-3.5" /> Excluir
+                          </Button>
+                        </>
+                      )
                     }
                   />
                 ))}

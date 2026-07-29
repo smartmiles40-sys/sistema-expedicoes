@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { cn, formatDate } from "@/lib/utils";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 import { criarDiaLider, atualizarDiaLider, excluirDiaLider } from "./actions";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 const NIVEIS = ["", "Crítico", "Atenção", "Verificar"];
 const EMOJI: Record<string, string> = { "Crítico": "🔴", "Atenção": "🟠", "Verificar": "🟡" };
@@ -30,6 +31,7 @@ const doRow = (d: RoteiroLiderDiaRow): Form => ({
 
 export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string; dias: RoteiroLiderDiaRow[] }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = React.useState<RoteiroLiderDiaRow | null>(null);
   const [criando, setCriando] = React.useState(false);
 
@@ -51,9 +53,11 @@ export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string;
           <h2 className="page-title">Roteiro do Líder</h2>
           <p className="page-subtitle mt-1">Resumo operacional dia a dia — o que a equipe traduz pro líder. Aparece na Área do Líder.</p>
         </div>
-        <Button variant="brand" onClick={() => { setEditando(null); setCriando(true); }}>
-          <Plus className="h-4 w-4" /> Adicionar dia
-        </Button>
+        {!somenteLeitura && (
+          <Button variant="brand" onClick={() => { setEditando(null); setCriando(true); }}>
+            <Plus className="h-4 w-4" /> Adicionar dia
+          </Button>
+        )}
       </div>
 
       {dias.length === 0 ? (
@@ -80,10 +84,12 @@ export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string;
                   {d.alerta_nivel && <span>{EMOJI[d.alerta_nivel]} {d.alerta_nivel}</span>}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <button type="button" onClick={() => { setCriando(false); setEditando(d); }} title="Editar" className="rounded-md p-1.5 hover:bg-muted"><Pencil className="h-3.5 w-3.5" /></button>
-                <button type="button" onClick={() => excluir(d)} title="Excluir" className="rounded-md p-1.5 text-critico-600 hover:bg-critico-50"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
+              {!somenteLeitura && (
+                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button type="button" onClick={() => { setCriando(false); setEditando(d); }} title="Editar" className="rounded-md p-1.5 hover:bg-muted"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => excluir(d)} title="Excluir" className="rounded-md p-1.5 text-critico-600 hover:bg-critico-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              )}
             </div>
           ))}
         </div>

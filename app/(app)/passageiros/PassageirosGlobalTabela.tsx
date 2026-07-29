@@ -27,6 +27,7 @@ import {
 import { atualizarDadosPessoais, criarPassageiroAvulso, excluirPessoa } from "@/app/(app)/expedicoes/actions";
 import { SenhaExpedamigoPessoa } from "./SenhaExpedamigoPessoa";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import type { StatusReserva, ArquivoRow, SaudePassageiro } from "@/types/database";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
@@ -84,6 +85,7 @@ export function PassageirosGlobalTabela({
   arquivos: ArquivoRow[];
   isAdmin?: boolean;
 }) {
+  const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [aberta, setAberta] = React.useState<PessoaAgregada | null>(null);
   const [view, setView] = React.useState<"clube" | "lista">("clube");
@@ -265,12 +267,16 @@ export function PassageirosGlobalTabela({
               <List className="h-4 w-4" />
             </button>
           </div>
-          <Button variant="brand" size="sm" onClick={() => setNovoOpen(true)}>
-            <UserPlus className="h-3 w-3" /> Novo passageiro
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="h-3 w-3" /> Importar CSV
-          </Button>
+          {!somenteLeitura && (
+            <>
+              <Button variant="brand" size="sm" onClick={() => setNovoOpen(true)}>
+                <UserPlus className="h-3 w-3" /> Novo passageiro
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="h-3 w-3" /> Importar CSV
+              </Button>
+            </>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -319,8 +325,8 @@ export function PassageirosGlobalTabela({
             icon={Users}
             title="Seu clube de viajantes começa aqui"
             description="Toda pessoa que viaja com a agência entra no clube, com perfil, saúde e nível de fidelidade. Cadastre a primeira."
-            actionLabel="Novo passageiro"
-            onAction={() => setNovoOpen(true)}
+            actionLabel={somenteLeitura ? undefined : "Novo passageiro"}
+            onAction={somenteLeitura ? undefined : () => setNovoOpen(true)}
           />
         ) : ordenadas.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border py-12 text-center text-[13px] text-muted-foreground">
@@ -364,8 +370,8 @@ export function PassageirosGlobalTabela({
                         icon={Users}
                         title="Sua base de pessoas começa aqui"
                         description="Toda pessoa que viaja com a agência fica aqui, com perfil, saúde e histórico de expedições. Cadastre a primeira."
-                        actionLabel="Novo passageiro"
-                        onAction={() => setNovoOpen(true)}
+                        actionLabel={somenteLeitura ? undefined : "Novo passageiro"}
+                        onAction={somenteLeitura ? undefined : () => setNovoOpen(true)}
                       />
                     ) : (
                       <div className="text-center text-muted-foreground py-8">Nenhum resultado para a busca.</div>
@@ -695,6 +701,7 @@ function PessoaDrawer({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const id = idade(pessoa.data_nascimento);
   const refId = pessoa.idsPassageiros[0];
   const [tab, setTab] = React.useState<"passageiro" | "saude" | "expedicoes">("passageiro");
@@ -967,28 +974,32 @@ function PessoaDrawer({
         </DrawerBody>
 
         <DrawerFooter>
-          <ConfirmDeleteButton
-            triggerLabel="Excluir passageiro"
-            triggerClassName="mr-auto"
-            ariaLabel="Excluir passageiro da base"
-            disabled={!refId}
-            title={`Excluir "${pessoa.nome_completo}" da base?`}
-            description={
-              pessoa.totalExpedicoes > 0
-                ? `Esta pessoa está em ${pessoa.totalExpedicoes} expediç${pessoa.totalExpedicoes === 1 ? "ão" : "ões"}. Excluir remove TODOS os registros dela do sistema, inclusive dessas expedições. Esta ação não pode ser desfeita.`
-                : "Remove o passageiro da base operacional. Esta ação não pode ser desfeita."
-            }
-            successMessage="Passageiro excluído da base"
-            onConfirm={() => excluirPessoa(refId)}
-            onDeleted={() => {
-              onClose();
-              router.refresh();
-            }}
-          />
+          {!somenteLeitura && (
+            <ConfirmDeleteButton
+              triggerLabel="Excluir passageiro"
+              triggerClassName="mr-auto"
+              ariaLabel="Excluir passageiro da base"
+              disabled={!refId}
+              title={`Excluir "${pessoa.nome_completo}" da base?`}
+              description={
+                pessoa.totalExpedicoes > 0
+                  ? `Esta pessoa está em ${pessoa.totalExpedicoes} expediç${pessoa.totalExpedicoes === 1 ? "ão" : "ões"}. Excluir remove TODOS os registros dela do sistema, inclusive dessas expedições. Esta ação não pode ser desfeita.`
+                  : "Remove o passageiro da base operacional. Esta ação não pode ser desfeita."
+              }
+              successMessage="Passageiro excluído da base"
+              onConfirm={() => excluirPessoa(refId)}
+              onDeleted={() => {
+                onClose();
+                router.refresh();
+              }}
+            />
+          )}
           <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
-          <Button type="submit" form="perfil-pessoa-form" disabled={isSubmitting || !isDirty}>
-            {isSubmitting ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          {!somenteLeitura && (
+            <Button type="submit" form="perfil-pessoa-form" disabled={isSubmitting || !isDirty}>
+              {isSubmitting ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          )}
         </DrawerFooter>
       </DrawerContent>
     </Drawer>

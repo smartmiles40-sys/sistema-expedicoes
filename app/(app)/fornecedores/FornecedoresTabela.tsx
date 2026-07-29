@@ -13,6 +13,7 @@ import { FornecedorDrawer } from "./FornecedorDrawer";
 import { excluirFornecedor } from "./actions";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 const STATUS_VARIANT: Record<StatusFornecedor, "vinculado" | "atencao" | "critico"> = {
   Ativo: "vinculado",
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function FornecedoresTabela({ fornecedores, historico }: Props) {
+  const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -78,9 +80,11 @@ export function FornecedoresTabela({ fornecedores, historico }: Props) {
               className="pl-7 w-56"
             />
           </div>
-          <Button variant="brand" onClick={abrirNovo}>
-            <Plus className="h-3.5 w-3.5" /> Novo Fornecedor
-          </Button>
+          {!somenteLeitura && (
+            <Button variant="brand" onClick={abrirNovo}>
+              <Plus className="h-3.5 w-3.5" /> Novo Fornecedor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -119,8 +123,8 @@ export function FornecedoresTabela({ fornecedores, historico }: Props) {
                         icon={Building2}
                         title="Nenhum fornecedor ainda"
                         description="Hotéis, DMCs, transportes e guias dos destinos. Cadastre os parceiros para usar nos custos e pagamentos das expedições."
-                        actionLabel="Novo fornecedor"
-                        onAction={abrirNovo}
+                        actionLabel={somenteLeitura ? undefined : "Novo fornecedor"}
+                        onAction={somenteLeitura ? undefined : abrirNovo}
                       />
                     ) : (
                       <div className="text-center text-muted-foreground py-8">Nenhum resultado.</div>
@@ -146,28 +150,30 @@ export function FornecedoresTabela({ fornecedores, historico }: Props) {
                         {usado} expediç{usado === 1 ? "ão" : "ões"}
                       </td>
                       <td className="w-16 px-1">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => abrirEditar(f.id)}
-                            aria-label="Editar fornecedor"
-                            title="Editar"
-                            className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <ConfirmDeleteButton
-                            ariaLabel="Excluir fornecedor"
-                            title={`Excluir "${f.nome}"?`}
-                            description={
-                              usado > 0
-                                ? `Este fornecedor aparece em ${usado} custo(s). A exclusão será bloqueada se houver vínculos.`
-                                : "Esta ação não pode ser desfeita."
-                            }
-                            successMessage="Fornecedor excluído"
-                            onConfirm={() => excluirFornecedor(f.id)}
-                          />
-                        </div>
+                        {!somenteLeitura && (
+                          <div className="flex items-center justify-end gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => abrirEditar(f.id)}
+                              aria-label="Editar fornecedor"
+                              title="Editar"
+                              className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <ConfirmDeleteButton
+                              ariaLabel="Excluir fornecedor"
+                              title={`Excluir "${f.nome}"?`}
+                              description={
+                                usado > 0
+                                  ? `Este fornecedor aparece em ${usado} custo(s). A exclusão será bloqueada se houver vínculos.`
+                                  : "Esta ação não pode ser desfeita."
+                              }
+                              successMessage="Fornecedor excluído"
+                              onConfirm={() => excluirFornecedor(f.id)}
+                            />
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

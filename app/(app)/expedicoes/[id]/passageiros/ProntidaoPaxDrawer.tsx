@@ -17,6 +17,7 @@ import { STATUS_REQUISITO, COR_PRONTIDAO } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { gerarRequisitosPadrao, atualizarRequisitoCampo, atualizarPassageiroCampo, criarRequisitoInstancia, atualizarAnexoPassaporte } from "@/app/(app)/expedicoes/actions";
 import { REQUISITOS_COM_ANEXO_OBRIGATORIO, REQUISITOS_DE_COLUNA, ANEXO_OPCIONAL, type Semaforo } from "@/lib/prontidao/regras";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type {
   PassageiroRequisitoRow, PassageiroRow, ArquivoRow, Tables,
@@ -185,6 +186,7 @@ export function ProntidaoConteudo({
   showBadge?: boolean;
 }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = React.useState<PassageiroRequisitoRow | null>(null);
   const [contratoOpen, setContratoOpen] = React.useState(false);
   const [gerando, startGerar] = React.useTransition();
@@ -228,7 +230,8 @@ export function ProntidaoConteudo({
           // dispensado/N-A): clicar cria a instância e abre pra editar. Os de anexo
           // opcional (semáforo "na") também são clicáveis, pra poder anexar.
           const podeCriar = !req && !ehContrato && !ehColuna && (c.semaforo !== "na" || ANEXO_OPCIONAL.has(c.tipo));
-          const clicavel = Boolean(req) || ehContrato || podeCriar;
+          // Perfis somente-leitura só visualizam a lista — nada abre para editar/anexar.
+          const clicavel = !somenteLeitura && (Boolean(req) || ehContrato || podeCriar);
           return (
             <li key={c.tipo}>
               <button
@@ -270,9 +273,11 @@ export function ProntidaoConteudo({
           <p className="text-[12px] text-muted-foreground mb-2">
             Requisitos de {destino} ainda não instanciados para esta expedição.
           </p>
-          <Button onClick={gerar} disabled={gerando} size="sm">
-            {gerando ? "Gerando..." : `Gerar requisitos de ${destino}`}
-          </Button>
+          {!somenteLeitura && (
+            <Button onClick={gerar} disabled={gerando} size="sm">
+              {gerando ? "Gerando..." : `Gerar requisitos de ${destino}`}
+            </Button>
+          )}
         </div>
       )}
 

@@ -11,6 +11,8 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
 import { cn, formatDate } from "@/lib/utils";
+import { Eye } from "lucide-react";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import {
   criarItemPortal, atualizarItemPortal, excluirItemPortal,
   adicionarFotoRoteiro, excluirFotoRoteiro, definirVoucherHospedagem,
@@ -46,6 +48,7 @@ export function PortalEditor({
   passeiosOpcionais: PasseioOpcionalRow[];
   hospedagemVoucherArquivoId: string | null;
 }) {
+  const somenteLeitura = useSomenteLeitura();
   const fotosPorDia = React.useMemo(() => {
     const m: Record<string, RoteiroDiaFotoRow[]> = {};
     for (const f of fotos) (m[f.roteiro_dia_id] ??= []).push(f);
@@ -56,6 +59,28 @@ export function PortalEditor({
     for (const p of passeiosOpcionais) (m[p.roteiro_dia_id] ??= []).push(p);
     return m;
   }, [passeiosOpcionais]);
+
+  // A aba do ExpedAmigo é 100% autoria de conteúdo — para perfis somente-leitura
+  // não faz sentido mostrar o editor. Mostramos um aviso e escondemos os controles.
+  if (somenteLeitura) {
+    return (
+      <div className="p-4">
+        <div>
+          <h2 className="text-base font-semibold">Portal do ExpedAmigo</h2>
+          <p className="text-xs text-muted-foreground">
+            O conteúdo que aparece para o passageiro em <span className="font-mono">/amigo</span>.
+          </p>
+        </div>
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-atencao-600/30 bg-atencao-50 px-4 py-3 text-[13px] text-atencao-700">
+          <Eye className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Modo leitura — a edição do conteúdo do ExpedAmigo fica disponível apenas para perfis
+            de edição (admin/operação).
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4">

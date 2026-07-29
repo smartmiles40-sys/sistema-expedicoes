@@ -11,11 +11,13 @@ import { toast } from "sonner";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { sincronizarCambios } from "./actions";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 interface Props { cambios: CambioRow[]; }
 
 export function CambiosTabela({ cambios }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [loading, setLoading] = React.useState(false);
 
   const realtimeStatus = useRealtimeRefresh({
@@ -51,10 +53,12 @@ export function CambiosTabela({ cambios }: Props) {
             Taxas em BRL — sincronizadas via open.er-api.com (cron de hora em hora)
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={sincronizar} disabled={loading}>
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-          {loading ? "Buscando..." : "Atualizar agora"}
-        </Button>
+        {!somenteLeitura && (
+          <Button variant="outline" size="sm" onClick={sincronizar} disabled={loading}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+            {loading ? "Buscando..." : "Atualizar agora"}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -72,13 +76,15 @@ export function CambiosTabela({ cambios }: Props) {
                 <span className="text-[10px] text-muted-foreground">
                   Atualizado {formatDateTime(c.atualizado_em)}
                 </span>
-                <button
-                  className="text-[11px] text-editavel-600 hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
-                  onClick={sincronizar}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} /> Atualizar
-                </button>
+                {!somenteLeitura && (
+                  <button
+                    className="text-[11px] text-editavel-600 hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
+                    onClick={sincronizar}
+                    disabled={loading}
+                  >
+                    <RefreshCw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} /> Atualizar
+                  </button>
+                )}
               </div>
             </CardContent>
           </Card>

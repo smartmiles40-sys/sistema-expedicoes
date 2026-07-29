@@ -3,6 +3,7 @@ import * as React from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 export interface SelectOption {
   value: string;
@@ -31,6 +32,7 @@ export function EditableSelectCell({
   renderValue,
   heading,
 }: Props) {
+  const somenteLeitura = useSomenteLeitura();
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [active, setActive] = React.useState(0);
@@ -80,6 +82,15 @@ export function EditableSelectCell({
     setSaving(false);
     setOpen(false);
     if (!r.ok) toast.error("Erro ao salvar", { description: r.error });
+  }
+
+  // Perfis somente-leitura: mostra o valor atual como texto, sem dropdown.
+  if (somenteLeitura) {
+    return (
+      <span className={cn("inline-flex items-center px-1 py-0.5", className)}>
+        {renderValue ? renderValue(current) : <span>{current?.label ?? value}</span>}
+      </span>
+    );
   }
 
   return (

@@ -19,6 +19,7 @@ import { reordenarExpedicoes } from "./actions";
 import { toast } from "sonner";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { LiveBadge } from "@/components/ui/LiveBadge";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 type PeriodoFiltro = "todos" | "30" | "60" | "90" | "ano";
 
@@ -37,6 +38,7 @@ interface Props {
 
 export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [statusSel, setStatusSel] = React.useState<Set<string>>(new Set());
   const [destinoSel, setDestinoSel] = React.useState<Set<string>>(new Set());
@@ -142,7 +144,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
       if (e.key === "/") {
         e.preventDefault();
         buscaRef.current?.focus();
-      } else if (e.key === "n" && !e.metaKey && !e.ctrlKey) {
+      } else if (e.key === "n" && !e.metaKey && !e.ctrlKey && !somenteLeitura) {
         e.preventDefault();
         setDrawerOpen(true);
       } else if (e.key === "ArrowDown") {
@@ -158,7 +160,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtradas, selecionada, router]);
+  }, [filtradas, selecionada, router, somenteLeitura]);
 
   function toggle<T>(set: Set<T>, value: T): Set<T> {
     const novo = new Set(set);
@@ -213,13 +215,15 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
               <List className="h-4 w-4" />
             </button>
           </div>
-          <Button variant="brand" onClick={() => setDrawerOpen(true)} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            Nova Expedição
-            <kbd className="ml-1 hidden sm:inline-flex h-4 items-center rounded border border-[var(--brand-dark)]/30 bg-[var(--brand-dark)]/10 px-1 text-[10px] font-mono">
-              n
-            </kbd>
-          </Button>
+          {!somenteLeitura && (
+            <Button variant="brand" onClick={() => setDrawerOpen(true)} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Nova Expedição
+              <kbd className="ml-1 hidden sm:inline-flex h-4 items-center rounded border border-[var(--brand-dark)]/30 bg-[var(--brand-dark)]/10 px-1 text-[10px] font-mono">
+                n
+              </kbd>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -386,7 +390,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
 
       {/* Tabela agrupada por ano */}
       {expedicoes.length === 0 ? (
-        <EmptyState onCreate={() => setDrawerOpen(true)} />
+        <EmptyState onCreate={somenteLeitura ? undefined : () => setDrawerOpen(true)} />
       ) : filtradas.length === 0 ? (
         <div className="text-xs text-muted-foreground py-10 text-center border border-dashed border-border rounded-lg">
           Nenhuma expedição com os filtros atuais.
@@ -433,7 +437,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
                           expedicao={e}
                           destaque={e.id === proximaId}
                           onOpen={() => router.push(`/expedicoes/${e.id}`)}
-                          onEdit={() => setEditandoId(e.id)}
+                          onEdit={somenteLeitura ? undefined : () => setEditandoId(e.id)}
                         />
                       ))}
                     </div>
@@ -447,8 +451,8 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
                           : -1
                       }
                       onRowClick={(e) => router.push(`/expedicoes/${e.id}`)}
-                      onEdit={(e) => setEditandoId(e.id)}
-                      onReorder={async (novaOrdemDoAno) => {
+                      onEdit={somenteLeitura ? undefined : (e) => setEditandoId(e.id)}
+                      onReorder={somenteLeitura ? undefined : async (novaOrdemDoAno) => {
                         const ordemGlobal = agrupadoPorAno.flatMap(([anoG, listaG]) =>
                           anoG === ano ? novaOrdemDoAno : listaG.map((x) => x.id),
                         );
@@ -483,14 +487,14 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState({ onCreate }: { onCreate?: () => void }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-muted/20">
       <EmptyStateUI
         icon={Compass}
         title="Nenhuma expedição ainda"
         description="Crie sua primeira viagem em grupo para começar a organizar passageiros, prazos, rooming e prontidão — tudo num lugar só."
-        actionLabel="Criar primeira expedição"
+        actionLabel={onCreate ? "Criar primeira expedição" : undefined}
         onAction={onCreate}
       />
     </div>

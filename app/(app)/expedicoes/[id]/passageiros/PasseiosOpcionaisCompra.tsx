@@ -2,9 +2,11 @@
 import * as React from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   listPasseiosOpcionaisDoPax, marcarCompraPasseioOpcional, type PasseioOpcionalPax,
 } from "./passeios-opcionais-actions";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 /**
  * Seção do perfil do passageiro para o operacional marcar MANUALMENTE quais passeios
@@ -17,6 +19,7 @@ export function PasseiosOpcionaisCompra({
   expedicaoId: string;
   passageiroId: string;
 }) {
+  const somenteLeitura = useSomenteLeitura();
   const [passeios, setPasseios] = React.useState<PasseioOpcionalPax[] | null>(null);
   const [salvando, setSalvando] = React.useState<string | null>(null);
 
@@ -57,9 +60,9 @@ export function PasseiosOpcionaisCompra({
             <input
               type="checkbox"
               checked={p.comprou}
-              disabled={salvando === p.id}
+              disabled={salvando === p.id || somenteLeitura}
               onChange={(e) => toggle(p, e.target.checked)}
-              className="h-4 w-4 rounded border-border"
+              className={cn("h-4 w-4 rounded border-border", somenteLeitura && "opacity-60")}
             />
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium">{p.titulo || "Passeio opcional"}</div>

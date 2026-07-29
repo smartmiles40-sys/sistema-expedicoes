@@ -21,7 +21,7 @@ export function ExpedicaoCard({
   expedicao: ExpedicaoComAgregados;
   destaque?: boolean;
   onOpen: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   const dias = daysUntil(e.data_embarque);
   const embarcou = dias != null && dias < 0;
@@ -98,16 +98,18 @@ export function ExpedicaoCard({
         </div>
       </button>
 
-      {/* editar (aparece no hover) */}
-      <button
-        type="button"
-        onClick={onEdit}
-        aria-label="Editar expedição"
-        title="Editar"
-        className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white/70 opacity-100 transition-all hover:bg-white/20 hover:text-white lg:opacity-0 lg:group-hover:opacity-100"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
+      {/* editar (aparece no hover) — some pra perfis somente-leitura */}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Editar expedição"
+          title="Editar"
+          className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white/70 opacity-100 transition-all hover:bg-white/20 hover:text-white lg:opacity-0 lg:group-hover:opacity-100"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "./Dialog";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 interface Props {
   onConfirm: () => Promise<{ ok: boolean; error?: string }>;
@@ -43,8 +44,12 @@ export function ConfirmDeleteButton({
   disabled,
 }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+
+  // Perfis somente-leitura não excluem nada — o botão simplesmente não aparece.
+  if (somenteLeitura) return null;
 
   async function handle() {
     setLoading(true);

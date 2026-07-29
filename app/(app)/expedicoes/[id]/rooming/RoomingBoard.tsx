@@ -37,6 +37,7 @@ import { DuplicarHotelDrawer } from "./DuplicarHotelDrawer";
 import { ConexaoViagemDrawer } from "./ConexaoViagemDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { grupoEgito, ehExpedicaoEgito, type GrupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 
 interface Props {
@@ -79,6 +80,7 @@ type Trecho = {
 
 export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [autoOpen, setAutoOpen] = React.useState(false);
   // Quando setado, o drawer de auto-criação abre com hotel/datas pré-preenchidos
@@ -542,12 +544,16 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
             >
               <Download className="h-3 w-3" /> Exportar Excel
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { setAutoPrefill(null); setAutoOpen(true); }}>
-              <Wand2 className="h-3 w-3" /> Criar quartos automáticos
-            </Button>
-            <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
-              <Plus className="h-3 w-3" /> Novo quarto
-            </Button>
+            {!somenteLeitura && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => { setAutoPrefill(null); setAutoOpen(true); }}>
+                  <Wand2 className="h-3 w-3" /> Criar quartos automáticos
+                </Button>
+                <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
+                  <Plus className="h-3 w-3" /> Novo quarto
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -603,9 +609,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
               <span className="font-semibold text-[13px]">Viajam juntas</span>
               <span className="text-[11px] text-muted-foreground">ficam no mesmo quarto</span>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setConexaoDrawer({ membros: [] })}>
-              <Link2 className="h-3 w-3" /> Nova conexão
-            </Button>
+            {!somenteLeitura && (
+              <Button variant="outline" size="sm" onClick={() => setConexaoDrawer({ membros: [] })}>
+                <Link2 className="h-3 w-3" /> Nova conexão
+              </Button>
+            )}
           </header>
           <div className="p-3">
             {conexoes.length === 0 ? (
@@ -621,13 +629,15 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                     <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.cor }} />
                     <span className="text-[12px] truncate flex-1">{c.membros.map((m) => m.nome_completo).join(" · ")}</span>
                     <Badge variant="auto">{c.membros.length}</Badge>
-                    <button
-                      type="button"
-                      onClick={() => setConexaoDrawer({ membros: c.membros.map((m) => m.id) })}
-                      className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted"
-                    >
-                      Editar
-                    </button>
+                    {!somenteLeitura && (
+                      <button
+                        type="button"
+                        onClick={() => setConexaoDrawer({ membros: c.membros.map((m) => m.id) })}
+                        className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted"
+                      >
+                        Editar
+                      </button>
+                    )}
                     <ConfirmDeleteButton
                       ariaLabel="Desfazer conexão"
                       triggerLabel="Desfazer"
@@ -664,9 +674,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                   ) : candidato ? (
                     <>
                       <span className="text-[11px] text-muted-foreground">→ {candidato.nome_completo}</span>
-                      <Button variant="outline" size="sm" onClick={() => vincularAcompanhante(pax.id, candidato.id)}>
-                        <Link2 className="h-3 w-3" /> Vincular
-                      </Button>
+                      {!somenteLeitura && (
+                        <Button variant="outline" size="sm" onClick={() => vincularAcompanhante(pax.id, candidato.id)}>
+                          <Link2 className="h-3 w-3" /> Vincular
+                        </Button>
+                      )}
                     </>
                   ) : varios ? (
                     <span className="text-[11px] text-atencao-600">vários possíveis — use &quot;Nova conexão&quot;</span>
@@ -685,8 +697,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
               icon={BedDouble}
               title="Monte o rooming por hotel"
               description="Crie os quartos (com hotel e datas de check-in/out) e depois arraste os passageiros para distribuí-los. O jeito rápido é gerar vários de uma vez."
-              actionLabel="Criar quartos automáticos"
-              onAction={() => { setAutoPrefill(null); setAutoOpen(true); }}
+              actionLabel={somenteLeitura ? undefined : "Criar quartos automáticos"}
+              onAction={somenteLeitura ? undefined : () => { setAutoPrefill(null); setAutoOpen(true); }}
             />
           </div>
         ) : (
@@ -753,22 +765,24 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                     <Badge variant={sem.length === 0 ? "vinculado" : "atencao"}>
                       {paxAtivos.length - sem.length}/{paxAtivos.length} alocados
                     </Badge>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAutoPrefill({
-                          hotel_cidade: t.hotel_cidade ?? "",
-                          check_in: t.check_in ?? "",
-                          check_out: t.check_out ?? "",
-                        });
-                        setAutoOpen(true);
-                      }}
-                      title="Adicionar quartos a este hotel (mesmas datas)"
-                      className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium hover:bg-accent"
-                    >
-                      <Plus className="h-3 w-3" /> Adicionar quarto
-                    </button>
-                    {t.quartos.length > 0 && (
+                    {!somenteLeitura && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAutoPrefill({
+                            hotel_cidade: t.hotel_cidade ?? "",
+                            check_in: t.check_in ?? "",
+                            check_out: t.check_out ?? "",
+                          });
+                          setAutoOpen(true);
+                        }}
+                        title="Adicionar quartos a este hotel (mesmas datas)"
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium hover:bg-accent"
+                      >
+                        <Plus className="h-3 w-3" /> Adicionar quarto
+                      </button>
+                    )}
+                    {!somenteLeitura && t.quartos.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setDuplicarOrigem({ quartoIds: t.quartos.map((q) => q.id), hotelOrigem: t.hotel_cidade })}
@@ -814,7 +828,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                           ) : (
                             <>
                               <Badge variant="critico">separados</Badge>
-                              {st.quartoAncora && (
+                              {st.quartoAncora && !somenteLeitura && (
                                 <button
                                   type="button"
                                   onClick={() => juntarConexao(c.membros, st.quartoAncora!)}
@@ -876,24 +890,28 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                               <Badge variant={cheio ? "vinculado" : ocupIds.length > 0 ? "atencao" : "auto"}>
                                 {ocupIds.length}/{cap}
                               </Badge>
-                              <button
-                                type="button"
-                                onClick={() => setEditandoId(q.id)}
-                                aria-label="Editar quarto"
-                                title="Editar"
-                                className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDuplicarOrigem({ quartoIds: [q.id], hotelOrigem: q.hotel_cidade })}
-                                aria-label="Duplicar quarto"
-                                title="Duplicar este quarto (com os mesmos pax) para outro hotel"
-                                className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
+                              {!somenteLeitura && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditandoId(q.id)}
+                                  aria-label="Editar quarto"
+                                  title="Editar"
+                                  className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {!somenteLeitura && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDuplicarOrigem({ quartoIds: [q.id], hotelOrigem: q.hotel_cidade })}
+                                  aria-label="Duplicar quarto"
+                                  title="Duplicar este quarto (com os mesmos pax) para outro hotel"
+                                  className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               <ConfirmDeleteButton
                                 ariaLabel="Excluir quarto"
                                 title={`Excluir quarto ${q.numero}?`}
@@ -980,20 +998,26 @@ function PaxCard({
   conexao?: { cor: string; companheiros: string };
   grupo?: GrupoEgito | null; // ⚠️ local/temporário (G1/G2 Egito) — null fora do Egito
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `${trechoKey}::${p.id}` });
+  const somenteLeitura = useSomenteLeitura();
+  // Perfis somente-leitura não arrastam pax entre quartos.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${trechoKey}::${p.id}`,
+    disabled: somenteLeitura,
+  });
   const style = transform ? { transform: CSS.Translate.toString(transform), zIndex: 50 } : undefined;
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
+      {...(somenteLeitura ? {} : listeners)}
+      {...(somenteLeitura ? {} : attributes)}
       className={cn(
-        "flex items-center gap-2 rounded-md border border-border bg-background p-2 cursor-grab active:cursor-grabbing touch-none select-none",
+        "flex items-center gap-2 rounded-md border border-border bg-background p-2 select-none",
+        somenteLeitura ? "cursor-default" : "cursor-grab active:cursor-grabbing touch-none",
         isDragging && "opacity-50 shadow-lg",
       )}
     >
-      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {!somenteLeitura && <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
       {conexao && (
         <span
           className="h-2.5 w-2.5 rounded-full shrink-0"

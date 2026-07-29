@@ -20,6 +20,7 @@ import { ETAPA_CHECKLIST, FASES_CHECKLIST, STATUS_CHECKLIST, faseAtualChecklist 
 import { NovoChecklistDrawer } from "./NovoChecklistDrawer";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import type {
   ChecklistItemRow,
   UsuarioRow,
@@ -72,6 +73,7 @@ interface Props {
 }
 
 export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: Props) {
+  const somenteLeitura = useSomenteLeitura();
   const [view, setView] = React.useState<"tabela" | "kanban" | "grafico">("tabela");
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const usuariosById = new Map(usuarios.map((u) => [u.id, u]));
@@ -151,9 +153,11 @@ export function ChecklistTabela({ expedicaoId, itens, usuarios, dataEmbarque }: 
               <LayoutGrid className="h-3 w-3" /> Kanban
             </button>
           </div>
-          <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
-            <Plus className="h-3 w-3" /> Nova tarefa
-          </Button>
+          {!somenteLeitura && (
+            <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
+              <Plus className="h-3 w-3" /> Nova tarefa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -198,6 +202,7 @@ function ChecklistVazio({
   drawerSlot: React.ReactNode;
 }) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [gerando, setGerando] = React.useState(false);
 
   async function gerar() {
@@ -222,14 +227,16 @@ function ChecklistVazio({
         Gere o checklist padrão com os <strong>23 processos operacionais</strong> da expedição, organizados nas 5 fases
         de antecedência. Os prazos são calculados automaticamente a partir da data de embarque.
       </p>
-      <div className="mt-4 flex items-center justify-center gap-2">
-        <Button size="sm" onClick={gerar} disabled={gerando}>
-          <Sparkles className="h-3 w-3" /> {gerando ? "Gerando..." : "Gerar checklist padrão"}
-        </Button>
-        <Button size="sm" variant="outline" onClick={onNova}>
-          <Plus className="h-3 w-3" /> Tarefa avulsa
-        </Button>
-      </div>
+      {!somenteLeitura && (
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Button size="sm" onClick={gerar} disabled={gerando}>
+            <Sparkles className="h-3 w-3" /> {gerando ? "Gerando..." : "Gerar checklist padrão"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={onNova}>
+            <Plus className="h-3 w-3" /> Tarefa avulsa
+          </Button>
+        </div>
+      )}
       {!temEmbarque && (
         <p className="mt-3 text-[11px] text-atencao-600">
           Defina a data de embarque da expedição para prazos precisos.
@@ -528,6 +535,7 @@ function ItemRow({
   salvarCampo: (id: string, campo: string, valor: unknown) => Promise<{ ok: boolean; error?: string }>;
   isSub?: boolean;
 }) {
+  const somenteLeitura = useSomenteLeitura();
   const dias = daysUntil(it.prazo);
   const isVencido = dias != null && dias < 0 && it.status !== "Concluído";
   const concluido = it.status === "Concluído";
@@ -552,10 +560,11 @@ function ItemRow({
           <input
             type="checkbox"
             checked={concluido}
+            disabled={somenteLeitura}
             onChange={(e) =>
               salvarCampo(it.id, "status", e.target.checked ? "Concluído" : "Pendente")
             }
-            className="h-3.5 w-3.5 accent-vinculado-600 cursor-pointer"
+            className={cn("h-3.5 w-3.5 accent-vinculado-600", somenteLeitura ? "cursor-default opacity-60" : "cursor-pointer")}
             aria-label="Concluir"
           />
         </div>

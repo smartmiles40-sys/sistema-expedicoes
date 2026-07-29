@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { EditableCell } from "@/components/tables/EditableCell";
 import type { GrupoExpedicaoRow } from "@/types/database";
 import { criarGrupo, atualizarGrupoCampo, deletarGrupo } from "./actions";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 interface Props {
   expedicaoId: string;
@@ -17,6 +18,7 @@ interface Props {
 
 export function GruposPageCliente({ expedicaoId, grupos }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const [criando, setCriando] = React.useState(false);
   const [novoNome, setNovoNome] = React.useState("");
 
@@ -61,19 +63,21 @@ export function GruposPageCliente({ expedicaoId, grupos }: Props) {
             Crie subgrupos (G1, G2, G3…) com datas próprias dentro desta expedição.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Nome do grupo (ex: G1)"
-            value={novoNome}
-            onChange={(e) => setNovoNome(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && adicionar()}
-            className="w-48"
-          />
-          <Button onClick={adicionar} disabled={criando} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            Adicionar
-          </Button>
-        </div>
+        {!somenteLeitura && (
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Nome do grupo (ex: G1)"
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && adicionar()}
+              className="w-48"
+            />
+            <Button onClick={adicionar} disabled={criando} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar
+            </Button>
+          </div>
+        )}
       </div>
 
       {grupos.length === 0 ? (
@@ -101,13 +105,15 @@ export function GruposPageCliente({ expedicaoId, grupos }: Props) {
                     }}
                     className="text-base font-semibold"
                   />
-                  <button
-                    onClick={() => remover(g)}
-                    className="text-muted-foreground hover:text-critico-600 p-1"
-                    title="Remover grupo"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {!somenteLeitura && (
+                    <button
+                      onClick={() => remover(g)}
+                      className="text-muted-foreground hover:text-critico-600 p-1"
+                      title="Remover grupo"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[12px]">

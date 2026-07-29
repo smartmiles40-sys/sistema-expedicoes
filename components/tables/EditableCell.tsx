@@ -2,6 +2,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 interface EditableCellProps {
   value: string | number | null;
@@ -18,6 +19,7 @@ export function EditableCell({
   placeholder = "—",
   className,
 }: EditableCellProps) {
+  const somenteLeitura = useSomenteLeitura();
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState<string>(value == null ? "" : String(value));
   const [saving, setSaving] = React.useState(false);
@@ -68,6 +70,21 @@ export function EditableCell({
   function cancel() {
     setDraft(value == null ? "" : String(value));
     setEditing(false);
+  }
+
+  // Perfis somente-leitura veem o valor como texto puro (sem edição inline).
+  if (somenteLeitura) {
+    return (
+      <span
+        className={cn(
+          "block w-full text-left px-1.5 py-0.5 min-h-[24px] tabular-nums",
+          value == null && "text-muted-foreground italic",
+          className,
+        )}
+      >
+        {value == null || value === "" ? placeholder : String(value)}
+      </span>
+    );
   }
 
   if (editing) {

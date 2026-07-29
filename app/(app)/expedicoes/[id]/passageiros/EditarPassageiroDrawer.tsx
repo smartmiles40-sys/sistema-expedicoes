@@ -38,6 +38,7 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
 import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
 import { ExpedamigoPainel } from "./ExpedamigoPainel";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { PasseiosOpcionaisCompra } from "./PasseiosOpcionaisCompra";
 import type { ArquivoRow, PassageiroRow, Tables, SaudePassageiro } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
@@ -87,6 +88,7 @@ interface Props {
 
 export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, dataEmbarque, dataRetorno, prontidao, usuarios, posicaoFidelidade, onOpenChange }: Props) {
   const router = useRouter();
+  const somenteLeitura = useSomenteLeitura();
   const open = passageiro !== null;
   const [tab, setTab] = React.useState<"passageiro" | "prontidao" | "saude">("passageiro");
 
@@ -465,9 +467,11 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
-          <Button type="submit" form="edit-passageiro-form" disabled={isSubmitting || !isDirty}>
-            {isSubmitting ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          {!somenteLeitura && (
+            <Button type="submit" form="edit-passageiro-form" disabled={isSubmitting || !isDirty}>
+              {isSubmitting ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          )}
         </DrawerFooter>
       </DrawerContent>
     </Drawer>

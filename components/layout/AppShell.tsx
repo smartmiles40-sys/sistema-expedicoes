@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { PointerEventsGuard } from "./PointerEventsGuard";
+import { PermissoesProvider } from "./PermissoesContext";
 import type { CurrentUser } from "@/lib/supabase/auth";
 
 export function AppShell({
@@ -21,6 +22,8 @@ export function AppShell({
   // Perfis somente-leitura (relacionamento / leitura): mostram uma faixa e o servidor
   // bloqueia qualquer edição (RLS + guardas). Relacionamento ainda aprova/recusa inscrições.
   const somenteLeitura = user?.papel === "relacionamento" || user?.papel === "leitura";
+  // Editores E relacionamento podem decidir inscrições (aprovar/recusar); leitura não.
+  const podeDecidirInscricao = !somenteLeitura || user?.papel === "relacionamento";
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -46,7 +49,11 @@ export function AppShell({
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="relative min-h-full">
             <div className="incan-pattern pointer-events-none absolute inset-0 opacity-[0.35]" aria-hidden />
-            <div className="relative z-10">{children}</div>
+            <div className="relative z-10">
+              <PermissoesProvider somenteLeitura={somenteLeitura} podeDecidirInscricao={podeDecidirInscricao}>
+                {children}
+              </PermissoesProvider>
+            </div>
           </div>
         </main>
       </div>

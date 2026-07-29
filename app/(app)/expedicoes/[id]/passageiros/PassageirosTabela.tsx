@@ -27,6 +27,7 @@ import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 import { sincronizarExpedicaoBitrix } from "./bitrix-sync-actions";
+import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -51,6 +52,7 @@ interface Props {
 }
 
 export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade }: Props) {
+  const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
@@ -317,27 +319,33 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         </div>
         <div className="flex items-center gap-2">
           <LiveBadge status={realtimeStatus} />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={sincronizarBitrix}
-            disabled={sincronizando}
-            title="Puxa/atualiza os passageiros desta expedição a partir do Bitrix"
-          >
-            <RefreshCw className={cn("h-3 w-3", sincronizando && "animate-spin")} /> {sincronizando ? "Sincronizando…" : "Atualizar do Bitrix"}
-          </Button>
+          {!somenteLeitura && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={sincronizarBitrix}
+              disabled={sincronizando}
+              title="Puxa/atualiza os passageiros desta expedição a partir do Bitrix"
+            >
+              <RefreshCw className={cn("h-3 w-3", sincronizando && "animate-spin")} /> {sincronizando ? "Sincronizando…" : "Atualizar do Bitrix"}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={exportarCSV}>
             <Download className="h-3 w-3" /> Exportar
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-            <Upload className="h-3 w-3" /> Importar
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setExistenteOpen(true)}>
-            <UserPlus className="h-3 w-3" /> Adicionar existente
-          </Button>
-          <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
-            <Plus className="h-3 w-3" /> Adicionar
-          </Button>
+          {!somenteLeitura && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                <Upload className="h-3 w-3" /> Importar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setExistenteOpen(true)}>
+                <UserPlus className="h-3 w-3" /> Adicionar existente
+              </Button>
+              <Button variant="brand" size="sm" onClick={() => setDrawerOpen(true)}>
+                <Plus className="h-3 w-3" /> Adicionar
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -360,8 +368,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             icon={Users}
             title="Nenhum passageiro ainda"
             description="Adicione manualmente, importe de uma planilha (CSV) ou puxe alguém que já está na base da agência."
-            actionLabel="Adicionar passageiro"
-            onAction={() => setDrawerOpen(true)}
+            actionLabel={somenteLeitura ? undefined : "Adicionar passageiro"}
+            onAction={somenteLeitura ? undefined : () => setDrawerOpen(true)}
           />
         </div>
       ) : (
