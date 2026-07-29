@@ -5,6 +5,7 @@ import {
   mockPassageiros, mockExpedicoes, mockLinksExpedicao, mockQuartos, mockAlocacoes,
   mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
   mockRoteiroDiaFotos, mockExpedicaoAvisos, mockExpedamigoAcessos,
+  mockPasseiosOpcionais, mockPasseioOpcionalCompras,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
@@ -13,7 +14,7 @@ import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
-  RoteiroDiaFotoRow, ExpedicaoAvisoRow,
+  RoteiroDiaFotoRow, ExpedicaoAvisoRow, PasseioOpcionalRow, PasseioOpcionalCompraRow,
 } from "@/types/database";
 
 /** Arquivo de ingresso (Bilhetes) do passageiro — só os campos que o portal usa. */
@@ -41,6 +42,15 @@ export type AmigoQuarto = {
   check_out: string | null;
 };
 export type AmigoFoto = { url: string; legenda: string | null };
+/** Passeio opcional oferecido num dia livre (migration 0044). */
+export type AmigoPasseioOpcional = {
+  titulo: string | null;
+  descricao: string | null;
+  foto_url: string | null;
+  whatsapp_url: string | null;
+  /** Este passageiro já comprou? (marcado manualmente pelo operacional) */
+  comprou: boolean;
+};
 export type AmigoRoteiroDia = {
   id: string;
   dia: number;
@@ -51,6 +61,7 @@ export type AmigoRoteiroDia = {
   refeicoes: string | null;
   hospedagem: string | null;
   fotos: AmigoFoto[];
+  passeios_opcionais: AmigoPasseioOpcional[];
 };
 export type AmigoAviso = { tipo: string; titulo: string; conteudo: string };
 export type AmigoVooGrupo = {
@@ -136,6 +147,8 @@ export async function entrarExpedAmigo(
   let infos: ExpedicaoInfoRow[];
   let avisosAll: ExpedicaoAvisoRow[];
   let rtFotos: RoteiroDiaFotoRow[];
+  let passeiosOpc: PasseioOpcionalRow[];
+  let comprasOpc: PasseioOpcionalCompraRow[];
 
   const sb = DEV_USE_MOCK_DATA ? null : createServiceRoleClient();
 
@@ -151,9 +164,11 @@ export async function entrarExpedAmigo(
     infos = mockExpedicaoInfo;
     avisosAll = mockExpedicaoAvisos;
     rtFotos = mockRoteiroDiaFotos;
+    passeiosOpc = mockPasseiosOpcionais;
+    comprasOpc = mockPasseioOpcionalCompras;
   } else {
     const cli = sb!;
-    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll] = await Promise.all([
+    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll, poAll, pocAll] = await Promise.all([
       fetchAllRows<PassageiroRow>((from, to) => cli.from("passageiros").select("*").order("id").range(from, to)),
       cli.from("expedicoes").select("*"),
       fetchAllRows<LinkExpedicaoRow>((from, to) => cli.from("links_expedicao").select("*").order("id").range(from, to)),
@@ -165,6 +180,8 @@ export async function entrarExpedAmigo(
       fetchAllRows<ExpedicaoInfoRow>((from, to) => cli.from("expedicao_info").select("*").order("id").range(from, to)),
       fetchAllRows<ExpedicaoAvisoRow>((from, to) => cli.from("expedicao_avisos").select("*").order("id").range(from, to)),
       fetchAllRows<RoteiroDiaFotoRow>((from, to) => cli.from("roteiro_dia_fotos").select("*").order("id").range(from, to)),
+      fetchAllRows<PasseioOpcionalRow>((from, to) => cli.from("passeios_opcionais").select("*").order("id").range(from, to)),
+      fetchAllRows<PasseioOpcionalCompraRow>((from, to) => cli.from("passeio_opcional_compras").select("*").order("id").range(from, to)),
     ]);
     pax = paxAll;
     exps = (er.data ?? []) as ExpedicaoRow[];
@@ -177,6 +194,8 @@ export async function entrarExpedAmigo(
     infos = inAll;
     avisosAll = avAll;
     rtFotos = ftAll;
+    passeiosOpc = poAll;
+    comprasOpc = pocAll;
   }
 
   // 1) Acha as linhas da pessoa pelo CPF. Admin não precisa ser passageiro.
@@ -274,6 +293,7 @@ export async function entrarExpedAmigo(
       if (i.arquivo_id_2 && expIdsFuturas.has(i.expedicao_id)) idsRelevantes.add(i.arquivo_id_2);
     }
     for (const e of exps) if (e.hospedagem_voucher_arquivo_id && expIdsFuturas.has(e.id)) idsRelevantes.add(e.hospedagem_voucher_arquivo_id);
+    for (const p of passeiosOpc) if (p.foto_arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.foto_arquivo_id);
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
 
     if (DEV_USE_MOCK_DATA) {
@@ -295,6 +315,10 @@ export async function entrarExpedAmigo(
 
   const expedicoes: AmigoExpedicao[] = [];
   for (const { exp: e, row } of unidades) {
+    // Passeios opcionais comprados por ESTE passageiro (row null = admin → nada comprado).
+    const meusComprados = new Set(
+      row ? comprasOpc.filter((c) => c.passageiro_id === row.id).map((c) => c.passeio_opcional_id) : [],
+    );
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)
@@ -338,6 +362,16 @@ export async function entrarExpedAmigo(
             .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
             .map((f) => ({ url: fotoUrl.get(f.arquivo_id) ?? "", legenda: f.legenda }))
             .filter((x) => x.url),
+          passeios_opcionais: passeiosOpc
+            .filter((p) => p.roteiro_dia_id === r.id)
+            .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+            .map((p) => ({
+              titulo: p.titulo,
+              descricao: p.descricao,
+              foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
+              whatsapp_url: p.whatsapp_url,
+              comprou: meusComprados.has(p.id),
+            })),
         })),
       voos_grupo: voosGrupo
         .filter((v) => v.expedicao_id === e.id)

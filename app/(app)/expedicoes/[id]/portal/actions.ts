@@ -4,7 +4,7 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import {
   mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
-  mockExpedicaoAvisos, mockRoteiroDiaFotos,
+  mockExpedicaoAvisos, mockRoteiroDiaFotos, mockPasseiosOpcionais,
 } from "@/lib/mock-data";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { removeArquivoMock } from "@/lib/data/arquivos-mock";
@@ -13,7 +13,7 @@ import { removeArquivoMock } from "@/lib/data/arquivos-mock";
  * CRUD genérico das tabelas de conteúdo do Portal do ExpedAmigo (migrations 0021/0022).
  * O cliente passa o nome da tabela; validamos contra uma allowlist.
  */
-const TABELAS = ["roteiro_dias", "expedicao_voos", "expedicao_passeios", "expedicao_info", "expedicao_avisos"] as const;
+const TABELAS = ["roteiro_dias", "expedicao_voos", "expedicao_passeios", "expedicao_info", "expedicao_avisos", "passeios_opcionais"] as const;
 export type TabelaPortal = (typeof TABELAS)[number];
 
 type Valores = Record<string, string | number | boolean | null>;
@@ -25,6 +25,7 @@ const MOCKS: Record<TabelaPortal, MockRow[]> = {
   expedicao_passeios: mockExpedicaoPasseios as unknown as MockRow[],
   expedicao_info: mockExpedicaoInfo as unknown as MockRow[],
   expedicao_avisos: mockExpedicaoAvisos as unknown as MockRow[],
+  passeios_opcionais: mockPasseiosOpcionais as unknown as MockRow[],
 };
 
 const BUCKET = "arquivos-expedicoes";
@@ -170,6 +171,33 @@ export async function excluirFotoRoteiro(
   const sp = (arq as { storage_path: string } | null)?.storage_path;
   if (sp) await sb.storage.from(BUCKET).remove([sp]);
   await sb.from("arquivos").delete().eq("id", arquivoId);
+  revalidatePath(`/expedicoes/${expedicaoId}/portal`);
+  return { ok: true };
+}
+
+// ===== Passeios opcionais: excluir limpando a foto anexada (migration 0044) =====
+
+export async function excluirPasseioOpcional(
+  id: string,
+  fotoArquivoId: string | null,
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const idx = mockPasseiosOpcionais.findIndex((p) => p.id === id);
+    if (idx !== -1) mockPasseiosOpcionais.splice(idx, 1);
+    if (fotoArquivoId) await removeArquivoMock(fotoArquivoId);
+    revalidatePath(`/expedicoes/${expedicaoId}/portal`);
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  await sb.from("passeios_opcionais").delete().eq("id", id);
+  // Limpa o blob da foto (best-effort).
+  if (fotoArquivoId) {
+    const { data: arq } = await sb.from("arquivos").select("storage_path").eq("id", fotoArquivoId).maybeSingle();
+    const sp = (arq as { storage_path: string } | null)?.storage_path;
+    if (sp) await sb.storage.from(BUCKET).remove([sp]);
+    await sb.from("arquivos").delete().eq("id", fotoArquivoId);
+  }
   revalidatePath(`/expedicoes/${expedicaoId}/portal`);
   return { ok: true };
 }

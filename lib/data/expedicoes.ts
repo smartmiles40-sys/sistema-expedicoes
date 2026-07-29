@@ -20,6 +20,7 @@ import {
   mockExpedicaoInfo,
   mockRoteiroDiaFotos,
   mockExpedicaoAvisos,
+  mockPasseiosOpcionais,
   mockPassageiroRequisitos,
   getExpedicoesComAgregados,
 } from "@/lib/mock-data";
@@ -46,6 +47,7 @@ import type {
   ExpedicaoInfoRow,
   RoteiroDiaFotoRow,
   ExpedicaoAvisoRow,
+  PasseioOpcionalRow,
   RoteiroLiderDiaRow,
   EtapaChecklist,
   Prontidao,
@@ -322,6 +324,9 @@ export const listInfoDestino = (expedicaoId: string) =>
   listPortal<ExpedicaoInfoRow>("expedicao_info", expedicaoId, mockExpedicaoInfo);
 export const listAvisos = (expedicaoId: string) =>
   listPortal<ExpedicaoAvisoRow>("expedicao_avisos", expedicaoId, mockExpedicaoAvisos);
+/** Passeios opcionais dos dias livres (migration 0044). */
+export const listPasseiosOpcionais = (expedicaoId: string) =>
+  listPortal<PasseioOpcionalRow>("passeios_opcionais", expedicaoId, mockPasseiosOpcionais);
 /** Roteiro operacional do líder (migration 0029). Sem mock — lê direto do banco. */
 export const listRoteiroLider = (expedicaoId: string) =>
   listPortal<RoteiroLiderDiaRow>("roteiro_lider_dias", expedicaoId, []);

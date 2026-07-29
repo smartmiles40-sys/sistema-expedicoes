@@ -1,5 +1,6 @@
 import {
   listRoteiro, listVoosExpedicao, listPasseios, listInfoDestino, listAvisos, listRoteiroFotos,
+  listPasseiosOpcionais,
 } from "@/lib/data/expedicoes";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
@@ -11,13 +12,14 @@ export default async function PortalPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [roteiro, voos, passeios, info, avisos, fotos] = await Promise.all([
+  const [roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais] = await Promise.all([
     listRoteiro(id),
     listVoosExpedicao(id),
     listPasseios(id),
     listInfoDestino(id),
     listAvisos(id),
     listRoteiroFotos(id),
+    listPasseiosOpcionais(id),
   ]);
 
   // Voucher único da hospedagem (coluna em expedicoes, migration 0030).
@@ -42,6 +44,7 @@ export default async function PortalPage({
       info={info}
       avisos={avisos}
       fotos={fotos}
+      passeiosOpcionais={passeiosOpcionais}
       hospedagemVoucherArquivoId={hospedagemVoucherArquivoId}
     />
   );

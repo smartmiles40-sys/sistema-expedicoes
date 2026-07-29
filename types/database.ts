@@ -509,6 +509,30 @@ export type ExpedicaoAvisoRow = {
   updated_at: string;
 };
 
+// ===== Passeios opcionais dos dias livres (migration 0044) =====
+export type PasseioOpcionalRow = {
+  id: string;
+  expedicao_id: string;
+  roteiro_dia_id: string;
+  titulo: string | null;
+  descricao: string | null;
+  /** Foto do passeio (arquivos.id). */
+  foto_arquivo_id: string | null;
+  /** Link "Falar no WhatsApp". */
+  whatsapp_url: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Compra de um passeio opcional por um passageiro — presença = comprou. */
+export type PasseioOpcionalCompraRow = {
+  id: string;
+  passageiro_id: string;
+  passeio_opcional_id: string;
+  created_at: string;
+};
+
 // ===== Roteiro do Líder (resumo operacional dia a dia, migration 0029) =====
 export type RoteiroLiderDiaRow = {
   id: string;
@@ -619,6 +643,8 @@ export type Database = {
       expedicao_info: { Row: ExpedicaoInfoRow; Insert: Partial<ExpedicaoInfoRow> & Pick<ExpedicaoInfoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoInfoRow> };
       roteiro_dia_fotos: { Row: RoteiroDiaFotoRow; Insert: Partial<RoteiroDiaFotoRow> & Pick<RoteiroDiaFotoRow, "expedicao_id" | "roteiro_dia_id" | "arquivo_id">; Update: Partial<RoteiroDiaFotoRow> };
       expedicao_avisos: { Row: ExpedicaoAvisoRow; Insert: Partial<ExpedicaoAvisoRow> & Pick<ExpedicaoAvisoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoAvisoRow> };
+      passeios_opcionais: { Row: PasseioOpcionalRow; Insert: Partial<PasseioOpcionalRow> & Pick<PasseioOpcionalRow, "expedicao_id" | "roteiro_dia_id">; Update: Partial<PasseioOpcionalRow> };
+      passeio_opcional_compras: { Row: PasseioOpcionalCompraRow; Insert: Partial<PasseioOpcionalCompraRow> & Pick<PasseioOpcionalCompraRow, "passageiro_id" | "passeio_opcional_id">; Update: Partial<PasseioOpcionalCompraRow> };
       roteiro_lider_dias: { Row: RoteiroLiderDiaRow; Insert: Partial<RoteiroLiderDiaRow> & Pick<RoteiroLiderDiaRow, "expedicao_id">; Update: Partial<RoteiroLiderDiaRow> };
       acesso_senhas: { Row: AcessoSenhaRow; Insert: Partial<AcessoSenhaRow> & Pick<AcessoSenhaRow, "cpf" | "senha_hash">; Update: Partial<AcessoSenhaRow> };
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };

@@ -387,13 +387,17 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
         {exp.roteiro.length > 0 && (
           <View style={styles.secao}>
             <SecaoTitulo hint="Uma visão geral dia a dia. O detalhe completo vem logo abaixo.">Roteiro resumido</SecaoTitulo>
-            {exp.roteiro.map((d, i) => (
-              <View key={i} style={styles.resumoDia} wrap={false}>
-                <Text style={styles.resumoDiaNum}>Dia {d.dia}</Text>
-                <Text style={styles.resumoDiaTit}>{d.titulo || "—"}</Text>
-                <Text style={styles.resumoDiaMeta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
-              </View>
-            ))}
+            {exp.roteiro.map((d, i) => {
+              const principal = (d.passeios_opcionais ?? []).find((p) => p.comprou) ?? null;
+              const titulo = principal ? principal.titulo || "Passeio contratado" : d.titulo;
+              return (
+                <View key={i} style={styles.resumoDia} wrap={false}>
+                  <Text style={styles.resumoDiaNum}>Dia {d.dia}</Text>
+                  <Text style={styles.resumoDiaTit}>{titulo || "—"}</Text>
+                  <Text style={styles.resumoDiaMeta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join(" · ")}</Text>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -402,9 +406,18 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           <View style={styles.secao} break>
             <SecaoTitulo>Roteiro dia a dia (previsto)</SecaoTitulo>
             {exp.roteiro.map((d, i) => {
-              const dbImg = d.fotos.map((f) => fotos.get(f.url)).find((x): x is string => !!x);
+              // Se a pessoa contratou um passeio opcional no dia, ELE assume o dia:
+              // foto, título e descrição viram os do passeio (nada do programa original).
+              const principal = (d.passeios_opcionais ?? []).find((p) => p.comprou) ?? null;
+              const titulo = principal ? principal.titulo || "Passeio contratado" : d.titulo;
+              const descricao = principal ? principal.descricao : d.descricao;
+              const dbImg = principal
+                ? principal.foto_url
+                  ? fotos.get(principal.foto_url) ?? null
+                  : null
+                : d.fotos.map((f) => fotos.get(f.url)).find((x): x is string => !!x);
               const img = dbImg ?? pega(diaImgFallback(exp.destino, d.dia));
-              const temTexto = Boolean(d.descricao || d.refeicoes || d.hospedagem);
+              const temConteudo = Boolean(principal || descricao || d.refeicoes || d.hospedagem);
               return (
                 <View key={i} style={styles.diaCard} wrap={false}>
                   <View style={styles.diaBanner}>
@@ -416,13 +429,14 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
                         <View style={styles.diaChipLime}><Text style={styles.diaChipLimeTxt}>DIA {d.dia}</Text></View>
                         <Text style={styles.diaBannerMeta}>{[d.data ? formatDate(d.data) : null, d.cidade].filter(Boolean).join("   ·   ")}</Text>
                       </View>
-                      {d.titulo ? <Text style={styles.diaTituloBanner}>{d.titulo}</Text> : null}
+                      {titulo ? <Text style={styles.diaTituloBanner}>{titulo}</Text> : null}
                     </View>
                   </View>
-                  {temTexto && (
+                  {temConteudo && (
                     <View style={styles.diaContent}>
-                      {d.descricao ? <Text style={styles.texto}>{d.descricao}</Text> : null}
-                      {(d.refeicoes || d.hospedagem) ? (
+                      {principal ? <Text style={styles.voucherChip}>✓ Você adquiriu</Text> : null}
+                      {descricao ? <Text style={styles.texto}>{descricao}</Text> : null}
+                      {!principal && (d.refeicoes || d.hospedagem) ? (
                         <View style={styles.tags}>
                           {d.refeicoes ? <Text style={styles.tag}>Refeições: {d.refeicoes}</Text> : null}
                           {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
@@ -634,6 +648,10 @@ export async function gerarPdfViagem(exp: AmigoExpedicao, nome: string): Promise
   // e re-encoda cada uma num JPEG limpo — assim nenhuma "some" no @react-pdf.
   const alvos = new Set<string>();
   exp.roteiro.forEach((d) => d.fotos.forEach((f) => alvos.add(f.url)));
+  // Foto do passeio opcional CONTRATADO (ele assume o dia no PDF).
+  exp.roteiro.forEach((d) =>
+    (d.passeios_opcionais ?? []).forEach((p) => { if (p.comprou && p.foto_url) alvos.add(p.foto_url); }),
+  );
   const cover = heroDoDestino(exp.destino);
   const fecho = fechoDoDestino(exp.destino);
   if (cover) alvos.add(cover);

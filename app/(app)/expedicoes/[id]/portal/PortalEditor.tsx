@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2 } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -14,10 +14,11 @@ import { cn, formatDate } from "@/lib/utils";
 import {
   criarItemPortal, atualizarItemPortal, excluirItemPortal,
   adicionarFotoRoteiro, excluirFotoRoteiro, definirVoucherHospedagem,
+  excluirPasseioOpcional,
 } from "./actions";
 import type {
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
-  ExpedicaoAvisoRow, RoteiroDiaFotoRow,
+  ExpedicaoAvisoRow, RoteiroDiaFotoRow, PasseioOpcionalRow,
 } from "@/types/database";
 
 type Valor = string | number | boolean | null;
@@ -33,7 +34,7 @@ type Campo = {
 };
 
 export function PortalEditor({
-  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, hospedagemVoucherArquivoId,
+  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, hospedagemVoucherArquivoId,
 }: {
   expedicaoId: string;
   roteiro: RoteiroDiaRow[];
@@ -42,6 +43,7 @@ export function PortalEditor({
   info: ExpedicaoInfoRow[];
   avisos: ExpedicaoAvisoRow[];
   fotos: RoteiroDiaFotoRow[];
+  passeiosOpcionais: PasseioOpcionalRow[];
   hospedagemVoucherArquivoId: string | null;
 }) {
   const fotosPorDia = React.useMemo(() => {
@@ -49,6 +51,11 @@ export function PortalEditor({
     for (const f of fotos) (m[f.roteiro_dia_id] ??= []).push(f);
     return m;
   }, [fotos]);
+  const passeiosOpcPorDia = React.useMemo(() => {
+    const m: Record<string, PasseioOpcionalRow[]> = {};
+    for (const p of passeiosOpcionais) (m[p.roteiro_dia_id] ??= []).push(p);
+    return m;
+  }, [passeiosOpcionais]);
 
   return (
     <div className="space-y-6 p-4">
@@ -61,7 +68,7 @@ export function PortalEditor({
 
       <VoucherHospedagem expedicaoId={expedicaoId} arquivoId={hospedagemVoucherArquivoId} />
 
-      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} />
+      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} />
 
       <Secao
         tabela="expedicao_voos"
@@ -505,13 +512,162 @@ function FotosRoteiro({
   );
 }
 
+/** Passeios opcionais oferecidos num dia livre (até 3). Autoria: foto + descritivo + WhatsApp. */
+function PasseiosOpcionaisDia({
+  expedicaoId, roteiroDiaId, passeios,
+}: {
+  expedicaoId: string;
+  roteiroDiaId: string;
+  passeios: PasseioOpcionalRow[];
+}) {
+  const router = useRouter();
+  const [addBusy, setAddBusy] = React.useState(false);
+
+  async function adicionar() {
+    setAddBusy(true);
+    const r = await criarItemPortal("passeios_opcionais", expedicaoId, {
+      roteiro_dia_id: roteiroDiaId, titulo: null, descricao: null, foto_arquivo_id: null, whatsapp_url: null,
+    });
+    setAddBusy(false);
+    if (r.ok) router.refresh();
+    else toast.error("Erro ao adicionar", { description: r.error });
+  }
+
+  const cheio = passeios.length >= 3;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold">
+          <Sparkles className="h-3.5 w-3.5 text-lista-600" /> Passeios opcionais deste dia
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={adicionar} disabled={addBusy || cheio}>
+          <Plus className="h-3 w-3" /> {cheio ? "Máx. 3" : addBusy ? "Adicionando…" : "Adicionar passeio"}
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Ofertas para o dia livre. Aparecem no portal do passageiro; quando ele compra, você marca no perfil dele e o passeio entra “confirmado” no lugar do dia livre.
+      </p>
+      {passeios.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">Nenhum passeio opcional neste dia.</p>
+      ) : (
+        <div className="space-y-2">
+          {passeios.map((p) => (
+            <PasseioOpcionalCard key={p.id} expedicaoId={expedicaoId} passeio={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Cartão de edição inline de UM passeio opcional (salva ao sair do campo). */
+function PasseioOpcionalCard({ expedicaoId, passeio }: { expedicaoId: string; passeio: PasseioOpcionalRow }) {
+  const router = useRouter();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [enviando, setEnviando] = React.useState(false);
+  const [v, setV] = React.useState(() => ({
+    titulo: passeio.titulo ?? "",
+    descricao: passeio.descricao ?? "",
+    whatsapp_url: passeio.whatsapp_url ?? "",
+  }));
+  const salvoRef = React.useRef({ ...v });
+
+  async function salvar(k: keyof typeof v) {
+    if (v[k] === salvoRef.current[k]) return;
+    const r = await atualizarItemPortal("passeios_opcionais", passeio.id, expedicaoId, {
+      [k]: v[k].trim() === "" ? null : v[k].trim(),
+    });
+    if (r.ok) salvoRef.current = { ...salvoRef.current, [k]: v[k] };
+    else toast.error("Erro ao salvar", { description: r.error });
+  }
+
+  async function enviarFoto(file: File | null) {
+    if (!file) return;
+    setEnviando(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("expedicao_id", expedicaoId);
+      fd.append("categoria", "Outros");
+      fd.append("descricao", "Foto passeio opcional");
+      const res = await fetch("/api/arquivos/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!json.ok) { toast.error("Falha no upload", { description: json.error }); return; }
+      const r = await atualizarItemPortal("passeios_opcionais", passeio.id, expedicaoId, { foto_arquivo_id: json.id });
+      if (!r.ok) { toast.error("Falha ao salvar foto", { description: r.error }); return; }
+      toast.success("Foto anexada");
+      router.refresh();
+    } finally {
+      setEnviando(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function removerFoto() {
+    if (!passeio.foto_arquivo_id) return;
+    const r = await atualizarItemPortal("passeios_opcionais", passeio.id, expedicaoId, { foto_arquivo_id: null });
+    if (!r.ok) { toast.error("Falha ao remover", { description: r.error }); return; }
+    await fetch(`/api/arquivos/${passeio.foto_arquivo_id}`, { method: "DELETE" }).catch(() => {});
+    toast.success("Foto removida");
+    router.refresh();
+  }
+
+  async function excluir() {
+    const r = await excluirPasseioOpcional(passeio.id, passeio.foto_arquivo_id, expedicaoId);
+    if (r.ok) { toast.success("Passeio removido"); router.refresh(); }
+    else toast.error("Erro ao remover", { description: r.error });
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-lista-600/30 bg-lista-50/40 p-2.5">
+      <div className="flex items-start gap-2.5">
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+          {passeio.foto_arquivo_id ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/arquivos/${passeio.foto_arquivo_id}/download?inline=1`} alt="Foto do passeio" className="h-full w-full object-cover" />
+              <button type="button" onClick={removerFoto} aria-label="Remover foto" className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white">
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={enviando} className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground hover:bg-muted">
+              <ImageIcon className="h-4 w-4" />{enviando ? "…" : "Foto"}
+            </button>
+          )}
+          <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => enviarFoto(e.target.files?.[0] ?? null)} />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Input value={v.titulo} onChange={(e) => setV((s) => ({ ...s, titulo: e.target.value }))} onBlur={() => salvar("titulo")} placeholder="Título (ex.: Balonismo na Capadócia)" />
+          <textarea
+            value={v.descricao}
+            onChange={(e) => setV((s) => ({ ...s, descricao: e.target.value }))}
+            onBlur={() => salvar("descricao")}
+            rows={2}
+            placeholder="Descritivo do passeio"
+            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+          />
+        </div>
+        <button type="button" onClick={excluir} aria-label="Excluir passeio" title="Excluir passeio" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-critico-50 hover:text-critico-600">
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <MessageCircle className="h-3.5 w-3.5 shrink-0 text-vinculado-600" />
+        <Input value={v.whatsapp_url} onChange={(e) => setV((s) => ({ ...s, whatsapp_url: e.target.value }))} onBlur={() => salvar("whatsapp_url")} placeholder="Link do WhatsApp (https://wa.me/55…)" />
+      </div>
+    </div>
+  );
+}
+
 /** Editor INLINE do roteiro dia a dia — edita direto na tela, salva ao sair do campo. */
 function RoteiroInline({
-  expedicaoId, dias, fotosPorDia,
+  expedicaoId, dias, fotosPorDia, passeiosOpcPorDia,
 }: {
   expedicaoId: string;
   dias: RoteiroDiaRow[];
   fotosPorDia: Record<string, RoteiroDiaFotoRow[]>;
+  passeiosOpcPorDia: Record<string, PasseioOpcionalRow[]>;
 }) {
   const router = useRouter();
   const [addBusy, setAddBusy] = React.useState(false);
@@ -526,9 +682,14 @@ function RoteiroInline({
     const ultimaData = dias.map((d) => d.data).filter(Boolean).sort().pop() ?? null;
     let proxData: string | null = base?.data ?? null;
     if (!base && ultimaData) {
-      const dt = new Date(`${ultimaData}T00:00:00`);
-      dt.setDate(dt.getDate() + 1);
-      proxData = dt.toISOString().slice(0, 10);
+      // `data` pode vir como "AAAA-MM-DD" (Supabase) ou ISO completo com hora (mock);
+      // normaliza pra AAAA-MM-DD antes de somar 1 dia. Sem isso, ISO+T00:00:00 vira
+      // Invalid Date e `toISOString()` estoura (RangeError: Invalid time value).
+      const dt = new Date(`${String(ultimaData).slice(0, 10)}T00:00:00`);
+      if (!Number.isNaN(dt.getTime())) {
+        dt.setDate(dt.getDate() + 1);
+        proxData = dt.toISOString().slice(0, 10);
+      }
     }
     const payload = base
       ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao }
@@ -566,6 +727,7 @@ function RoteiroInline({
               expedicaoId={expedicaoId}
               dia={d}
               fotos={fotosPorDia[d.id] ?? []}
+              passeiosOpc={passeiosOpcPorDia[d.id] ?? []}
               aberto={abertos.has(d.id)}
               onToggle={() => toggle(d.id)}
               onDuplicar={() => adicionar(d)}
@@ -578,11 +740,12 @@ function RoteiroInline({
 }
 
 function DiaInline({
-  expedicaoId, dia, fotos, aberto, onToggle, onDuplicar,
+  expedicaoId, dia, fotos, passeiosOpc, aberto, onToggle, onDuplicar,
 }: {
   expedicaoId: string;
   dia: RoteiroDiaRow;
   fotos: RoteiroDiaFotoRow[];
+  passeiosOpc: PasseioOpcionalRow[];
   aberto: boolean;
   onToggle: () => void;
   onDuplicar: () => void;
@@ -622,6 +785,7 @@ function DiaInline({
   }
 
   const nFotos = fotos.length;
+  const nPasseios = passeiosOpc.length;
 
   return (
     <li className="overflow-hidden rounded-lg border border-border bg-background">
@@ -631,7 +795,7 @@ function DiaInline({
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium">{v.titulo || "—"}</span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              {v.data ? formatDate(v.data) : "sem data"}{v.cidade ? ` · ${v.cidade}` : ""}{nFotos ? ` · ${nFotos} foto${nFotos === 1 ? "" : "s"}` : ""}
+              {v.data ? formatDate(v.data) : "sem data"}{v.cidade ? ` · ${v.cidade}` : ""}{nFotos ? ` · ${nFotos} foto${nFotos === 1 ? "" : "s"}` : ""}{nPasseios ? ` · ${nPasseios} passeio${nPasseios === 1 ? "" : "s"} opcional${nPasseios === 1 ? "" : "is"}` : ""}
             </span>
           </span>
         </button>
@@ -671,6 +835,9 @@ function DiaInline({
           </div>
           <div className="border-t border-border pt-3">
             <FotosRoteiro expedicaoId={expedicaoId} roteiroDiaId={dia.id} fotos={fotos} />
+          </div>
+          <div className="border-t border-border pt-3">
+            <PasseiosOpcionaisDia expedicaoId={expedicaoId} roteiroDiaId={dia.id} passeios={passeiosOpc} />
           </div>
           <p className="text-[11px] text-muted-foreground">As mudanças salvam sozinhas ao sair de cada campo.</p>
         </div>

@@ -566,6 +566,10 @@ export const mockExpedicaoInfo: Tables<"expedicao_info">[] = persist("mockExpedi
 // Fotos por dia do roteiro — vazio no mock (envie pelo editor para testar o fluxo).
 export const mockRoteiroDiaFotos: Tables<"roteiro_dia_fotos">[] = persist("mockRoteiroDiaFotos", () => []);
 
+// Passeios opcionais dos dias livres (migration 0044) + compras por passageiro.
+export const mockPasseiosOpcionais: Tables<"passeios_opcionais">[] = persist("mockPasseiosOpcionais", () => []);
+export const mockPasseioOpcionalCompras: Tables<"passeio_opcional_compras">[] = persist("mockPasseioOpcionalCompras", () => []);
+
 // Área de espera das inscrições do formulário público (migration 0037).
 export const mockInscricoesPendentes: Tables<"inscricoes_pendentes">[] = persist("mockInscricoesPendentes", () => []);
 

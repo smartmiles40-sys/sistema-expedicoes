@@ -388,7 +388,27 @@ role**, **só leitura**.
     todos no mesmo hotel), anexado no painel "Voucher da hospedagem" do editor do
     ExpedAmigo (`definirVoucherHospedagem`) e exibido na seção Hospedagem do portal.
 - Fetchers em `lib/data/expedicoes.ts`: `listRoteiro`, `listVoosExpedicao`,
-  `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`.
+  `listPasseios`, `listInfoDestino`, `listAvisos`, `listRoteiroFotos`,
+  `listPasseiosOpcionais`.
+- **Passeios opcionais nos dias livres (migration 0044):** cada dia do roteiro pode
+  oferecer até **3 passeios adicionais** (foto + descritivo + link do WhatsApp). Duas
+  tabelas: `passeios_opcionais` (`roteiro_dia_id`, `titulo`, `descricao`,
+  `foto_arquivo_id`, `whatsapp_url`, `ordem`) e `passeio_opcional_compras`
+  (`passageiro_id`, `passeio_opcional_id` — **presença = comprou**, unique). A **compra
+  é MANUAL**: o operacional marca no perfil do passageiro (drawer), seção "Passeios
+  opcionais" (`PasseiosOpcionaisCompra.tsx`, auto-carrega via
+  `listPasseiosOpcionaisDoPax`; toggle = `marcarCompraPasseioOpcional`, ambos em
+  `passeios-opcionais-actions.ts`). **Autoria:** no editor do ExpedAmigo, dentro de cada
+  dia do roteiro (`PortalEditor.tsx` → `PasseiosOpcionaisDia`/`PasseioOpcionalCard`),
+  reaproveitando o CRUD genérico (`passeios_opcionais` entrou na allowlist `TABELAS`;
+  excluir usa `excluirPasseioOpcional`, que limpa a foto). **Quando o passageiro contrata,
+  o DIA INTEIRO vira o passeio** — tanto no portal (`app/amigo/page.tsx` → `DiaRoteiro`)
+  quanto no **PDF** (`ViagemPDF.tsx`, roteiro resumido + dia a dia): foto, título e
+  descrição do passeio substituem os do dia; some o programa original + refeições/
+  hospedagem/fotos do dia; selo "Você adquiriu". **Quem NÃO contratou:** no portal vê a
+  oferta com botão "Contratar agora" (`whatsapp_url`); no **PDF não aparece nada** (fica
+  idêntico ao de hoje — nenhuma oferta é impressa). Campo `passeios_opcionais` (com
+  `comprou` por pax) em cada `AmigoRoteiroDia`; fetcher `listPasseiosOpcionais`.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.

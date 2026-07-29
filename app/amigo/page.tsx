@@ -3,6 +3,7 @@ import * as React from "react";
 import {
   CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
   CalendarDays, Ticket, Info, ChevronRight, Megaphone, Download, ArrowLeft,
+  Sparkles, Check, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -741,9 +742,25 @@ function emojiAviso(titulo: string, tipo: string): string {
 /** Um dia do roteiro — card editorial com foto, recolhível (toca no banner). */
 function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
   const [aberto, setAberto] = React.useState(false);
-  const img = d.fotos[0]?.url ?? diaImgFallback(destino, d.dia);
-  const extras = d.fotos.slice(1);
-  const temDetalhe = Boolean(d.descricao || d.refeicoes || d.hospedagem || extras.length);
+  const passeiosOpc = d.passeios_opcionais ?? [];
+  const contratados = passeiosOpc.filter((p) => p.comprou);
+  const ofertas = passeiosOpc.filter((p) => !p.comprou);
+  // Ao contratar um passeio opcional, o DIA INTEIRO vira esse passeio: foto, título e
+  // descrição passam a ser os do passeio; o programa original (e refeições/hospedagem/
+  // fotos do dia) some. `principal` é o passeio contratado que "assume" o dia.
+  const principal = contratados[0] ?? null;
+  const contratadosExtra = contratados.slice(1);
+
+  const titulo = principal ? (principal.titulo || "Passeio contratado") : d.titulo;
+  const descricao = principal ? principal.descricao : d.descricao;
+  const img = principal
+    ? principal.foto_url ?? diaImgFallback(destino, d.dia)
+    : d.fotos[0]?.url ?? diaImgFallback(destino, d.dia);
+  const extras = principal ? [] : d.fotos.slice(1);
+
+  const temDetalhe = Boolean(
+    descricao || (!principal && (d.refeicoes || d.hospedagem || extras.length)) || passeiosOpc.length,
+  );
   return (
     <li className="overflow-hidden rounded-3xl bg-white shadow-[0_8px_30px_rgba(9,40,43,0.10)]">
       {/* Banner clicável (foto ou gradiente + número gigante) */}
@@ -755,7 +772,7 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
       >
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt={d.titulo || `Dia ${d.dia}`} className="h-full w-full object-cover" />
+          <img src={img} alt={titulo || `Dia ${d.dia}`} className="h-full w-full object-cover" />
         ) : (
           <div className="bg-brand-gradient h-full w-full" />
         )}
@@ -778,21 +795,25 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
           </span>
         )}
         <div className="absolute inset-x-0 bottom-0 z-10 p-5">
-          {d.cidade && (
+          {principal ? (
+            <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-lime)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--brand-dark)] shadow">
+              <Check className="h-3 w-3" /> Você adquiriu
+            </div>
+          ) : d.cidade ? (
             <div className="mb-1.5 inline-flex items-center gap-1.5 text-[12px] text-white/90">
               <MapPin className="h-3 w-3" /> {d.cidade}
             </div>
-          )}
-          {d.titulo && (
-            <h4 className="font-display text-2xl font-bold leading-[1.1] text-white drop-shadow sm:text-3xl">{d.titulo}</h4>
+          ) : null}
+          {titulo && (
+            <h4 className="font-display text-2xl font-bold leading-[1.1] text-white drop-shadow sm:text-3xl">{titulo}</h4>
           )}
         </div>
       </button>
       {/* Corpo recolhível */}
       {aberto && temDetalhe && (
         <div className="p-5">
-          {d.descricao && <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-[#09282B]/85">{d.descricao}</p>}
-          {(d.refeicoes || d.hospedagem) && (
+          {descricao && <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-[#09282B]/85">{descricao}</p>}
+          {!principal && (d.refeicoes || d.hospedagem) && (
             <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
               {d.refeicoes && <span className="rounded-full bg-[#EDF5DC] px-3 py-1 font-medium text-[#09282B]/80">🍽 {d.refeicoes}</span>}
               {d.hospedagem && <span className="rounded-full bg-[#EDF5DC] px-3 py-1 font-medium text-[#09282B]/80">🛏 {d.hospedagem}</span>}
@@ -806,9 +827,73 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
               ))}
             </div>
           )}
+          {contratadosExtra.length > 0 && (
+            <div className="mt-5 space-y-3">
+              {contratadosExtra.map((p, i) => (
+                <PasseioOpcionalCard key={`c${i}`} p={p} />
+              ))}
+            </div>
+          )}
+          {ofertas.length > 0 && (
+            <div className="mt-5 space-y-3">
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#09282B]/60">
+                <Sparkles className="h-3.5 w-3.5" /> Passeios opcionais neste dia
+              </div>
+              {ofertas.map((p, i) => (
+                <PasseioOpcionalCard key={i} p={p} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Passeio opcional no portal do passageiro. Quem comprou vê "confirmado" (foto +
+ * descritivo, sem WhatsApp); quem não comprou vê a oferta + botão "Falar no WhatsApp".
+ */
+function PasseioOpcionalCard({ p }: { p: AmigoRoteiroDia["passeios_opcionais"][number] }) {
+  if (p.comprou) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-[var(--brand-lime)] bg-[#EDF5DC]/60">
+        {p.foto_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.foto_url} alt={p.titulo ?? "Passeio opcional"} className="h-36 w-full object-cover" />
+        )}
+        <div className="p-4">
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-lime)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--brand-dark)]">
+            <Check className="h-3 w-3" /> Você adquiriu
+          </div>
+          {p.titulo && <h5 className="font-display text-lg font-bold leading-tight text-[#09282B]">{p.titulo}</h5>}
+          {p.descricao && <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-[#09282B]/80">{p.descricao}</p>}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border border-dashed border-[#09282B]/25 bg-white">
+      {p.foto_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.foto_url} alt={p.titulo ?? "Passeio opcional"} className="h-36 w-full object-cover" />
+      )}
+      <div className="p-4">
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#09282B]/50">Passeio opcional</div>
+        {p.titulo && <h5 className="font-display text-lg font-bold leading-tight text-[#09282B]">{p.titulo}</h5>}
+        {p.descricao && <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-[#09282B]/80">{p.descricao}</p>}
+        {p.whatsapp_url && (
+          <a
+            href={p.whatsapp_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            <MessageCircle className="h-4 w-4" /> Contratar agora
+          </a>
+        )}
+      </div>
+    </div>
   );
 }
 
