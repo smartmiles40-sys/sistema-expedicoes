@@ -1,6 +1,8 @@
 "use server";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
 import { mockExpedicoes } from "@/lib/mock-data";
 
 /**
@@ -15,6 +17,8 @@ import { mockExpedicoes } from "@/lib/mock-data";
 export async function sincronizarExpedicaoBitrix(
   expedicaoId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   const url = process.env.N8N_SYNC_URL;
   if (!url) return { ok: false, error: "Integração não configurada (N8N_SYNC_URL ausente)." };
 

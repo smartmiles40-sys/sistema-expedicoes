@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { sincronizarTaxas, type SyncCambiosResult } from "@/lib/cambio/sync";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
 
 /**
  * Sincroniza as taxas de câmbio (botão "Atualizar agora").
@@ -11,6 +13,8 @@ import { sincronizarTaxas, type SyncCambiosResult } from "@/lib/cambio/sync";
  * refletia em dev).
  */
 export async function sincronizarCambios(): Promise<SyncCambiosResult> {
+  const eu = await getCurrentUser();
+  if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   const r = await sincronizarTaxas();
   if (r.ok) {
     revalidatePath("/cambios");

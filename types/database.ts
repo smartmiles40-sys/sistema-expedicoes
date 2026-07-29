@@ -12,7 +12,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type PapelUsuario = "admin" | "operacional" | "comercial" | "financeiro" | "leitura";
+export type PapelUsuario = "admin" | "operacional" | "comercial" | "financeiro" | "relacionamento" | "leitura";
 export type StatusExpedicao = "Planejamento" | "Vendas Abertas" | "Em andamento" | "Concluída" | "Cancelada";
 export type StatusReserva = "Lead" | "Pré-reserva" | "Confirmado" | "Cancelado";
 export type TipoPassageiro = "Pagante" | "Cortesia" | "Líder";

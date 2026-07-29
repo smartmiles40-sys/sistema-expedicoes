@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
 import { removeArquivoMock } from "@/lib/data/arquivos-mock";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export async function DELETE(
   if (!DEV_AUTH_BYPASS) {
     const u = await getCurrentUser();
     if (!u) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    if (!podeEditar(u.papel)) return NextResponse.json({ ok: false, error: "Seu perfil é somente leitura." }, { status: 403 });
   }
   const { id } = await ctx.params;
 

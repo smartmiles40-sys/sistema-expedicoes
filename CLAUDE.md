@@ -447,6 +447,38 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
 - **Importação inicial:** a partir de `Roteiro_Japao_China_G1_G2.xlsx` (34 dias
   G1+G2 + 7 alertas críticos), por script pontual não versionado.
 
+## 🔐 Papéis e permissões (perfil do usuário)
+
+`usuarios.papel` (enum `papel_usuario`) define o que o usuário faz. Perfis em uso
+(seletor "Mudar papel" em `/configuracoes`, `PAPEIS_ATRIBUIVEIS`): **admin**, **operação**
+(`operacional`), **relacionamento**. Os antigos `comercial`/`financeiro`/`leitura`
+continuam válidos no enum (compat), mas não são oferecidos no seletor.
+
+- **Editores** (podem escrever): admin, operacional, comercial, financeiro.
+- **Somente leitura**: `relacionamento` e `leitura`. `relacionamento` é a exceção — lê
+  TUDO e ainda **aprova/recusa inscrições**; `leitura` é leitura pura.
+- Helpers puros em **`lib/auth/permissoes.ts`**: `ehSomenteLeitura`, `podeEditar`,
+  `podeDecidirInscricao`, `assertPodeEditar`/`assertPodeDecidirInscricao`. NÃO importar
+  esse módulo em client component (ele puxa `getCurrentUser`); no cliente, cheque o papel
+  inline (ex.: `AppShell` calcula `somenteLeitura` direto de `user.papel`).
+- **Enforcement em 2 camadas:**
+  1. **RLS (migration `0046`)**: função `is_readonly()` (fail-open) + políticas
+     RESTRICTIVE de insert/update/delete bloqueando `relacionamento`/`leitura` em todas
+     as tabelas de dados. Cobre as ações que escrevem com a **sessão** do usuário
+     (`getServerClient()`) — a maioria (expedicoes/actions.ts, grupos, fornecedores,
+     portal CRUD). SELECT continua liberado. Só vale em **produção** (dev bypass/mock
+     ignora RLS, e o `MOCK_USER` é admin).
+  2. **Guardas no app**: as ações que usam **service role** ignoram RLS, então checam
+     `podeEditar`/`podeDecidirInscricao` na mão: inscrições (aprovar/recusar liberam
+     `relacionamento`; restaurar/excluir só editores), roteiro-líder, fotos/vouchers do
+     portal, compra de passeio opcional, câmbios, bitrix-sync, e as rotas
+     `/api/arquivos/{upload,[id]}` (403 p/ read-only). `expedamigo-actions` já era admin-only.
+- **UI**: `AppShell` mostra uma faixa "Modo leitura" p/ perfis read-only. Os botões de
+  edição ainda aparecem (v1), mas o servidor rejeita a ação com "somente leitura".
+- **Migrations**: `0045` adiciona o valor `relacionamento` ao enum (rodar ANTES da `0046`).
+- **Mudar papel**: `alterarPapelUsuario` (admin, service role) — não deixa alterar o
+  próprio papel (anti-lockout); UI em `MudarPapelSelect.tsx`.
+
 ## 📝 Inscrição pública: área de espera + materialização na aprovação
 
 Ao se inscrever pelo `/inscricao`, o cliente é reconhecido **em qualquer expedição**

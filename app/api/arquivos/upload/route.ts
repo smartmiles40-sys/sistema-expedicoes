@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { DEV_AUTH_BYPASS, DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
 import { addArquivoMock } from "@/lib/data/arquivos-mock";
 import {
   CATEGORIA_ARQUIVO,
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   if (!DEV_AUTH_BYPASS) {
     const u = await getCurrentUser();
     if (!u) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    if (!podeEditar(u.papel)) return NextResponse.json({ ok: false, error: "Seu perfil é somente leitura." }, { status: 403 });
   }
 
   let form: FormData;

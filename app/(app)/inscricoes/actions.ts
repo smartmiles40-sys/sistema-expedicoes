@@ -7,6 +7,8 @@ import { mockPassageiros, mockExpedicoes, mockInscricoesPendentes } from "@/lib/
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { materializarInscricao, type Dados } from "@/lib/inscricao/core";
 import { enviarPassageiroParaBitrix, type PassageiroOutbound } from "@/lib/bitrix/outbound";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar, podeDecidirInscricao } from "@/lib/auth/permissoes";
 import type { PassageiroRow, ExpedicaoRow, SaudePassageiro, InscricaoPendenteRow } from "@/types/database";
 
 const BUCKET_ARQUIVOS = "arquivos-expedicoes";
@@ -225,6 +227,8 @@ export async function contarInscricoesPendentes(): Promise<number> {
 }
 
 export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão para aprovar inscrições." };
   // 1) Lê a inscrição pendente.
   let pend: InscricaoPendenteRow | null = null;
   if (DEV_USE_MOCK_DATA) {
@@ -309,6 +313,8 @@ export async function recusarInscricao(
   motivo: string,
   recusaArquivoId?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão para recusar inscrições." };
   const motivoLimpo = (motivo ?? "").trim();
   if (!motivoLimpo) return { ok: false, error: "Informe o motivo da recusa." };
   const agora = new Date().toISOString();
@@ -334,6 +340,8 @@ export async function recusarInscricao(
 
 /** Restaura uma inscrição recusada de volta pra fila de pendentes. */
 export async function restaurarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   if (DEV_USE_MOCK_DATA) {
     const p = mockInscricoesPendentes.find((p) => p.id === id);
     if (p) { p.status = "pendente"; p.recusada_em = null; p.updated_at = new Date().toISOString(); }
@@ -354,6 +362,8 @@ export async function restaurarInscricao(id: string): Promise<{ ok: boolean; err
  * órfão no Storage. Ação irreversível.
  */
 export async function excluirInscricaoDefinitivo(id: string): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   if (DEV_USE_MOCK_DATA) {
     const i = mockInscricoesPendentes.findIndex((p) => p.id === id);
     if (i >= 0) mockInscricoesPendentes.splice(i, 1);

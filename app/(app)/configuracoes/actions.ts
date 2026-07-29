@@ -1,8 +1,10 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { mockUsuarios } from "@/lib/mock-data";
+import { PAPEIS_ATRIBUIVEIS, type PapelUsuario } from "@/lib/constants";
 
 /** Gera uma senha provisória curta e fácil de repassar (o usuário troca no 1º login). */
 function gerarSenhaProvisoria(): string {
@@ -45,4 +47,32 @@ export async function resetarSenhaUsuario(
   await admin.from("usuarios").update({ senha_provisoria: true }).eq("id", usuarioId);
 
   return { ok: true, senha };
+}
+
+/**
+ * Muda o papel de um usuário (ação de admin). Só oferece os 3 perfis em uso
+ * (`PAPEIS_ATRIBUIVEIS`: admin / operacional / relacionamento). Não deixa o admin
+ * alterar o PRÓPRIO papel (evita se trancar fora sem querer).
+ */
+export async function alterarPapelUsuario(
+  usuarioId: string,
+  papel: PapelUsuario,
+): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (eu?.papel !== "admin") return { ok: false, error: "Apenas administradores podem mudar papéis." };
+  if (!PAPEIS_ATRIBUIVEIS.includes(papel)) return { ok: false, error: "Papel inválido." };
+  if (eu.id === usuarioId) return { ok: false, error: "Você não pode alterar o próprio papel." };
+
+  if (DEV_USE_MOCK_DATA) {
+    const u = mockUsuarios.find((x) => x.id === usuarioId);
+    if (u) u.papel = papel;
+    revalidatePath("/configuracoes");
+    return { ok: true };
+  }
+
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("usuarios").update({ papel }).eq("id", usuarioId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/configuracoes");
+  return { ok: true };
 }

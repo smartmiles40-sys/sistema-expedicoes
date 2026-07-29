@@ -144,9 +144,23 @@ export const PAPEL_USUARIO = [
   "operacional",
   "comercial",
   "financeiro",
+  "relacionamento",
   "leitura",
 ] as const;
 export type PapelUsuario = (typeof PAPEL_USUARIO)[number];
+
+/** Rótulo amigável de cada papel (o que aparece na UI). */
+export const PAPEL_LABEL: Record<PapelUsuario, string> = {
+  admin: "Admin",
+  operacional: "Operação",
+  comercial: "Comercial",
+  financeiro: "Financeiro",
+  relacionamento: "Relacionamento",
+  leitura: "Leitura",
+};
+
+/** Papéis oferecidos no seletor de "Mudar papel" (os 3 perfis em uso). */
+export const PAPEIS_ATRIBUIVEIS: PapelUsuario[] = ["admin", "operacional", "relacionamento"];
 
 export const MOEDAS = ["BRL", "USD", "EUR", "PEN", "GBP", "JPY", "ARS", "CLP"] as const;
 export type Moeda = (typeof MOEDAS)[number];

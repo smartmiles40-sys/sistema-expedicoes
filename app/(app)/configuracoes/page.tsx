@@ -2,11 +2,12 @@ import { listUsuarios } from "@/lib/data/expedicoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { Button } from "@/components/ui/Button";
 import { MARGEM_MINIMA, MARGEM_IDEAL, PROVISAO_EXTRA_PADRAO } from "@/lib/constants";
 import { formatPercent } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { PAPEL_LABEL } from "@/lib/constants";
 import { ResetarSenhaBtn } from "./ResetarSenhaBtn";
+import { MudarPapelSelect } from "./MudarPapelSelect";
 
 export const metadata = { title: "Configurações" };
 
@@ -42,12 +43,14 @@ export default async function ConfiguracoesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="lista">{u.papel}</Badge>
+                  <Badge variant="lista">{PAPEL_LABEL[u.papel] ?? u.papel}</Badge>
                   {isAdmin && (
                     <>
-                      <Button variant="ghost" size="sm" disabled>
-                        Mudar papel
-                      </Button>
+                      <MudarPapelSelect
+                        usuarioId={u.id}
+                        papelAtual={u.papel}
+                        isSelf={u.id === currentUser?.id}
+                      />
                       <ResetarSenhaBtn usuarioId={u.id} nome={u.nome} />
                     </>
                   )}

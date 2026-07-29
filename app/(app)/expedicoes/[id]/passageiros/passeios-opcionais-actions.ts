@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockPasseiosOpcionais, mockPasseioOpcionalCompras, mockRoteiroDias } from "@/lib/mock-data";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
 import type { PasseioOpcionalRow } from "@/types/database";
 
 type DiaLite = { id: string; dia: number; titulo: string };
@@ -75,6 +77,8 @@ export async function marcarCompraPasseioOpcional(
   comprou: boolean,
   expedicaoId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   if (DEV_USE_MOCK_DATA) {
     const idx = mockPasseioOpcionalCompras.findIndex(
       (c) => c.passageiro_id === passageiroId && c.passeio_opcional_id === passeioOpcionalId,

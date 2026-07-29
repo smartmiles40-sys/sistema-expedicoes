@@ -8,6 +8,14 @@ import {
 } from "@/lib/mock-data";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { removeArquivoMock } from "@/lib/data/arquivos-mock";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
+
+/** Bloqueia perfis somente-leitura (parte das ações do portal usa service role). */
+async function negarSeLeitura(): Promise<{ ok: false; error: string } | null> {
+  const u = await getCurrentUser();
+  return podeEditar(u?.papel) ? null : { ok: false, error: "Seu perfil é somente leitura." };
+}
 
 /**
  * CRUD genérico das tabelas de conteúdo do Portal do ExpedAmigo (migrations 0021/0022).
@@ -56,6 +64,7 @@ export async function criarItemPortal(
   expedicaoId: string,
   valores: Valores,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (!valida(tabela)) return { ok: false, error: "Tabela inválida" };
   if (DEV_USE_MOCK_DATA) {
     const arr = MOCKS[tabela];
@@ -84,6 +93,7 @@ export async function atualizarItemPortal(
   expedicaoId: string,
   valores: Valores,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (!valida(tabela)) return { ok: false, error: "Tabela inválida" };
   if (DEV_USE_MOCK_DATA) {
     const arr = MOCKS[tabela];
@@ -105,6 +115,7 @@ export async function excluirItemPortal(
   id: string,
   expedicaoId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (!valida(tabela)) return { ok: false, error: "Tabela inválida" };
   if (DEV_USE_MOCK_DATA) {
     const arr = MOCKS[tabela];
@@ -128,6 +139,7 @@ export async function adicionarFotoRoteiro(
   arquivoId: string,
   legenda: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (DEV_USE_MOCK_DATA) {
     const agora = new Date().toISOString();
     const ordem = mockRoteiroDiaFotos.filter((f) => f.roteiro_dia_id === roteiroDiaId).length;
@@ -157,6 +169,7 @@ export async function excluirFotoRoteiro(
   arquivoId: string,
   expedicaoId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (DEV_USE_MOCK_DATA) {
     const idx = mockRoteiroDiaFotos.findIndex((f) => f.id === fotoId);
     if (idx !== -1) mockRoteiroDiaFotos.splice(idx, 1);
@@ -182,6 +195,7 @@ export async function excluirPasseioOpcional(
   fotoArquivoId: string | null,
   expedicaoId: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (DEV_USE_MOCK_DATA) {
     const idx = mockPasseiosOpcionais.findIndex((p) => p.id === id);
     if (idx !== -1) mockPasseiosOpcionais.splice(idx, 1);
@@ -208,6 +222,7 @@ export async function definirVoucherHospedagem(
   expedicaoId: string,
   arquivoId: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   if (DEV_USE_MOCK_DATA) {
     revalidatePath(`/expedicoes/${expedicaoId}/portal`);
     return { ok: true };

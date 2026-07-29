@@ -1,6 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { podeEditar } from "@/lib/auth/permissoes";
+
+/** Bloqueia perfis somente-leitura (service role ignora RLS, então guarda aqui). */
+async function negarSeLeitura(): Promise<{ ok: false; error: string } | null> {
+  const u = await getCurrentUser();
+  return podeEditar(u?.papel) ? null : { ok: false, error: "Seu perfil é somente leitura." };
+}
 
 // CRUD do Roteiro do Líder (migration 0029). Usa service role (lê/escreve no banco
 // real; sem branch de mock — a tabela não tem fixtures).
@@ -18,6 +26,7 @@ const loose = () => createServiceRoleClient() as unknown as LooseClient;
 const rev = (id: string) => revalidatePath(`/expedicoes/${id}/roteiro-lider`);
 
 export async function criarDiaLider(expedicaoId: string, valores: Valores): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   const sb = loose();
   const { count } = await sb.from("roteiro_lider_dias").select("id", { count: "exact", head: true }).eq("expedicao_id", expedicaoId);
   const { error } = await sb.from("roteiro_lider_dias").insert({ expedicao_id: expedicaoId, ordem: count ?? 0, ...valores });
@@ -27,6 +36,7 @@ export async function criarDiaLider(expedicaoId: string, valores: Valores): Prom
 }
 
 export async function atualizarDiaLider(id: string, expedicaoId: string, valores: Valores): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   const sb = loose();
   const { error } = await sb.from("roteiro_lider_dias").update(valores).eq("id", id);
   if (error) return { ok: false, error: error.message };
@@ -35,6 +45,7 @@ export async function atualizarDiaLider(id: string, expedicaoId: string, valores
 }
 
 export async function excluirDiaLider(id: string, expedicaoId: string): Promise<{ ok: boolean; error?: string }> {
+  const negado = await negarSeLeitura(); if (negado) return negado;
   const sb = loose();
   const { error } = await sb.from("roteiro_lider_dias").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
