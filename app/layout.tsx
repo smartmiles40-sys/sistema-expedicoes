@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
@@ -17,6 +17,18 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "Sistema Operacional de Expedições",
   description: "Se Tu For, Eu Vou — gestão de expedições",
+  // iOS: quando adicionado à Tela de Início, abre em tela cheia com esse nome.
+  // O ícone vem de app/apple-icon.png (apple-touch-icon, gerado da logo).
+  appleWebApp: {
+    capable: true,
+    title: "STFEV",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+// Cor da barra do navegador / status bar no atalho (verde-petróleo da marca).
+export const viewport: Viewport = {
+  themeColor: "#09282b",
 };
 
 export default function RootLayout({
