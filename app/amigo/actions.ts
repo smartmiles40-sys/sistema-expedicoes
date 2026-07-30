@@ -124,6 +124,8 @@ export type AmigoDados = {
  */
 const ADMINS_AMIGO: Record<string, string> = {
   "20262027999": "Administrador",
+  "79746748220": "Carolina Lage Taketomi",
+  "40718963881": "Antonio Carlos Feitosa Beserra dos Santos",
 };
 
 export async function entrarExpedAmigo(
