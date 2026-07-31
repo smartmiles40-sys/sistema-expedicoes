@@ -30,7 +30,7 @@ export const PERGUNTAS_SAUDE: {
   { campo: "gravidez", pergunta: "Está grávida?", detalheCampo: "gravidez_semanas", detalhePergunta: "De quantas semanas?" },
   { campo: "enjoo_transporte", pergunta: "Costuma enjoar em avião, barco ou ônibus?" },
   { campo: "medo_altura", pergunta: "Tem medo intenso de altura, teleférico ou atividades específicas?" },
-  { campo: "ronca_cpap", pergunta: "Ronca ou utiliza CPAP?" },
+  { campo: "ronca_cpap", pergunta: "Tem algo no seu sono que a gente precise considerar na divisão dos quartos? (ronco, CPAP, sono muito leve)", detalheCampo: "ronca_cpap_qual", detalhePergunta: "Se sim, qual?" },
   { campo: "vacina_febre_amarela", pergunta: "Você possui o Certificado Internacional de Vacinação contra Febre Amarela?" },
 ];
 

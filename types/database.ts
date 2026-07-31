@@ -240,6 +240,8 @@ export type SaudePassageiro = {
   enjoo_transporte?: string;
   medo_altura?: string;
   ronca_cpap?: string;
+  /** "Se sim, qual?" do sono (ronco, CPAP, sono leve) — preenchido quando ronca_cpap = "Sim". */
+  ronca_cpap_qual?: string;
 };
 
 export type RequisitoDestinoRow = {
