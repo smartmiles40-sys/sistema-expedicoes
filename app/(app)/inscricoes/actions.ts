@@ -72,8 +72,7 @@ function montarOutbound(
     pref_upgrade_classe: p.pref_upgrade_classe,
     ja_viajou_internacional: p.ja_viajou_internacional,
     paises_visitados: p.paises_visitados,
-    acompanhante_nome: p.acompanhante_nome,
-    acompanhante_divide_quarto: p.acompanhante_divide_quarto,
+    // Acompanhante de quarto NÃO vai mais pro Bitrix (só preferências de voo).
     saude: (p.saude as Record<string, string> | null) ?? null,
     passaporte_arquivo_url: null,
     passaporte_arquivo_nome: null,
