@@ -169,11 +169,20 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
           return n === alvo || n.includes(alvo) || alvo.includes(n);
         });
         const candidato = candidatos.length === 1 ? candidatos[0] : null;
-        const jaConectados =
-          !!candidato && !!p.conexao_viagem_id && p.conexao_viagem_id === candidato.conexao_viagem_id;
-        return { pax: p, candidato, varios: candidatos.length > 1, jaConectados };
+        // Já conectado se o pax tem conexão E há alguém dessa conexão que não é ele.
+        const jaConectados = !!p.conexao_viagem_id &&
+          paxAtivos.some((o) => o.id !== p.id && o.conexao_viagem_id === p.conexao_viagem_id);
+        return { pax: p, candidato, jaConectados };
       });
   }, [paxAtivos]);
+
+  // Escolha manual do passageiro correspondente por linha (pax.id -> id escolhido).
+  // Resolve o caso de o nome ter sido escrito de um jeito diferente na inscrição.
+  const [escolhaAcompanhante, setEscolhaAcompanhante] = React.useState<Record<string, string>>({});
+  const paxOrdenados = React.useMemo(
+    () => [...paxAtivos].sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR")),
+    [paxAtivos],
+  );
 
   async function vincularAcompanhante(paxId: string, candidatoId: string) {
     const r = await conectarPassageiros(expedicaoId, [paxId, candidatoId]);
@@ -662,31 +671,49 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
               <span className="text-[11px] text-muted-foreground">informado na inscrição</span>
             </header>
             <div className="space-y-1.5 p-3">
-              {acompanhantes.map(({ pax, candidato, varios, jaConectados }) => (
-                <div key={pax.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5">
-                  <span className="text-[12px]">
-                    <strong>{pax.nome_completo.split(" ")[0]}</strong> quer viajar com <strong>{pax.acompanhante_nome}</strong>
-                  </span>
-                  {pax.acompanhante_divide_quarto && <Badge variant="lista">{pax.acompanhante_divide_quarto}</Badge>}
-                  <span className="flex-1" />
-                  {jaConectados ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-vinculado-600"><CheckCircle2 className="h-3 w-3" /> vinculados</span>
-                  ) : candidato ? (
-                    <>
-                      <span className="text-[11px] text-muted-foreground">→ {candidato.nome_completo}</span>
-                      {!somenteLeitura && (
-                        <Button variant="outline" size="sm" onClick={() => vincularAcompanhante(pax.id, candidato.id)}>
+              {acompanhantes.map(({ pax, candidato, jaConectados }) => {
+                // Pré-seleciona o palpite automático, mas o operador pode trocar por qualquer um.
+                const escolhido = escolhaAcompanhante[pax.id] ?? candidato?.id ?? "";
+                return (
+                  <div key={pax.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5">
+                    <span className="text-[12px]">
+                      <strong>{pax.nome_completo.split(" ")[0]}</strong> quer viajar com <strong>{pax.acompanhante_nome}</strong>
+                    </span>
+                    {pax.acompanhante_divide_quarto && <Badge variant="lista">{pax.acompanhante_divide_quarto}</Badge>}
+                    <span className="flex-1" />
+                    {jaConectados ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-vinculado-600"><CheckCircle2 className="h-3 w-3" /> vinculados</span>
+                    ) : somenteLeitura ? (
+                      candidato && <span className="text-[11px] text-muted-foreground">→ {candidato.nome_completo}</span>
+                    ) : (
+                      <>
+                        {/* Escolha manual: útil quando o nome foi escrito diferente na inscrição. */}
+                        <select
+                          value={escolhido}
+                          onChange={(e) => setEscolhaAcompanhante((s) => ({ ...s, [pax.id]: e.target.value }))}
+                          title="Escolha o passageiro correspondente"
+                          className="max-w-[240px] rounded-md border border-border bg-background px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+                        >
+                          <option value="">Escolher passageiro…</option>
+                          {paxOrdenados.filter((o) => o.id !== pax.id).map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.nome_completo}{o.id === candidato?.id ? " (sugerido)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!escolhido}
+                          onClick={() => vincularAcompanhante(pax.id, escolhido)}
+                        >
                           <Link2 className="h-3 w-3" /> Vincular
                         </Button>
-                      )}
-                    </>
-                  ) : varios ? (
-                    <span className="text-[11px] text-atencao-600">vários possíveis — use &quot;Nova conexão&quot;</span>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground">ainda não está na expedição</span>
-                  )}
-                </div>
-              ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
