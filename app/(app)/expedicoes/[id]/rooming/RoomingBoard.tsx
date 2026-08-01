@@ -70,6 +70,19 @@ function normalizarNome(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Quebra o texto livre de "acompanhante" em nomes individuais. A pessoa pode ter
+ * escrito vários (o form pede "separe por vírgula", mas também aceita "e", "&", "/").
+ * Anotações entre parênteses — ex.: "(Amigos)", "(Tio e Tia)" — são removidas antes.
+ */
+function nomesAcompanhante(raw: string): string[] {
+  return raw
+    .replace(/\([^)]*\)/g, " ")
+    .split(/\s*,\s*|\s*;\s*|\s+e\s+|\s*&\s*|\s*\/\s*/i)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 1);
+}
+
 type Trecho = {
   key: string;
   hotel_cidade: string | null;
@@ -157,22 +170,25 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
     return m;
   }, [conexoes]);
 
-  // Acompanhantes indicados na inscrição: tenta casar o nome com um pax da expedição.
+  // Acompanhantes indicados na inscrição: quebra o texto em nomes e tenta casar
+  // CADA nome com um pax da expedição (o palpite vira "sugerido" no seletor).
   const acompanhantes = React.useMemo(() => {
     return paxAtivos
       .filter((p) => (p.acompanhante_nome ?? "").trim())
       .map((p) => {
-        const alvo = normalizarNome(p.acompanhante_nome!);
-        const candidatos = paxAtivos.filter((o) => {
-          if (o.id === p.id) return false;
-          const n = normalizarNome(o.nome_completo);
-          return n === alvo || n.includes(alvo) || alvo.includes(n);
+        const partes = nomesAcompanhante(p.acompanhante_nome!).map((nome) => {
+          const alvo = normalizarNome(nome);
+          const candidatos = paxAtivos.filter((o) => {
+            if (o.id === p.id) return false;
+            const n = normalizarNome(o.nome_completo);
+            return n === alvo || n.includes(alvo) || alvo.includes(n);
+          });
+          return { nome, candidato: candidatos.length === 1 ? candidatos[0] : null };
         });
-        const candidato = candidatos.length === 1 ? candidatos[0] : null;
         // Já conectado se o pax tem conexão E há alguém dessa conexão que não é ele.
         const jaConectados = !!p.conexao_viagem_id &&
           paxAtivos.some((o) => o.id !== p.id && o.conexao_viagem_id === p.conexao_viagem_id);
-        return { pax: p, candidato, jaConectados };
+        return { pax: p, partes, jaConectados };
       });
   }, [paxAtivos]);
 
@@ -184,10 +200,12 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
     [paxAtivos],
   );
 
-  async function vincularAcompanhante(paxId: string, candidatoId: string) {
-    const r = await conectarPassageiros(expedicaoId, [paxId, candidatoId]);
+  async function vincularAcompanhantes(paxId: string, ids: string[]) {
+    const alvos = [...new Set(ids.filter(Boolean))].filter((id) => id !== paxId);
+    if (alvos.length === 0) return;
+    const r = await conectarPassageiros(expedicaoId, [paxId, ...alvos]);
     if (r.ok) {
-      toast.success("Vinculados como 'viajam juntas'");
+      toast.success(alvos.length > 1 ? "Grupo vinculado como 'viajam juntas'" : "Vinculados como 'viajam juntas'");
       router.refresh();
     } else {
       toast.error("Não foi possível vincular", { description: r.error });
@@ -671,9 +689,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
               <span className="text-[11px] text-muted-foreground">informado na inscrição</span>
             </header>
             <div className="space-y-1.5 p-3">
-              {acompanhantes.map(({ pax, candidato, jaConectados }) => {
-                // Pré-seleciona o palpite automático, mas o operador pode trocar por qualquer um.
-                const escolhido = escolhaAcompanhante[pax.id] ?? candidato?.id ?? "";
+              {acompanhantes.map(({ pax, partes, jaConectados }) => {
+                // Um seletor por nome indicado; pré-seleciona o palpite automático (sugerido).
+                const escolha = (i: number) => escolhaAcompanhante[`${pax.id}:${i}`] ?? partes[i]?.candidato?.id ?? "";
+                const escolhidos = [...new Set(partes.map((_, i) => escolha(i)).filter(Boolean))].filter((id) => id !== pax.id);
+                const multi = partes.length > 1;
                 return (
                   <div key={pax.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5">
                     <span className="text-[12px]">
@@ -684,32 +704,39 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                     {jaConectados ? (
                       <span className="inline-flex items-center gap-1 text-[11px] text-vinculado-600"><CheckCircle2 className="h-3 w-3" /> vinculados</span>
                     ) : somenteLeitura ? (
-                      candidato && <span className="text-[11px] text-muted-foreground">→ {candidato.nome_completo}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {partes.map((p) => p.candidato?.nome_completo).filter(Boolean).join(", ") || "—"}
+                      </span>
                     ) : (
-                      <>
-                        {/* Escolha manual: útil quando o nome foi escrito diferente na inscrição. */}
-                        <select
-                          value={escolhido}
-                          onChange={(e) => setEscolhaAcompanhante((s) => ({ ...s, [pax.id]: e.target.value }))}
-                          title="Escolha o passageiro correspondente"
-                          className="max-w-[240px] rounded-md border border-border bg-background px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
-                        >
-                          <option value="">Escolher passageiro…</option>
-                          {paxOrdenados.filter((o) => o.id !== pax.id).map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.nome_completo}{o.id === candidato?.id ? " (sugerido)" : ""}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+                        {/* Um seletor por nome: útil pra grupos e pra nomes escritos diferente. */}
+                        {partes.map((parte, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            {multi && <span className="text-[11px] text-muted-foreground whitespace-nowrap">{parte.nome}:</span>}
+                            <select
+                              value={escolha(i)}
+                              onChange={(e) => setEscolhaAcompanhante((s) => ({ ...s, [`${pax.id}:${i}`]: e.target.value }))}
+                              title={`Passageiro correspondente a "${parte.nome}"`}
+                              className="max-w-[220px] rounded-md border border-border bg-background px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+                            >
+                              <option value="">{multi ? "— ignorar —" : "Escolher passageiro…"}</option>
+                              {paxOrdenados.filter((o) => o.id !== pax.id).map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.nome_completo}{o.id === parte.candidato?.id ? " (sugerido)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={!escolhido}
-                          onClick={() => vincularAcompanhante(pax.id, escolhido)}
+                          disabled={escolhidos.length === 0}
+                          onClick={() => vincularAcompanhantes(pax.id, escolhidos)}
                         >
-                          <Link2 className="h-3 w-3" /> Vincular
+                          <Link2 className="h-3 w-3" /> {multi ? `Vincular (${escolhidos.length})` : "Vincular"}
                         </Button>
-                      </>
+                      </div>
                     )}
                   </div>
                 );
