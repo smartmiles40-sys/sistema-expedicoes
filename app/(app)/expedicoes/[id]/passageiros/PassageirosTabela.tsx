@@ -28,6 +28,7 @@ import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 import { sincronizarExpedicaoBitrix } from "./bitrix-sync-actions";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
+import { definirGrupoRapido, type GrupoRapido } from "./grupo-actions";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -49,9 +50,13 @@ interface Props {
   pessoas: PessoaAgregada[];
   /** passageiro_id → posição cronológica desta expedição na história da pessoa. */
   posicoesFidelidade: Record<string, number>;
+  /** Grupos (G1/G2…) desta expedição — pra o seletor rápido de grupo. */
+  grupos: { id: string; nome: string }[];
+  /** Só admin pode atribuir G1/G2. */
+  isAdmin: boolean;
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade, grupos, isAdmin }: Props) {
   const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
@@ -85,8 +90,19 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     [passageiros],
   );
   const passageiroEditando = editandoId ? passageiros.find((p) => p.id === editandoId) ?? null : null;
-  // ⚠️ local/temporário: G1/G2 só na Expedição do Egito (não nas outras dos pax).
-  const mostrarGrupos = ehExpedicaoEgito(destino);
+  // Grupo (G1/G2) do passageiro: prefere a atribuição real (grupo_id → nome); se
+  // não houver, cai no indicativo legado do Egito (hardcoded). Admin edita no seletor.
+  const grupoNomePorId = React.useMemo(() => new Map(grupos.map((g) => [g.id, g.nome])), [grupos]);
+  const grupoLabel = React.useCallback((p: PassageiroRow): string | null => {
+    if (p.grupo_id && grupoNomePorId.has(p.grupo_id)) return grupoNomePorId.get(p.grupo_id)!;
+    if (ehExpedicaoEgito(destino)) return grupoEgito(p.nome_completo);
+    return null;
+  }, [grupoNomePorId, destino]);
+  async function mudarGrupo(paxId: string, alvo: GrupoRapido | null) {
+    const r = await definirGrupoRapido(paxId, expedicaoId, alvo);
+    if (r.ok) router.refresh();
+    else toast.error("Não foi possível definir o grupo", { description: r.error });
+  }
   const [sincronizando, setSincronizando] = React.useState(false);
 
   async function sincronizarBitrix() {
@@ -159,23 +175,6 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             >
               {p.nome_completo}
             </button>
-            {(() => {
-              const g = mostrarGrupos ? grupoEgito(p.nome_completo) : null;
-              if (!g) return null;
-              return (
-                <span
-                  title={g === "G1" ? "Grupo 1" : "Grupo 2"}
-                  className={cn(
-                    "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                    g === "G1"
-                      ? "bg-editavel-100 text-editavel-700"
-                      : "bg-lista-100 text-lista-600",
-                  )}
-                >
-                  {g}
-                </span>
-              );
-            })()}
             <FidelidadeBadge posicao={posicoesFidelidade[p.id]} />
             {aniv && (
               <span
@@ -191,6 +190,30 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
           <Badge variant={p.tipo === "Líder" ? "lista" : p.tipo === "Cortesia" ? "auto" : "vinculado"}>
             {p.tipo}
           </Badge>
+        </td>
+        <td className="px-2.5">
+          {(() => {
+            const l = grupoLabel(p);
+            const cor = (g: string) => cn(
+              "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+              g === "G1" ? "bg-editavel-100 text-editavel-700" : g === "G2" ? "bg-lista-100 text-lista-600" : "bg-atencao-100 text-atencao-700",
+            );
+            if (isAdmin) {
+              return (
+                <select
+                  value={l === "G1" || l === "G2" ? l : ""}
+                  onChange={(e) => mudarGrupo(p.id, (e.target.value || null) as GrupoRapido | null)}
+                  title="Definir grupo (G1/G2)"
+                  className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+                >
+                  <option value="">—</option>
+                  <option value="G1">G1</option>
+                  <option value="G2">G2</option>
+                </select>
+              );
+            }
+            return l ? <span className={cor(l)}>{l}</span> : <span className="text-muted-foreground">—</span>;
+          })()}
         </td>
         <td>
           <EditableCell value={p.cpf} onSave={(v) => atualizarPassageiroCampo(p.id, "cpf", v)} />
@@ -244,6 +267,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                 <Th>ID</Th>
                 <Th>Nome</Th>
                 <Th>Tipo</Th>
+                <Th>Grupo</Th>
                 <Th>CPF</Th>
                 <Th>Passaporte</Th>
                 <Th>Validade</Th>
@@ -256,7 +280,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             <tbody>
               {linhas.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
+                  <td colSpan={11} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
                 </tr>
               ) : (
                 linhas.map(renderLinha)

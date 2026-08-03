@@ -2,6 +2,8 @@ import { listPassageiros, listQuartos, getProntidaoExpedicao, listUsuarios } fro
 import { getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { listPessoas } from "@/lib/data/pessoas";
+import { listGruposExpedicao } from "@/lib/data/grupos";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { construirPosicoesFidelidade } from "@/lib/fidelidade";
 import { PassageirosTabela } from "./PassageirosTabela";
 import { notFound } from "next/navigation";
@@ -12,7 +14,7 @@ export default async function PassageirosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pax, quartos, expedicao, arquivos, prontidao, usuarios, pessoas] = await Promise.all([
+  const [pax, quartos, expedicao, arquivos, prontidao, usuarios, pessoas, grupos, user] = await Promise.all([
     listPassageiros(id),
     listQuartos(id),
     getExpedicao(id),
@@ -20,6 +22,8 @@ export default async function PassageirosPage({
     getProntidaoExpedicao(id),
     listUsuarios(),
     listPessoas(),
+    listGruposExpedicao(id),
+    getCurrentUser(),
   ]);
   if (!expedicao) notFound();
 
@@ -39,6 +43,8 @@ export default async function PassageirosPage({
         usuarios={usuarios}
         pessoas={pessoas}
         posicoesFidelidade={posicoesFidelidade}
+        grupos={grupos.map((g) => ({ id: g.id, nome: g.nome }))}
+        isAdmin={user?.papel === "admin"}
       />
     </div>
   );

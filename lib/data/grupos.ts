@@ -2,7 +2,7 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import type { GrupoExpedicaoRow } from "@/types/database";
 
-const mockGrupos: GrupoExpedicaoRow[] = [];
+export const mockGrupos: GrupoExpedicaoRow[] = [];
 
 export async function listGruposExpedicao(expedicaoId: string): Promise<GrupoExpedicaoRow[]> {
   if (DEV_USE_MOCK_DATA) {

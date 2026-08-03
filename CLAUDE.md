@@ -435,6 +435,14 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
 - **Vínculo de grupos irmãos:** `expedicoes.viagem_grupo` (rótulo compartilhado entre
   irmãs) + `expedicoes.grupo_rotulo` ("G1"/"G2"), ambos nuláveis (migration 0029).
   Não confundir com `grupos_expedicao` (subgrupos DENTRO de uma expedição).
+- **Botão rápido G1/G2 (subgrupos numa expedição, admin):** coluna **"Grupo"** na aba
+  Passageiros com um seletor (G1 / G2 / —) **só pra admin** (`isAdmin` na `page.tsx`).
+  `definirGrupoRapido` (`passageiros/grupo-actions.ts`, service role + checa `papel==="admin"`)
+  acha-ou-cria o `grupos_expedicao` de nome "G1"/"G2" e seta `passageiros.grupo_id`.
+  O badge (`grupoLabel` em `PassageirosTabela`) prefere o `grupo_id` real; se não houver e
+  for Egito, cai no legado `lib/dev-grupos-egito.ts`. Generaliza o G1/G2 (antes só hardcoded
+  no Egito) pra qualquer expedição. **Sem migration** (tabela/coluna já existiam). ⚠️ O
+  RoomingBoard ainda usa o hardcode do Egito — generalizar depois se preciso.
 - **Editor no operacional:** aba **"Roteiro do Líder"** na expedição
   (`app/(app)/expedicoes/[id]/roteiro-lider/`, `RoteiroLiderEditor.tsx` + `actions.ts`
   com CRUD via service role, sem mock). Fetcher `listRoteiroLider` em
