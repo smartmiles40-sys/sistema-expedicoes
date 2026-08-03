@@ -517,6 +517,17 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   status; `contarInscricoesPendentes` (badge) só conta `pendente`.
 - A fila `/inscricoes` lê `inscricoes_pendentes` (mapeia o jsonb → `InscricaoPendente`,
   com `situacao`/`recusada_em`). Badge = `contarInscricoesPendentes`.
+- **Log de decisões (migration 0047):** tabela `inscricoes_decisoes` registra QUEM
+  aprovou/recusou/restaurou/excluiu cada inscrição (ação, quem decidiu, data/hora,
+  motivo na recusa). Escrito best-effort pelas 4 ações (`app/(app)/inscricoes/decisoes.ts`:
+  `registrarDecisaoInscricao`; nunca quebra a decisão). Visualização **só admin**:
+  seção recolhível `DecisoesLog` no rodapé de `/inscricoes` (a página gate por
+  `getCurrentUser().papel === "admin"`; `listDecisoesInscricao` resolve o nome da
+  expedição). Código degrada sem a tabela (log no-op / lista vazia).
+- **Envio da inscrição comprime imagens no navegador** (`lib/comprimir-imagem.ts`):
+  passaporte/foto/certificado são reduzidos (máx 2000px, JPEG) ANTES do upload, pra não
+  estourar o `bodySizeLimit` da server action (32mb) — o que aparecia como "Falha de
+  rede". Guarda de tamanho no `InscricaoForm` avisa claro se ainda passar do limite.
 - **Perfil & conexões (migration 0038):** o form ganhou 2 etapas — "Perfil & conexões"
   (profissão, "como se descreve em grupo", "o que te anima", significado, @Instagram,
   camiseta, música, foto opcional) e "Próximos passos" (texto + checkbox obrigatório

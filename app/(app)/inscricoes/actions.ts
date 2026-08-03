@@ -9,6 +9,7 @@ import { materializarInscricao, type Dados } from "@/lib/inscricao/core";
 import { enviarPassageiroParaBitrix, type PassageiroOutbound } from "@/lib/bitrix/outbound";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { podeEditar, podeDecidirInscricao } from "@/lib/auth/permissoes";
+import { registrarDecisaoInscricao } from "./decisoes";
 import type { PassageiroRow, ExpedicaoRow, SaudePassageiro, InscricaoPendenteRow } from "@/types/database";
 
 const BUCKET_ARQUIVOS = "arquivos-expedicoes";
@@ -262,6 +263,12 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     await sb.from("inscricoes_pendentes").delete().eq("id", id);
   }
 
+  // Log da decisão (best-effort): quem aprovou.
+  await registrarDecisaoInscricao({
+    expedicaoId: pend.expedicao_id, cpf: pend.cpf, nome: pend.nome_completo,
+    acao: "aprovada", usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+  });
+
   // 4) Melhor esforço: avisa o Bitrix (via n8n). Falha aqui NÃO desfaz a aprovação.
   if (pax) {
     let codigo: string | null = null;
@@ -324,15 +331,26 @@ export async function recusarInscricao(
       p.status = "recusada"; p.recusada_em = agora; p.updated_at = agora;
       p.motivo_recusa = motivoLimpo; p.recusa_arquivo_id = arqId;
     }
+    await registrarDecisaoInscricao({
+      expedicaoId: p?.expedicao_id ?? null, cpf: p?.cpf ?? null, nome: p?.nome_completo ?? null,
+      acao: "recusada", motivo: motivoLimpo, usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+    });
     revalidatePath("/inscricoes");
     return { ok: true };
   }
   const sb = createServiceRoleClient();
-  const { error } = await sb
+  const { data: row, error } = await sb
     .from("inscricoes_pendentes")
     .update({ status: "recusada", recusada_em: agora, motivo_recusa: motivoLimpo, recusa_arquivo_id: arqId })
-    .eq("id", id);
+    .eq("id", id)
+    .select("cpf,nome_completo,expedicao_id")
+    .maybeSingle();
   if (error) return { ok: false, error: error.message };
+  const r = row as { cpf: string | null; nome_completo: string | null; expedicao_id: string | null } | null;
+  await registrarDecisaoInscricao({
+    expedicaoId: r?.expedicao_id ?? null, cpf: r?.cpf ?? null, nome: r?.nome_completo ?? null,
+    acao: "recusada", motivo: motivoLimpo, usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+  });
   revalidatePath("/inscricoes");
   return { ok: true };
 }
@@ -344,13 +362,23 @@ export async function restaurarInscricao(id: string): Promise<{ ok: boolean; err
   if (DEV_USE_MOCK_DATA) {
     const p = mockInscricoesPendentes.find((p) => p.id === id);
     if (p) { p.status = "pendente"; p.recusada_em = null; p.updated_at = new Date().toISOString(); }
+    await registrarDecisaoInscricao({
+      expedicaoId: p?.expedicao_id ?? null, cpf: p?.cpf ?? null, nome: p?.nome_completo ?? null,
+      acao: "restaurada", usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+    });
     revalidatePath("/inscricoes");
     return { ok: true };
   }
   const sb = createServiceRoleClient();
-  const { error } = await sb
-    .from("inscricoes_pendentes").update({ status: "pendente", recusada_em: null }).eq("id", id);
+  const { data: row, error } = await sb
+    .from("inscricoes_pendentes").update({ status: "pendente", recusada_em: null }).eq("id", id)
+    .select("cpf,nome_completo,expedicao_id").maybeSingle();
   if (error) return { ok: false, error: error.message };
+  const r = row as { cpf: string | null; nome_completo: string | null; expedicao_id: string | null } | null;
+  await registrarDecisaoInscricao({
+    expedicaoId: r?.expedicao_id ?? null, cpf: r?.cpf ?? null, nome: r?.nome_completo ?? null,
+    acao: "restaurada", usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+  });
   revalidatePath("/inscricoes");
   return { ok: true };
 }
@@ -365,14 +393,19 @@ export async function excluirInscricaoDefinitivo(id: string): Promise<{ ok: bool
   if (!podeEditar(eu?.papel)) return { ok: false, error: "Seu perfil é somente leitura." };
   if (DEV_USE_MOCK_DATA) {
     const i = mockInscricoesPendentes.findIndex((p) => p.id === id);
+    const p = i >= 0 ? mockInscricoesPendentes[i] : null;
     if (i >= 0) mockInscricoesPendentes.splice(i, 1);
+    await registrarDecisaoInscricao({
+      expedicaoId: p?.expedicao_id ?? null, cpf: p?.cpf ?? null, nome: p?.nome_completo ?? null,
+      acao: "excluida", usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+    });
     revalidatePath("/inscricoes");
     return { ok: true };
   }
   const sb = createServiceRoleClient();
   const { data } = await sb
-    .from("inscricoes_pendentes").select("passaporte_arquivo_id, foto_arquivo_id, recusa_arquivo_id, dados").eq("id", id).maybeSingle();
-  const row = data as { passaporte_arquivo_id: string | null; foto_arquivo_id: string | null; recusa_arquivo_id: string | null; dados: Record<string, unknown> | null } | null;
+    .from("inscricoes_pendentes").select("passaporte_arquivo_id, foto_arquivo_id, recusa_arquivo_id, dados, cpf, nome_completo, expedicao_id").eq("id", id).maybeSingle();
+  const row = data as { passaporte_arquivo_id: string | null; foto_arquivo_id: string | null; recusa_arquivo_id: string | null; dados: Record<string, unknown> | null; cpf: string | null; nome_completo: string | null; expedicao_id: string | null } | null;
   const saude = (row?.dados?.saude ?? null) as Record<string, unknown> | null;
   const certId = saude && typeof saude.vacina_febre_amarela_arquivo_id === "string" ? saude.vacina_febre_amarela_arquivo_id : null;
   const arqIds = [row?.passaporte_arquivo_id, row?.foto_arquivo_id, row?.recusa_arquivo_id, certId].filter((x): x is string => Boolean(x));
@@ -384,6 +417,10 @@ export async function excluirInscricaoDefinitivo(id: string): Promise<{ ok: bool
   }
   const { error } = await sb.from("inscricoes_pendentes").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  await registrarDecisaoInscricao({
+    expedicaoId: row?.expedicao_id ?? null, cpf: row?.cpf ?? null, nome: row?.nome_completo ?? null,
+    acao: "excluida", usuarioId: eu?.id ?? null, usuarioNome: eu?.nome ?? null,
+  });
   revalidatePath("/inscricoes");
   return { ok: true };
 }
