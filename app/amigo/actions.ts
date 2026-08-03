@@ -127,6 +127,7 @@ const ADMINS_AMIGO: Record<string, string> = {
   "79746748220": "Carolina Lage Taketomi",
   "40718963881": "Antonio Carlos Feitosa Beserra dos Santos",
   "01997549344": "Luis Antonio de Negreiros Caetano",
+  "47146666816": "Beatriz Rodrigues Galvão",
 };
 
 export async function entrarExpedAmigo(
