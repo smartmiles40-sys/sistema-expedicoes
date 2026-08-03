@@ -45,8 +45,10 @@ interface Props {
   passageiros: PassageiroRow[];
   quartos: QuartoRow[];
   alocacoes: AlocacaoQuartoRow[];
-  /** Destino da expedição — G1/G2 só aparece na do Egito. */
+  /** Destino da expedição — usado só pro fallback legado de G1/G2 do Egito. */
   destino?: string | null;
+  /** Grupos (G1/G2…) da expedição — mapeia grupo_id → nome pra montar os quartos por grupo. */
+  grupos?: { id: string; nome: string }[];
 }
 
 const CAPACIDADE = CAPACIDADE_QUARTO;
@@ -91,7 +93,7 @@ type Trecho = {
   quartos: QuartoRow[];
 };
 
-export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino }: Props) {
+export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino, grupos }: Props) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -112,11 +114,19 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
-  // ⚠️ local/temporário: grupo (G1/G2) de cada pax — só na Expedição do Egito.
+  // Grupo (G1/G2) de cada pax: prefere a atribuição real (grupo_id → nome "G1"/"G2");
+  // se não houver e for Egito, cai no legado hardcoded (dev-grupos-egito).
+  const grupoNomePorId = React.useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.nome])), [grupos]);
   const ehEgito = ehExpedicaoEgito(destino);
   const grupoDoPax = React.useCallback(
-    (p: PassageiroRow) => (ehEgito ? grupoEgito(p.nome_completo) : null),
-    [ehEgito],
+    (p: PassageiroRow): GrupoEgito | null => {
+      if (p.grupo_id) {
+        const nome = grupoNomePorId.get(p.grupo_id);
+        if (nome === "G1" || nome === "G2") return nome;
+      }
+      return ehEgito ? grupoEgito(p.nome_completo) : null;
+    },
+    [grupoNomePorId, ehEgito],
   );
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 

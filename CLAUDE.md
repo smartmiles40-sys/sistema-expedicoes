@@ -441,8 +441,11 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
   acha-ou-cria o `grupos_expedicao` de nome "G1"/"G2" e seta `passageiros.grupo_id`.
   O badge (`grupoLabel` em `PassageirosTabela`) prefere o `grupo_id` real; se não houver e
   for Egito, cai no legado `lib/dev-grupos-egito.ts`. Generaliza o G1/G2 (antes só hardcoded
-  no Egito) pra qualquer expedição. **Sem migration** (tabela/coluna já existiam). ⚠️ O
-  RoomingBoard ainda usa o hardcode do Egito — generalizar depois se preciso.
+  no Egito) pra qualquer expedição. **Sem migration** (tabela/coluna já existiam). O
+  **RoomingBoard** também usa `grupo_id` (mesma lógica: `grupoDoPax` lê o nome "G1"/"G2" do
+  grupo, fallback Egito) — recebe `grupos` da `page.tsx`; monta os quartos por grupo.
+- **Egito migrado** (via script pontual): os 47 pax do Egito ganharam `grupo_id` real (G1/G2)
+  a partir do mapa legado, então já não dependem mais do hardcode (1 sem match ficou sem grupo).
 - **Editor no operacional:** aba **"Roteiro do Líder"** na expedição
   (`app/(app)/expedicoes/[id]/roteiro-lider/`, `RoteiroLiderEditor.tsx` + `actions.ts`
   com CRUD via service role, sem mock). Fetcher `listRoteiroLider` em
