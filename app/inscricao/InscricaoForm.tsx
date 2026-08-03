@@ -11,6 +11,10 @@ import { mascaraCpf } from "@/lib/cpf";
 import { SaudeCampos, PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import type { SaudePassageiro } from "@/types/database";
 import { enviarInscricao, identificarInscricao, type ExpedicaoOpcao } from "./actions";
+import { comprimirImagem } from "@/lib/comprimir-imagem";
+
+/** Folga sob o bodySizeLimit da server action (32 MB) — deixa margem pro JSON + multipart. */
+const LIMITE_ENVIO_BYTES = 28 * 1024 * 1024;
 
 function SimNao({ value, onChange }: { value: boolean | null; onChange: (v: boolean | null) => void }) {
   return (
@@ -250,16 +254,36 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
         anima_expedicao: animaExpedicao ?? "",
         confirmou_veracidade: confirmou,
       };
+      // Comprime as imagens no navegador antes de enviar (transparente pro usuário):
+      // foto de passaporte/selfie de celular deixa de estourar o limite de upload.
+      const [passaporteComp, fotoComp, certComp] = await Promise.all([
+        passaporteFile ? comprimirImagem(passaporteFile) : Promise.resolve(null),
+        fotoFile ? comprimirImagem(fotoFile) : Promise.resolve(null),
+        certificadoFile ? comprimirImagem(certificadoFile) : Promise.resolve(null),
+      ]);
+
+      // Mesmo comprimido, se ainda passar do limite (ex.: PDF grande), avisa CLARO
+      // em vez de deixar o envio falhar com "Falha de rede".
+      const totalBytes = [passaporteComp, fotoComp, certComp].reduce((s, x) => s + (x?.size ?? 0), 0);
+      if (totalBytes > LIMITE_ENVIO_BYTES) {
+        toast.error("Arquivos muito grandes", {
+          description: `Seus anexos somam ${(totalBytes / 1024 / 1024).toFixed(1)} MB. Envie o passaporte como foto (não PDF) ou reduza a qualidade da imagem.`,
+        });
+        return;
+      }
+
       const fd = new FormData();
       fd.append("dados", JSON.stringify(dados));
-      if (passaporteFile) fd.append("passaporte", passaporteFile);
-      if (fotoFile) fd.append("foto", fotoFile);
-      if (certificadoFile) fd.append("certificado", certificadoFile);
+      if (passaporteComp) fd.append("passaporte", passaporteComp);
+      if (fotoComp) fd.append("foto", fotoComp);
+      if (certComp) fd.append("certificado", certComp);
       const r = await enviarInscricao(fd);
       if (r.ok) setOk(r.completou ? "completou" : "novo");
       else toast.error("Não foi possível enviar", { description: r.error });
     } catch {
-      toast.error("Falha de rede. Tente novamente.");
+      toast.error("Não foi possível enviar", {
+        description: "Falha de conexão ou arquivos muito grandes. Confira a internet e tente novamente.",
+      });
     } finally {
       setBusy(false);
     }
