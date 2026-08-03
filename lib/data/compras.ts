@@ -27,7 +27,10 @@ export type ClienteCompras = {
   bitrix_contact_id: string | null;
   totalCompras: number;
   totalGasto: number;
+  ticketMedio: number;
   moedas: string[];
+  funis: string[];
+  primeiraCompra: string | null;
   ultimaCompra: string | null;
   compras: CompraBitrix[];
 };
@@ -71,7 +74,8 @@ export async function listClientesCompras(): Promise<ClienteCompras[]> {
     if (!cli) {
       cli = {
         chave: k, nome: c.nome_contato ?? "Sem nome", cpf: c.cpf, bitrix_contact_id: c.bitrix_contact_id,
-        totalCompras: 0, totalGasto: 0, moedas: [], ultimaCompra: null, compras: [],
+        totalCompras: 0, totalGasto: 0, ticketMedio: 0, moedas: [], funis: [],
+        primeiraCompra: null, ultimaCompra: null, compras: [],
       };
       porChave.set(k, cli);
     }
@@ -79,15 +83,19 @@ export async function listClientesCompras(): Promise<ClienteCompras[]> {
     cli.totalCompras += 1;
     if (c.valor != null) cli.totalGasto += c.valor;
     if (c.moeda && !cli.moedas.includes(c.moeda)) cli.moedas.push(c.moeda);
+    if (c.funil && !cli.funis.includes(c.funil)) cli.funis.push(c.funil);
     if (c.nome_contato && (cli.nome === "Sem nome")) cli.nome = c.nome_contato;
     if (!cli.cpf && c.cpf) cli.cpf = c.cpf;
     if (!cli.bitrix_contact_id && c.bitrix_contact_id) cli.bitrix_contact_id = c.bitrix_contact_id;
     if (c.data_compra && (!cli.ultimaCompra || c.data_compra > cli.ultimaCompra)) cli.ultimaCompra = c.data_compra;
+    if (c.data_compra && (!cli.primeiraCompra || c.data_compra < cli.primeiraCompra)) cli.primeiraCompra = c.data_compra;
   }
-  // Ordena as compras de cada cliente (mais recente primeiro) e a lista por total gasto.
+  // Ordena as compras de cada cliente (mais recente primeiro), calcula ticket médio,
+  // e ordena a lista por total gasto (padrão: quem mais gastou no topo).
   const lista = [...porChave.values()];
   for (const cli of lista) {
     cli.compras.sort((a, b) => (b.data_compra ?? "").localeCompare(a.data_compra ?? ""));
+    cli.ticketMedio = cli.totalCompras > 0 ? cli.totalGasto / cli.totalCompras : 0;
   }
   lista.sort((a, b) => b.totalGasto - a.totalGasto || b.totalCompras - a.totalCompras);
   return lista;
