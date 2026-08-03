@@ -146,6 +146,26 @@ Detalhes em `db/migrations/0001_initial_schema.sql`. Triggers: `set_updated_at`,
 
 RLS habilitado em todas as tabelas com políticas iniciais permissivas (autenticado → tudo). Refinar antes de prod.
 
+## 🛒 Base de clientes & compras (histórico Bitrix)
+
+Base de TODOS que já compraram (negócios GANHOS no Bitrix), com total gasto e
+histórico de viagens. Puxado do Bitrix pelo **n8n** → `POST /api/bitrix/importar-compras`
+(valida `x-webhook-secret`; aceita lote `{ compras: [...] }`; upsert idempotente por
+`bitrix_deal_id`). Tabela **`compras_bitrix`** (migration `0048`): deal_id, contato,
+cpf, nome, titulo, data_compra, valor, moeda, funil, etapa. RLS: leitura autenticado,
+escrita só service role.
+
+- **Agregação:** `lib/data/compras.ts` (`listClientesCompras` agrupa por identidade
+  CPF→contato→nome, soma total gasto, ordena por quem mais gastou; `comprasDaPessoa`
+  casa por CPF/contato pra usar no perfil global). Sem tipo no `types/database.ts`
+  (usa service-role client loose). Degrada sem a tabela (retorna []).
+- **UI:** página **`/clientes`** ("Clientes & compras", item na Sidebar) — tabela
+  ordenada por total gasto, busca, drawer com o histórico de viagens. Financeiro
+  assume BRL (marca `*` se houver outra moeda).
+- **Escopo definido:** só negócios GANHOS, com valores/totais, e mantido sincronizado
+  (carga inicial + webhook de novos ganhos). A LÓGICA de puxar fica num node do n8n
+  (fora do repo), igual ao resto da integração.
+
 ## 🔌 Integração Bitrix (P7)
 
 Eventos: `ONCRMDEALADD`, `ONCRMDEALUPDATE`, `ONCRMCONTACTUPDATE`.

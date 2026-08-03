@@ -11,6 +11,7 @@ import {
   Settings,
   LayoutDashboard,
   ScrollText,
+  ShoppingBag,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
+  { href: "/clientes", label: "Clientes & compras", icon: ShoppingBag },
   { href: "/inscricoes", label: "Inscrições", icon: UserPlus },
   { href: "/expedicoes", label: "Expedições", icon: Map },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
