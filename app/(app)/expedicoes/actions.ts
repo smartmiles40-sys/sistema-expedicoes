@@ -1597,6 +1597,73 @@ export async function excluirPassageiro(
 }
 
 /**
+ * MOVE o passageiro pra outra expedição SEM perder os dados (corrige quando a
+ * pessoa se inscreveu na expedição errada). Mantém a linha e todos os campos
+ * pessoais/reserva; só reseta o que é ESPECÍFICO da expedição antiga (grupo,
+ * quarto, conexão, requisitos de prontidão) e gera os requisitos do novo destino.
+ * Bloqueia se a pessoa já tiver uma linha na expedição de destino (evita duplicar).
+ */
+export async function mudarExpedicaoPassageiro(
+  passageiroId: string,
+  novaExpedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockPassageiros.find((x) => x.id === passageiroId);
+    if (!p) return { ok: false, error: "Passageiro não encontrado" };
+    if (p.expedicao_id === novaExpedicaoId) return { ok: false, error: "Já está nessa expedição." };
+    const chave = chaveIdentidade(p);
+    if (mockPassageiros.some((o) => o.id !== passageiroId && o.expedicao_id === novaExpedicaoId && chaveIdentidade(o) === chave))
+      return { ok: false, error: "Essa pessoa já está na expedição de destino." };
+    const antiga = p.expedicao_id;
+    for (let i = mockPassageiroRequisitos.length - 1; i >= 0; i--) {
+      if (mockPassageiroRequisitos[i].passageiro_id === passageiroId) mockPassageiroRequisitos.splice(i, 1);
+    }
+    p.expedicao_id = novaExpedicaoId; p.grupo_id = null; p.conexao_viagem_id = null; p.quarto_id = null;
+    p.updated_at = new Date().toISOString();
+    await gerarRequisitosPadrao(novaExpedicaoId);
+    if (antiga) { revalidatePath(`/expedicoes/${antiga}/passageiros`); revalidatePath(`/expedicoes/${antiga}`); }
+    revalidatePath(`/expedicoes/${novaExpedicaoId}/passageiros`);
+    revalidatePath(`/expedicoes/${novaExpedicaoId}`);
+    revalidatePath("/passageiros");
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { data: alvo } = await supabase
+    .from("passageiros")
+    .select("id, cpf, bitrix_contact_id, email, nome_completo, expedicao_id")
+    .eq("id", passageiroId)
+    .maybeSingle();
+  if (!alvo) return { ok: false, error: "Passageiro não encontrado" };
+  const antiga = (alvo as PassageiroRow).expedicao_id;
+  if (antiga === novaExpedicaoId) return { ok: false, error: "Já está nessa expedição." };
+
+  // Evita duplicar: a mesma pessoa não pode ter duas linhas na expedição de destino.
+  const chave = chaveIdentidade(alvo as PassageiroRow);
+  const todos = await fetchAllRows<PassageiroRow>((from, to) =>
+    supabase.from("passageiros").select("id, cpf, bitrix_contact_id, email, nome_completo, expedicao_id").order("id").range(from, to));
+  if (todos.some((p) => p.id !== passageiroId && p.expedicao_id === novaExpedicaoId && chaveIdentidade(p) === chave))
+    return { ok: false, error: "Essa pessoa já está na expedição de destino." };
+
+  // Requisitos e alocação de quarto eram da expedição antiga → limpa.
+  await supabase.from("passageiro_requisitos").delete().eq("passageiro_id", passageiroId);
+  await supabase.from("passageiro_quarto").delete().eq("passageiro_id", passageiroId);
+  const { error } = await supabase
+    .from("passageiros")
+    .update({ expedicao_id: novaExpedicaoId, grupo_id: null, conexao_viagem_id: null, quarto_id: null })
+    .eq("id", passageiroId);
+  if (error) return { ok: false, error: error.message };
+  await gerarRequisitosPadrao(novaExpedicaoId);
+
+  if (antiga) { revalidatePath(`/expedicoes/${antiga}/passageiros`); revalidatePath(`/expedicoes/${antiga}`); }
+  revalidatePath(`/expedicoes/${novaExpedicaoId}/passageiros`);
+  revalidatePath(`/expedicoes/${novaExpedicaoId}`);
+  revalidatePath("/passageiros");
+  revalidatePath("/avisos");
+  return { ok: true };
+}
+
+/**
  * Exclui a PESSOA inteira da base operacional: remove TODAS as linhas
  * `passageiros` da mesma identidade (todas as expedições + a linha avulsa) e
  * seus requisitos. `refId` é qualquer linha da pessoa. Usado no perfil global

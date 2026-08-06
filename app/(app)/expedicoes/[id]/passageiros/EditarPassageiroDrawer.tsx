@@ -44,6 +44,7 @@ import type { ArquivoRow, PassageiroRow, Tables, SaudePassageiro } from "@/types
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { SaudeCampos } from "./SaudeCampos";
 import { FidelidadeBadge } from "./FidelidadeBadge";
+import { MudarExpedicao } from "./MudarExpedicao";
 
 const schema = z.object({
   nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
@@ -450,19 +451,27 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
 
         <DrawerFooter>
           {passageiro && (
-            <ConfirmDeleteButton
-              triggerLabel="Remover desta expedição"
-              triggerClassName="mr-auto"
-              ariaLabel="Remover passageiro desta expedição"
-              title={`Remover "${passageiro.nome_completo}" desta expedição?`}
-              description="Remove o passageiro apenas desta expedição. A pessoa continua no sistema (na base global e em outras expedições, se houver). Para apagá-la de vez, use o perfil em Passageiros."
-              successMessage="Passageiro removido desta expedição"
-              onConfirm={() => excluirPassageiro(passageiro.id, expedicaoId)}
-              onDeleted={() => {
-                onOpenChange(false);
-                router.refresh();
-              }}
-            />
+            <div className="mr-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              {!somenteLeitura && (
+                <MudarExpedicao
+                  passageiroId={passageiro.id}
+                  expedicaoAtualId={expedicaoId}
+                  onMudou={() => { onOpenChange(false); router.refresh(); }}
+                />
+              )}
+              <ConfirmDeleteButton
+                triggerLabel="Remover desta expedição"
+                ariaLabel="Remover passageiro desta expedição"
+                title={`Remover "${passageiro.nome_completo}" desta expedição?`}
+                description="Remove o passageiro apenas desta expedição. A pessoa continua no sistema (na base global e em outras expedições, se houver). Para apagá-la de vez, use o perfil em Passageiros."
+                successMessage="Passageiro removido desta expedição"
+                onConfirm={() => excluirPassageiro(passageiro.id, expedicaoId)}
+                onDeleted={() => {
+                  onOpenChange(false);
+                  router.refresh();
+                }}
+              />
+            </div>
           )}
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
