@@ -524,10 +524,17 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
   **edita**. Portão de privacidade = CPF + nascimento (nascimento divergente → `conflito`,
   não revela nada). **Todos os campos são obrigatórios** (validação por etapa no client +
   `essenciaisFaltando` no servidor pra inscrição nova).
-- **Área de espera (migration 0037):** o envio **NÃO grava mais no `passageiros`**.
-  Guarda a inscrição em `inscricoes_pendentes` (jsonb `dados` + `passaporte_arquivo_id`;
-  unique `(expedicao_id, cpf)` → reenvio substitui). O anexo do passaporte é subido na
-  hora com `passageiro_id = null` (linkado só na aprovação).
+- **Área de espera (migration 0037):** a RESERVA na expedição só materializa na
+  aprovação. O envio guarda a inscrição em `inscricoes_pendentes` (jsonb `dados` +
+  `passaporte_arquivo_id`; unique `(expedicao_id, cpf)` → reenvio substitui). O anexo
+  do passaporte é subido na hora com `passageiro_id = null` (linkado só na aprovação).
+- **Perfil salvo no GLOBAL já no envio (cinto de segurança):** pra o dado NÃO se perder
+  antes/independente da aprovação, `enviarInscricao` chama `salvarPerfilGlobalInscricao`
+  (`lib/inscricao/core.ts`, best-effort). Pessoa que já existe → preenche só o que está
+  **vazio** nas linhas dela (não sobrescreve edição do operacional; saúde mescla). Pessoa
+  nova → cria uma linha **AVULSA** (`expedicao_id null`, `pendente_aprovacao=true`, status
+  Lead). Na aprovação, `materializarInscricao` **reaproveita a avulsa** (converte em
+  reserva da expedição, setando `expedicao_id`) em vez de criar linha nova — sem duplicar.
 - **Materialização na APROVAÇÃO:** `aprovarInscricao` (fila `/inscricoes`) lê a pendência
   e chama `materializarInscricao` → cria/atualiza a linha do passageiro (**sobrescreve**
   com os dados revisados), promove Lead→Pré-reserva, **propaga** os dados pessoais para as

@@ -268,6 +268,89 @@ function pessoaisPropagar(d: Dados): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Ao ENVIAR a inscrição, grava o PERFIL PESSOAL na base global — pra o dado não
+ * se perder mesmo antes/independente da aprovação (a reserva na expedição segue
+ * dependendo do aprovador). Pessoa que já existe: preenche só o que está VAZIO
+ * (não sobrescreve dado editado pelo operacional). Pessoa nova: cria uma linha
+ * AVULSA (expedicao_id null) que a aprovação depois converte na reserva.
+ * Best-effort: nunca lança (não pode quebrar o envio da inscrição).
+ */
+export async function salvarPerfilGlobalInscricao(
+  d: Dados,
+  cpf: string,
+  passaporteArqId: string | null,
+  fotoArqId: string | null,
+): Promise<void> {
+  try {
+    const campos = novosCampos(d, cpf) as Record<string, unknown>;
+    const pessoal: Record<string, unknown> = {};
+    for (const k of CAMPOS_PESSOAIS_CARRY) if (k in campos) pessoal[k] = campos[k];
+    pessoal.perfil_viajante = campos.perfil_viajante;
+    if (passaporteArqId) pessoal.passaporte_arquivo_id = passaporteArqId;
+    if (fotoArqId) pessoal.foto_arquivo_id = fotoArqId;
+
+    const vazio = (v: unknown) => v == null || v === "" || (typeof v === "object" && v !== null && Object.keys(v).length === 0);
+    const temAlgo = (k: string, v: unknown) =>
+      k === "saude" ? temSaude(v)
+        : k === "perfil_viajante" ? !!(v && typeof v === "object" && Object.values(v).some((x) => temValor(x)))
+        : temValor(v);
+
+    const linhas = await acharLinhasPorCpf(cpf);
+
+    // Monta o patch "só preenche vazio" pra uma linha existente (saúde mescla).
+    const patchVazios = (l: Pax): Record<string, unknown> => {
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(pessoal)) {
+        if (k === "saude") {
+          const atual = (l.saude ?? {}) as Record<string, unknown>;
+          if (temSaude(v)) patch.saude = { ...(v as Record<string, unknown>), ...atual }; // atual vence
+          continue;
+        }
+        if (vazio((l as Record<string, unknown>)[k]) && temAlgo(k, v)) patch[k] = v;
+      }
+      return patch;
+    };
+
+    if (DEV_USE_MOCK_DATA) {
+      if (linhas.length) {
+        for (const l of mockPassageiros) {
+          if (!linhas.some((x) => x.id === l.id)) continue;
+          Object.assign(l, patchVazios(l), { updated_at: new Date().toISOString() });
+        }
+      } else {
+        const now = new Date().toISOString();
+        mockPassageiros.push({
+          ...PASSAGEIRO_INSCRICAO_DEFAULTS, ...novosCampos(d, cpf),
+          id: `p${Math.random().toString(36).slice(2, 14).padEnd(12, "0")}`,
+          expedicao_id: null, grupo_id: null, conexao_viagem_id: null, quarto_id: null,
+          passaporte_arquivo_id: passaporteArqId, foto_arquivo_id: fotoArqId,
+          status_reserva: "Lead", pendente_aprovacao: true, created_at: now, updated_at: now,
+        } as unknown as Pax);
+      }
+      return;
+    }
+
+    const sb = createServiceRoleClient();
+    if (linhas.length) {
+      for (const l of linhas) {
+        const patch = patchVazios(l);
+        if (Object.keys(patch).length) await sb.from("passageiros").update(patch).eq("id", l.id);
+      }
+    } else {
+      const registro: Record<string, unknown> = {
+        ...novosCampos(d, cpf),
+        expedicao_id: null, grupo_id: null, conexao_viagem_id: null, quarto_id: null,
+        passaporte_arquivo_id: passaporteArqId, foto_arquivo_id: fotoArqId,
+        status_reserva: "Lead", pendente_aprovacao: true,
+      };
+      await sb.from("passageiros").insert(registro);
+    }
+  } catch {
+    // best-effort: se falhar, o envio da inscrição segue (a pendência já foi salva).
+  }
+}
+
 export type PendenteMaterializar = {
   expedicao_id: string;
   cpf: string;
@@ -285,7 +368,11 @@ export type PendenteMaterializar = {
 export async function materializarInscricao(pend: PendenteMaterializar): Promise<Pax | null> {
   const { expedicao_id, cpf, dados: d, passaporte_arquivo_id, foto_arquivo_id } = pend;
   const linhas = await acharLinhasPorCpf(cpf);
-  const existente = linhas.find((l) => l.expedicao_id === expedicao_id) ?? null;
+  // Prefere a linha DESTA expedição; senão, reaproveita a AVULSA (criada no envio,
+  // pra o perfil não se perder) convertendo-a na reserva desta expedição.
+  const existente = linhas.find((l) => l.expedicao_id === expedicao_id)
+    ?? linhas.find((l) => l.expedicao_id == null)
+    ?? null;
   const perfil = agregarPerfil(linhas);
 
   // ── MOCK ──
@@ -298,6 +385,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
     if (existente) {
       const patch = patchAtualizar(existente, d);
       patch.pendente_aprovacao = false;
+      if (existente.expedicao_id !== expedicao_id) patch.expedicao_id = expedicao_id; // avulsa → reserva
       if (existente.status_reserva === "Lead") patch.status_reserva = "Pré-reserva";
       if (passaporte_arquivo_id) patch.passaporte_arquivo_id = passaporte_arquivo_id;
       if (foto_arquivo_id) patch.foto_arquivo_id = foto_arquivo_id;
@@ -349,6 +437,7 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
   if (existente) {
     const patch = patchAtualizar(existente, d);
     patch.pendente_aprovacao = false;
+    if (existente.expedicao_id !== expedicao_id) patch.expedicao_id = expedicao_id; // avulsa → reserva
     if (existente.status_reserva === "Lead") patch.status_reserva = "Pré-reserva";
     if (passaporte_arquivo_id) patch.passaporte_arquivo_id = passaporte_arquivo_id;
     if (foto_arquivo_id) patch.foto_arquivo_id = foto_arquivo_id;

@@ -8,7 +8,7 @@ import { mockInscricoesPendentes } from "@/lib/mock-data";
 import { addArquivoMock } from "@/lib/data/arquivos-mock";
 import {
   dadosSchema, acharLinhasPorCpf, agregarPerfil, montarValores, CAMPOS_CHECAR, temValor,
-  essenciaisFaltando, validarArquivo, safeName,
+  essenciaisFaltando, validarArquivo, safeName, salvarPerfilGlobalInscricao,
   type Pax, type ValoresInscricao,
 } from "@/lib/inscricao/core";
 import type { ExpedicaoRow, InscricaoPendenteRow, Json } from "@/types/database";
@@ -238,11 +238,16 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     } else {
       mockInscricoesPendentes.push({ ...registro, id: `insc${Math.random().toString(36).slice(2, 12)}`, created_at: now, updated_at: now });
     }
+    // Cinto de segurança: grava o perfil na base global já no envio (não perde o dado).
+    await salvarPerfilGlobalInscricao(d, cpf, passaporteArqId, fotoArqId);
     return { ok: true, completou: !!(existente || perfil) };
   }
 
   const sb = createServiceRoleClient();
   const up = await sb.from("inscricoes_pendentes").upsert(registro, { onConflict: "expedicao_id,cpf" });
   if (up.error) return { ok: false, error: up.error.message };
+  // Cinto de segurança: grava o perfil na base global já no envio (não perde o dado
+  // mesmo antes/independente da aprovação). Best-effort — não quebra o envio.
+  await salvarPerfilGlobalInscricao(d, cpf, passaporteArqId, fotoArqId);
   return { ok: true, completou: !!(existente || perfil) };
 }
