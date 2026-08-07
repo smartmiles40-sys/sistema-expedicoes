@@ -94,6 +94,58 @@ export function aniversarioNaViagem(
   return null;
 }
 
+/** Meses (número 1-12) que a expedição atravessa, do embarque ao retorno (inclusive). */
+export function mesesDaExpedicao(
+  embarque: string | null | undefined,
+  retorno: string | null | undefined,
+): number[] {
+  const emb = (embarque ?? "").slice(0, 10);
+  const ret = (retorno ?? "").slice(0, 10);
+  if (emb.length < 10 || ret.length < 10 || ret < emb) return [];
+  const out: number[] = [];
+  let y = Number(emb.slice(0, 4)), m = Number(emb.slice(5, 7));
+  const yEnd = Number(ret.slice(0, 4)), mEnd = Number(ret.slice(5, 7));
+  for (let i = 0; i < 24 && (y < yEnd || (y === yEnd && m <= mEnd)); i++) {
+    if (!out.includes(m)) out.push(m);
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+/**
+ * Se o passageiro faz aniversário em ALGUM mês que a expedição atravessa (mesmo
+ * fora das datas exatas da viagem), retorna a data do aniversário no ano da
+ * expedição, o dia, o mês, a idade e se cai DURANTE a viagem. Senão null.
+ * Quando a expedição pega dois meses, aniversariantes dos dois entram.
+ */
+export function aniversarioNoMesDaExpedicao(
+  nascimento: string | null | undefined,
+  embarque: string | null | undefined,
+  retorno: string | null | undefined,
+): { data: string; dia: number; mes: number; idade: number | null; naViagem: boolean } | null {
+  if (!nascimento || !embarque || !retorno) return null;
+  const nasc = nascimento.slice(0, 10);
+  const emb = embarque.slice(0, 10), ret = retorno.slice(0, 10);
+  if (nasc.length < 10 || emb.length < 10 || ret.length < 10 || ret < emb) return null;
+  const mesNasc = Number(nasc.slice(5, 7));
+  // Acha o ano em que esse mês ocorre dentro do intervalo da expedição.
+  let y = Number(emb.slice(0, 4)), m = Number(emb.slice(5, 7));
+  const yEnd = Number(ret.slice(0, 4)), mEnd = Number(ret.slice(5, 7));
+  let ano: number | null = null;
+  for (let i = 0; i < 24 && (y < yEnd || (y === yEnd && m <= mEnd)); i++) {
+    if (m === mesNasc) { ano = y; break; }
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  if (ano == null) return null;
+  const data = `${ano}-${nasc.slice(5)}`;
+  const anoNasc = Number(nasc.slice(0, 4));
+  return {
+    data, dia: Number(nasc.slice(8, 10)), mes: mesNasc,
+    idade: anoNasc > 0 ? ano - anoNasc : null,
+    naViagem: data >= emb && data <= ret,
+  };
+}
+
 export function generateExpedicaoCodigo(destino: string, dataEmbarque: string | Date): string {
   const meses = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
   const d = typeof dataEmbarque === "string" ? parseISO(dataEmbarque) : dataEmbarque;

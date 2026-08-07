@@ -12,7 +12,7 @@ import { construirPosicoesFidelidade, ehMarco, ordinalFem } from "@/lib/fidelida
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatDate, daysUntil, aniversarioNaViagem, cn } from "@/lib/utils";
+import { formatDate, daysUntil, aniversarioNoMesDaExpedicao, cn } from "@/lib/utils";
 import { Calendar, ShieldCheck, PartyPopper, Star, Cake, Sparkles } from "lucide-react";
 import { DocumentosPendentesCard } from "./DocumentosPendentesCard";
 
@@ -42,8 +42,8 @@ export default async function VisaoGeralPage({
     .sort((a, b) => (b.pos ?? 0) - (a.pos ?? 0));
   const estreantes = paxAtivos.filter((p) => posicoes[p.id] === 1);
   const aniversariantes = paxAtivos
-    .map((p) => ({ p, aniv: aniversarioNaViagem(p.data_nascimento, expedicao?.data_embarque, expedicao?.data_retorno) }))
-    .filter((x): x is { p: (typeof paxAtivos)[number]; aniv: { data: string; idade: number | null } } => x.aniv != null)
+    .map((p) => ({ p, aniv: aniversarioNoMesDaExpedicao(p.data_nascimento, expedicao?.data_embarque, expedicao?.data_retorno) }))
+    .filter((x): x is { p: (typeof paxAtivos)[number]; aniv: NonNullable<ReturnType<typeof aniversarioNoMesDaExpedicao>> } => x.aniv != null)
     .sort((a, b) => a.aniv.data.localeCompare(b.aniv.data));
   const temMomentos = marcos.length + estreantes.length + aniversariantes.length > 0;
 
@@ -166,12 +166,12 @@ export default async function VisaoGeralPage({
                 </MomentoGrupo>
               )}
               {aniversariantes.length > 0 && (
-                <MomentoGrupo icone={<Cake className="h-3.5 w-3.5" />} cor="text-atencao-600" bg="bg-atencao-100" titulo="Aniversariantes na viagem">
+                <MomentoGrupo icone={<Cake className="h-3.5 w-3.5" />} cor="text-atencao-600" bg="bg-atencao-100" titulo="Aniversariantes do mês">
                   {aniversariantes.map(({ p, aniv }) => (
                     <MomentoItem
                       key={p.id}
                       nome={p.nome_completo}
-                      detalhe={`🎂 ${formatDate(aniv.data)}${aniv.idade != null ? ` — faz ${aniv.idade} anos` : ""}`}
+                      detalhe={`🎂 ${formatDate(aniv.data)}${aniv.idade != null ? ` — faz ${aniv.idade} anos` : ""}${aniv.naViagem ? " · 🎉 durante a viagem" : ""}`}
                     />
                   ))}
                 </MomentoGrupo>
