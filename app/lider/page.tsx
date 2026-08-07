@@ -400,6 +400,7 @@ const MESES_PT = ["", "janeiro", "fevereiro", "março", "abril", "maio", "junho"
  * Destaca quem faz aniversário DURANTE a viagem. Aparece na Área do Líder.
  */
 function Aniversariantes({ exp }: { exp: LiderExpedicao }) {
+  const [aberto, setAberto] = React.useState(false);
   const lista = exp.passageiros
     .map((p) => {
       const a = aniversarioNoMesDaExpedicao(p.data_nascimento, exp.data_embarque, exp.data_retorno);
@@ -411,33 +412,45 @@ function Aniversariantes({ exp }: { exp: LiderExpedicao }) {
   const meses = [...new Set(lista.map((x) => x.mes))].map((m) => MESES_PT[m]);
 
   return (
-    <section className="rounded-xl border border-lista-600/30 bg-lista-50/60 p-3 dark:bg-lista-600/10">
-      <h3 className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-lista-700 dark:text-lista-300">
-        🎂 Aniversariantes do mês
-      </h3>
-      <p className="mb-2 text-[11px] text-muted-foreground">
-        Quem faz aniversário em {meses.join(" ou ")} — dá pra preparar uma surpresa. 🎉
-      </p>
-      <ul className="space-y-1">
-        {lista.map((x) => (
-          <li key={x.p.id} className="flex items-center gap-2 rounded-lg bg-background/70 px-2.5 py-1.5">
-            <Avatar nome={x.p.nome_completo} size={22} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{x.p.nome_completo}</span>
-            {x.idade != null && <span className="shrink-0 text-[11px] text-muted-foreground">faz {x.idade}</span>}
-            <span className="shrink-0 rounded-full bg-lista-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-lista-600">
-              {String(x.dia).padStart(2, "0")}/{String(x.mes).padStart(2, "0")}
-            </span>
-            {x.naViagem && (
-              <span
-                title="Faz aniversário durante a viagem!"
-                className="shrink-0 rounded-full bg-[var(--brand-lime)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand-dark)]"
-              >
-                na viagem 🎉
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
+    <section className="overflow-hidden rounded-xl border border-lista-600/30 bg-lista-50/60 dark:bg-lista-600/10">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-3 py-2 text-left"
+        aria-expanded={aberto}
+      >
+        <span className="text-[13px] font-semibold text-lista-700 dark:text-lista-300">🎂 Aniversariantes do mês</span>
+        <span className="rounded-full bg-lista-100 px-1.5 py-0.5 text-[11px] font-semibold text-lista-600">{lista.length}</span>
+        <span className="hidden text-[11px] text-muted-foreground sm:inline">· {meses.join(" e ")}</span>
+        <ChevronRight className={cn("ml-auto h-4 w-4 text-lista-600 transition-transform", aberto && "rotate-90")} />
+      </button>
+      {aberto && (
+        <div className="px-3 pb-3">
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Quem faz aniversário em {meses.join(" ou ")} — dá pra preparar uma surpresa. 🎉
+          </p>
+          <ul className="space-y-1">
+            {lista.map((x) => (
+              <li key={x.p.id} className="flex items-center gap-2 rounded-lg bg-background/70 px-2.5 py-1.5">
+                <Avatar nome={x.p.nome_completo} size={22} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{x.p.nome_completo}</span>
+                {x.idade != null && <span className="shrink-0 text-[11px] text-muted-foreground">faz {x.idade}</span>}
+                <span className="shrink-0 rounded-full bg-lista-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-lista-600">
+                  {String(x.dia).padStart(2, "0")}/{String(x.mes).padStart(2, "0")}
+                </span>
+                {x.naViagem && (
+                  <span
+                    title="Faz aniversário durante a viagem!"
+                    className="shrink-0 rounded-full bg-[var(--brand-lime)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand-dark)]"
+                  >
+                    na viagem 🎉
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
