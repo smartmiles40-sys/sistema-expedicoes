@@ -93,6 +93,17 @@ type Trecho = {
   quartos: QuartoRow[];
 };
 
+/** Rótulo da faixa de grupo no export do rooming. */
+function rotuloGrupoExport(g: GrupoEgito | "misto" | null): string {
+  return g === "G1"
+    ? "Grupo 1 (G1)"
+    : g === "G2"
+      ? "Grupo 2 (G2)"
+      : g === "misto"
+        ? "Grupo misto"
+        : "Sem grupo definido";
+}
+
 export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino, grupos }: Props) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
@@ -502,8 +513,35 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
         c.border = todasBordas;
       }
 
+      // Com grupos mapeados, ordena os quartos por grupo (G1 → G2 → sem grupo)
+      // e injeta uma faixa "Grupo 1 (G1)" / "Grupo 2 (G2)" antes de cada bloco.
+      const quartosDoTrecho = temGrupos
+        ? [...t.quartos].sort((a, b) => {
+            const d = prioridadeQuarto(a) - prioridadeQuarto(b);
+            return d !== 0
+              ? d
+              : String(a.numero).localeCompare(String(b.numero), "pt-BR", { numeric: true });
+          })
+        : t.quartos;
+
       let r = 5;
-      for (const q of t.quartos) {
+      let grupoAtual: number | null = null;
+      for (const q of quartosDoTrecho) {
+        if (temGrupos) {
+          const g = grupoDoQuarto(q);
+          const pr = prioridadeQuarto(q);
+          if (pr !== grupoAtual) {
+            grupoAtual = pr;
+            ws.mergeCells(`A${r}:H${r}`);
+            const gc = ws.getRow(r).getCell(1);
+            gc.value = rotuloGrupoExport(g);
+            gc.font = { bold: true, color: { argb: "FF1E293B" } };
+            gc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
+            gc.alignment = { vertical: "middle" };
+            for (let col = 1; col <= NCOL; col++) ws.getRow(r).getCell(col).border = todasBordas;
+            r++;
+          }
+        }
         const ocup = (ocupantesPorQuarto.get(q.id) ?? []).map((id) => paxById.get(id)).filter(Boolean) as PassageiroRow[];
         const linhas: (PassageiroRow | null)[] = ocup.length ? ocup : [null];
         linhas.forEach((p, i) => {
