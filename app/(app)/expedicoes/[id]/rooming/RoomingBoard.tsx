@@ -472,22 +472,26 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
 
     for (const t of trechos) {
       const ws = wb.addWorksheet(nomeAba(t.hotel_cidade ?? "Hotel"));
-      ws.columns = [{ width: 16 }, { width: 16 }, { width: 34 }, { width: 12 }];
+      ws.columns = [
+        { width: 16 }, { width: 16 }, { width: 34 }, { width: 12 },
+        { width: 18 }, { width: 16 }, { width: 18 }, { width: 18 },
+      ];
+      const NCOL = 8;
 
-      ws.mergeCells("A1:D1");
+      ws.mergeCells("A1:H1");
       const titulo = ws.getCell("A1");
       titulo.value = `Rooming — ${t.hotel_cidade ?? "Hotel"}`;
       titulo.font = { bold: true, size: 14 };
 
-      ws.mergeCells("A2:D2");
+      ws.mergeCells("A2:H2");
       const sub = ws.getCell("A2");
       sub.value = `Check-in: ${t.check_in ? formatDate(t.check_in) : "—"}    •    Check-out: ${t.check_out ? formatDate(t.check_out) : "—"}`;
       sub.font = { italic: true, color: { argb: "FF64748B" } };
 
       const head = ws.getRow(4);
-      head.values = ["Quarto", "Tipo do quarto", "Passageiro", "Tipo"];
+      head.values = ["Quarto", "Tipo do quarto", "Passageiro", "Tipo", "Data de nascimento", "Nº passaporte", "Venc. passaporte", "CPF"];
       head.height = 18;
-      for (let col = 1; col <= 4; col++) {
+      for (let col = 1; col <= NCOL; col++) {
         const c = head.getCell(col);
         c.font = { bold: true, color: { argb: "FFFFFFFF" } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
@@ -506,7 +510,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
           row.getCell(2).value = i === 0 ? q.tipo : "";
           row.getCell(3).value = p ? p.nome_completo : "(vazio)";
           row.getCell(4).value = p ? p.tipo : "";
-          for (let col = 1; col <= 4; col++) {
+          row.getCell(5).value = p?.data_nascimento ? formatDate(p.data_nascimento) : "";
+          row.getCell(6).value = p?.passaporte ?? "";
+          row.getCell(7).value = p?.validade_passaporte ? formatDate(p.validade_passaporte) : "";
+          row.getCell(8).value = p?.cpf ?? "";
+          for (let col = 1; col <= NCOL; col++) {
             const c = row.getCell(col);
             c.border = { top: borda, left: borda, bottom: ultima ? separador : borda, right: borda };
             if (col <= 2 && i === 0) c.font = { bold: true };
