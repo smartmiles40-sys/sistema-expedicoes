@@ -296,12 +296,18 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                   // Só separa por grupo se houver mais de um grupo na seção.
                   const distintos = new Set(linhas.map((p) => grupoLabel(p) ?? "—"));
                   const separar = distintos.size > 1;
+                  // Quantos passageiros em cada grupo (pra mostrar ao lado do rótulo).
+                  const contagem = new Map<string, number>();
+                  for (const p of linhas) {
+                    const k = grupoLabel(p) ?? "—";
+                    contagem.set(k, (contagem.get(k) ?? 0) + 1);
+                  }
                   const out: React.ReactNode[] = [];
                   let ultimo: string | null | undefined = undefined;
                   for (const p of linhas) {
                     const g = grupoLabel(p);
                     if (separar && g !== ultimo) {
-                      out.push(<GrupoDivider key={`div-${g ?? "sem"}`} grupo={g} />);
+                      out.push(<GrupoDivider key={`div-${g ?? "sem"}`} grupo={g} total={contagem.get(g ?? "—") ?? 0} />);
                       ultimo = g;
                     }
                     out.push(renderLinha(p));
@@ -502,7 +508,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
   );
 }
 
-function GrupoDivider({ grupo }: { grupo: string | null }) {
+function GrupoDivider({ grupo, total }: { grupo: string | null; total: number }) {
   const label = grupo === "G1" ? "Grupo 1 (G1)" : grupo === "G2" ? "Grupo 2 (G2)" : "Sem grupo definido";
   const cor =
     grupo === "G1" ? "bg-editavel-100 text-editavel-700"
@@ -512,6 +518,9 @@ function GrupoDivider({ grupo }: { grupo: string | null }) {
     <tr className="border-b border-border">
       <td colSpan={11} className={cn("px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", cor)}>
         {label}
+        <span className="ml-1.5 font-semibold normal-case tabular-nums opacity-80">
+          · {total} {total === 1 ? "pessoa" : "pessoas"}
+        </span>
       </td>
     </tr>
   );
