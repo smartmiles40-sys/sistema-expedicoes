@@ -515,14 +515,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
 
       // Com grupos mapeados, ordena os quartos por grupo (G1 → G2 → sem grupo)
       // e injeta uma faixa "Grupo 1 (G1)" / "Grupo 2 (G2)" antes de cada bloco.
-      const quartosDoTrecho = temGrupos
-        ? [...t.quartos].sort((a, b) => {
-            const d = prioridadeQuarto(a) - prioridadeQuarto(b);
-            return d !== 0
-              ? d
-              : String(a.numero).localeCompare(String(b.numero), "pt-BR", { numeric: true });
-          })
-        : t.quartos;
+      const cmpNumero = (a: QuartoRow, b: QuartoRow) =>
+        String(a.numero).localeCompare(String(b.numero), "pt-BR", { numeric: true });
+      const quartosDoTrecho = [...t.quartos].sort((a, b) =>
+        temGrupos ? (prioridadeQuarto(a) - prioridadeQuarto(b) || cmpNumero(a, b)) : cmpNumero(a, b),
+      );
 
       let r = 5;
       let grupoAtual: number | null = null;
@@ -990,9 +987,12 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                     </div>
                   </Dropzone>
 
-                  {/* Quartos do hotel — G1 em cima, depois G2, depois sem grupo */}
+                  {/* Quartos do hotel — G1 em cima, depois G2, depois sem grupo; dentro do grupo, em ordem numérica */}
                   <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[...t.quartos].sort((a, b) => prioridadeQuarto(a) - prioridadeQuarto(b)).map((q) => {
+                    {[...t.quartos].sort((a, b) =>
+                      prioridadeQuarto(a) - prioridadeQuarto(b) ||
+                      String(a.numero).localeCompare(String(b.numero), "pt-BR", { numeric: true }),
+                    ).map((q) => {
                       const ocupIds = ocupantesPorQuarto.get(q.id) ?? [];
                       const cap = CAPACIDADE[q.tipo] ?? 1;
                       const cheio = ocupIds.length >= cap;
