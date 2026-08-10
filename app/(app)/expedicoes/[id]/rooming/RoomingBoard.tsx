@@ -205,6 +205,9 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
   // Escolha manual do passageiro correspondente por linha (pax.id -> id escolhido).
   // Resolve o caso de o nome ter sido escrito de um jeito diferente na inscrição.
   const [escolhaAcompanhante, setEscolhaAcompanhante] = React.useState<Record<string, string>>({});
+  // Painéis recolhíveis (começam fechados pra não empurrar os quartos pra baixo).
+  const [conexoesAberto, setConexoesAberto] = React.useState(false);
+  const [acompAberto, setAcompAberto] = React.useState(false);
   const paxOrdenados = React.useMemo(
     () => [...paxAtivos].sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR")),
     [paxAtivos],
@@ -649,17 +652,24 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
         {/* Conexões "viajam juntas" (mesmo quarto) */}
         <section className="rounded-md border border-border">
           <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2">
-            <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => setConexoesAberto((v) => !v)}
+              className="flex items-center gap-2 min-w-0 flex-1 text-left"
+            >
+              {conexoesAberto ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
               <Users className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="font-semibold text-[13px]">Viajam juntas</span>
               <span className="text-[11px] text-muted-foreground">ficam no mesmo quarto</span>
-            </div>
+              {conexoes.length > 0 && <Badge variant="auto">{conexoes.length}</Badge>}
+            </button>
             {!somenteLeitura && (
               <Button variant="outline" size="sm" onClick={() => setConexaoDrawer({ membros: [] })}>
                 <Link2 className="h-3 w-3" /> Nova conexão
               </Button>
             )}
           </header>
+          {conexoesAberto && (
           <div className="p-3">
             {conexoes.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">
@@ -696,16 +706,24 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
               </div>
             )}
           </div>
+          )}
         </section>
 
         {/* Acompanhantes indicados na inscrição (sugestão de conexão) */}
         {acompanhantes.length > 0 && (
           <section className="rounded-md border border-border">
-            <header className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setAcompAberto((v) => !v)}
+              className="flex w-full items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-left"
+            >
+              {acompAberto ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
               <BedDouble className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="text-[13px] font-semibold">Acompanhantes indicados</span>
               <span className="text-[11px] text-muted-foreground">informado na inscrição</span>
-            </header>
+              <Badge variant="auto">{acompanhantes.length}</Badge>
+            </button>
+            {acompAberto && (
             <div className="space-y-1.5 p-3">
               {acompanhantes.map(({ pax, partes, jaConectados }) => {
                 // Um seletor por nome indicado; pré-seleciona o palpite automático (sugerido).
@@ -760,6 +778,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                 );
               })}
             </div>
+            )}
           </section>
         )}
 
