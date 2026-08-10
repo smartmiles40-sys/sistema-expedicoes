@@ -17,7 +17,6 @@ import { atualizarQuarto } from "@/app/(app)/expedicoes/actions";
 import type { QuartoRow } from "@/types/database";
 
 const schema = z.object({
-  numero: z.string().min(1, "Número obrigatório"),
   tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
   hotel_cidade: z.string().optional(),
   check_in: z.string().optional(),
@@ -39,13 +38,12 @@ export function EditarQuartoDrawer({ expedicaoId, quarto, onOpenChange }: Props)
   const router = useRouter();
   const open = quarto !== null;
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting, isDirty } } =
+  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting, isDirty } } =
     useForm<FormData>({ resolver: zodResolver(schema) });
 
   React.useEffect(() => {
     if (!quarto) return;
     reset({
-      numero: quarto.numero,
       tipo: quarto.tipo,
       hotel_cidade: quarto.hotel_cidade ?? "",
       check_in: quarto.check_in?.slice(0, 10) ?? "",
@@ -58,7 +56,6 @@ export function EditarQuartoDrawer({ expedicaoId, quarto, onOpenChange }: Props)
   async function onSubmit(data: FormData) {
     if (!quarto) return;
     const r = await atualizarQuarto(quarto.id, expedicaoId, {
-      numero: data.numero,
       tipo: data.tipo,
       hotel_cidade: data.hotel_cidade?.trim() || null,
       check_in: data.check_in || null,
@@ -85,9 +82,11 @@ export function EditarQuartoDrawer({ expedicaoId, quarto, onOpenChange }: Props)
           <DrawerBody>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label htmlFor="eq-numero">Número/Identificador</Label>
-                <Input id="eq-numero" {...register("numero")} />
-                {errors.numero && <p className="text-[11px] text-critico-600">{errors.numero.message}</p>}
+                <Label>Número</Label>
+                <div className="flex h-9 items-center rounded-md border border-border bg-muted/40 px-2.5 text-[13px] font-medium text-muted-foreground">
+                  Quarto {quarto?.numero ?? "—"}
+                </div>
+                <p className="text-[11px] text-muted-foreground">Numeração automática — não editável.</p>
               </div>
               <div className="space-y-1">
                 <Label>Tipo</Label>

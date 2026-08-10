@@ -16,7 +16,6 @@ import { TIPO_QUARTO } from "@/lib/constants";
 import { criarQuarto } from "@/app/(app)/expedicoes/actions";
 
 const schema = z.object({
-  numero: z.string().min(1, "Número obrigatório"),
   tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
   hotel_cidade: z.string().optional(),
   check_in: z.string().optional(),
@@ -33,7 +32,7 @@ interface Props {
 
 export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange }: Props) {
   const router = useRouter();
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } =
+  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
       defaultValues: { tipo: "Duplo" },
@@ -62,21 +61,17 @@ export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange }: Props) {
             <DrawerTitle>Novo quarto</DrawerTitle>
           </DrawerHeader>
           <DrawerBody>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="nq-numero">Número/Identificador</Label>
-                <Input id="nq-numero" {...register("numero")} placeholder="101 ou Q-A" autoFocus />
-                {errors.numero && <p className="text-[11px] text-critico-600">{errors.numero.message}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label>Tipo</Label>
-                <Select value={watch("tipo")} onValueChange={(v) => setValue("tipo", v as "Duplo", { shouldDirty: true })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TIPO_QUARTO.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1">
+              <Label>Tipo</Label>
+              <Select value={watch("tipo")} onValueChange={(v) => setValue("tipo", v as "Duplo", { shouldDirty: true })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIPO_QUARTO.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                O número do quarto é atribuído automaticamente, em ordem, dentro de cada hotel.
+              </p>
             </div>
 
             <div className="space-y-1">

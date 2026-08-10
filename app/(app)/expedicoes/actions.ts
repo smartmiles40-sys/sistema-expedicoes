@@ -919,7 +919,8 @@ export async function adicionarPassageiroExistente(
 
 const novoQuartoSchema = z.object({
   expedicao_id: z.string().min(1),
-  numero: z.string().min(1, "Número obrigatório"),
+  // numero é atribuído automaticamente (numeração sequencial por trecho); ignorado se vier.
+  numero: z.string().optional().nullable(),
   tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
   hotel_cidade: z.string().optional().nullable(),
   check_in: z.string().optional().nullable(),
@@ -927,38 +928,106 @@ const novoQuartoSchema = z.object({
   observacoes: z.string().optional().nullable(),
 });
 
+/** Chave do trecho (hotel) de um quarto — mesma regra do board/export. */
+function trechoKeyQuarto(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
+  return `${(q.hotel_cidade ?? "").trim()}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
+}
+
+/**
+ * Padroniza a numeração dos quartos: dentro de cada trecho (hotel) numera 1..N
+ * pela ordem de criação. Fecha buracos quando um quarto é excluído e garante que
+ * o "nome" (número) nunca seja trocado à mão. Idempotente — só grava o que mudou.
+ */
+async function renumerarQuartosSupabase(
+  supabase: Awaited<ReturnType<typeof getServerClient>>,
+  expedicaoId: string,
+): Promise<void> {
+  const { data } = await supabase
+    .from("quartos")
+    .select("id, numero, hotel_cidade, check_in, check_out, created_at")
+    .eq("expedicao_id", expedicaoId);
+  const qs = (data ?? []) as { id: string; numero: string; hotel_cidade: string | null; check_in: string | null; check_out: string | null; created_at: string | null }[];
+  const grupos = new Map<string, typeof qs>();
+  for (const q of qs) {
+    const k = trechoKeyQuarto(q);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k)!.push(q);
+  }
+  const updates: PromiseLike<unknown>[] = [];
+  for (const arr of grupos.values()) {
+    arr.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || String(a.id).localeCompare(String(b.id)));
+    arr.forEach((q, i) => {
+      const novo = String(i + 1);
+      if (q.numero !== novo) updates.push(supabase.from("quartos").update({ numero: novo }).eq("id", q.id));
+    });
+  }
+  if (updates.length) await Promise.all(updates);
+}
+
+/** Versão mock da renumeração (memória). */
+function renumerarQuartosMock(expedicaoId: string): void {
+  const qs = mockQuartos.filter((q) => q.expedicao_id === expedicaoId);
+  const grupos = new Map<string, typeof qs>();
+  for (const q of qs) {
+    const k = trechoKeyQuarto(q);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k)!.push(q);
+  }
+  for (const arr of grupos.values()) {
+    arr.sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || String(a.id).localeCompare(String(b.id)));
+    arr.forEach((q, i) => { q.numero = String(i + 1); });
+  }
+}
+
 export async function criarQuarto(
   input: z.infer<typeof novoQuartoSchema>,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const parsed = novoQuartoSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
-  const payload = {
-    expedicao_id: d.expedicao_id,
-    numero: d.numero,
-    tipo: d.tipo,
+  const trecho = {
     hotel_cidade: d.hotel_cidade || null,
     check_in: d.check_in || null,
     check_out: d.check_out || null,
-    observacoes: d.observacoes || null,
-    status: "ativo",
   };
+  const k = trechoKeyQuarto(trecho);
 
   if (DEV_USE_MOCK_DATA) {
     const id = genId("q");
+    const base = mockQuartos.filter((q) => q.expedicao_id === d.expedicao_id && trechoKeyQuarto(q) === k).length;
     mockQuartos.push({
-      ...payload,
+      expedicao_id: d.expedicao_id,
+      numero: String(base + 1),
+      tipo: d.tipo,
+      ...trecho,
+      observacoes: d.observacoes || null,
+      status: "ativo",
       id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+    renumerarQuartosMock(d.expedicao_id);
     revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
     return { ok: true, id };
   }
 
   const supabase = await getServerClient();
+  // Número provisório = qtd atual no trecho + 1; a renumeração normaliza em seguida.
+  const { data: todos } = await supabase
+    .from("quartos").select("hotel_cidade, check_in, check_out")
+    .eq("expedicao_id", d.expedicao_id);
+  const base = (todos ?? []).filter((q) => trechoKeyQuarto(q) === k).length;
+  const payload = {
+    expedicao_id: d.expedicao_id,
+    numero: String(base + 1),
+    tipo: d.tipo,
+    ...trecho,
+    observacoes: d.observacoes || null,
+    status: "ativo",
+  };
   const r = await supabase.from("quartos").insert(payload).select("id").single();
   if (r.error) return { ok: false, error: r.error.message };
+  await renumerarQuartosSupabase(supabase, d.expedicao_id);
   revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
   return { ok: true, id: (r.data as { id: string }).id };
 }
@@ -1004,6 +1073,7 @@ export async function criarQuartosAutomaticos(
         updated_at: now,
       });
     }
+    renumerarQuartosMock(d.expedicao_id);
     revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
     return { ok: true, criados: d.quantidade };
   }
@@ -1027,6 +1097,7 @@ export async function criarQuartosAutomaticos(
   }));
   const { error } = await supabase.from("quartos").insert(rows);
   if (error) return { ok: false, error: error.message };
+  await renumerarQuartosSupabase(supabase, d.expedicao_id);
   revalidatePath(`/expedicoes/${d.expedicao_id}/rooming`);
   return { ok: true, criados: d.quantidade };
 }
@@ -1466,7 +1537,8 @@ export async function atualizarQuarto(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   }
-  const dados = parsed.data;
+  // O número é padronizado automaticamente e NÃO pode ser trocado à mão — descarta.
+  const { numero: _numeroIgnorado, ...dados } = parsed.data;
 
   if (DEV_USE_MOCK_DATA) {
     const idx = mockQuartos.findIndex((q) => q.id === quartoId);
@@ -1739,6 +1811,7 @@ export async function excluirQuarto(
     for (let i = mockAlocacoes.length - 1; i >= 0; i--) {
       if (mockAlocacoes[i].quarto_id === quartoId) mockAlocacoes.splice(i, 1);
     }
+    renumerarQuartosMock(expedicaoId);
     revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
     return { ok: true };
   }
@@ -1749,6 +1822,7 @@ export async function excluirQuarto(
   await supabase.from("passageiro_quarto").delete().eq("quarto_id", quartoId);
   const { error } = await supabase.from("quartos").delete().eq("id", quartoId);
   if (error) return { ok: false, error: error.message };
+  await renumerarQuartosSupabase(supabase, expedicaoId);
   revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
   return { ok: true };
 }
