@@ -138,11 +138,20 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     return true;
   });
 
-  // Líderes primeiro; dentro de cada grupo, mantém a ordem de cadastro (indiceById).
+  // Ordem de exibição por grupo: G1 (0) → G2 (1) → sem grupo (2).
+  const prioridadeGrupoPax = React.useCallback((p: PassageiroRow) => {
+    const g = grupoLabel(p);
+    return g === "G1" ? 0 : g === "G2" ? 1 : 2;
+  }, [grupoLabel]);
+
+  // Líderes primeiro; depois G1 antes de G2; dentro do grupo, ordem de cadastro.
   const ordenados = [...filtrados].sort((a, b) => {
     const liderA = a.tipo === "Líder" ? 0 : 1;
     const liderB = b.tipo === "Líder" ? 0 : 1;
     if (liderA !== liderB) return liderA - liderB;
+    const gA = prioridadeGrupoPax(a);
+    const gB = prioridadeGrupoPax(b);
+    if (gA !== gB) return gA - gB;
     return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
   });
 
@@ -283,7 +292,22 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
                   <td colSpan={11} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
                 </tr>
               ) : (
-                linhas.map(renderLinha)
+                (() => {
+                  // Só separa por grupo se houver mais de um grupo na seção.
+                  const distintos = new Set(linhas.map((p) => grupoLabel(p) ?? "—"));
+                  const separar = distintos.size > 1;
+                  const out: React.ReactNode[] = [];
+                  let ultimo: string | null | undefined = undefined;
+                  for (const p of linhas) {
+                    const g = grupoLabel(p);
+                    if (separar && g !== ultimo) {
+                      out.push(<GrupoDivider key={`div-${g ?? "sem"}`} grupo={g} />);
+                      ultimo = g;
+                    }
+                    out.push(renderLinha(p));
+                  }
+                  return out;
+                })()
               )}
             </tbody>
           </table>
@@ -475,6 +499,21 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         onClose={() => setProntidaoPaxId(null)}
       />
     </div>
+  );
+}
+
+function GrupoDivider({ grupo }: { grupo: string | null }) {
+  const label = grupo === "G1" ? "Grupo 1 (G1)" : grupo === "G2" ? "Grupo 2 (G2)" : "Sem grupo definido";
+  const cor =
+    grupo === "G1" ? "bg-editavel-100 text-editavel-700"
+    : grupo === "G2" ? "bg-lista-100 text-lista-600"
+    : "bg-atencao-100 text-atencao-700";
+  return (
+    <tr className="border-b border-border">
+      <td colSpan={11} className={cn("px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", cor)}>
+        {label}
+      </td>
+    </tr>
   );
 }
 
