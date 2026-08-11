@@ -551,7 +551,7 @@ function PasseiosOpcionaisDia({
   async function adicionar() {
     setAddBusy(true);
     const r = await criarItemPortal("passeios_opcionais", expedicaoId, {
-      roteiro_dia_id: roteiroDiaId, titulo: null, descricao: null, foto_arquivo_id: null, whatsapp_url: null,
+      roteiro_dia_id: roteiroDiaId, titulo: null, descricao: null, foto_arquivo_id: null, whatsapp_url: null, tipo: "opcional",
     });
     setAddBusy(false);
     if (r.ok) router.refresh();
@@ -596,6 +596,14 @@ function PasseioOpcionalCard({ expedicaoId, passeio }: { expedicaoId: string; pa
     whatsapp_url: passeio.whatsapp_url ?? "",
   }));
   const salvoRef = React.useRef({ ...v });
+  const [tipo, setTipo] = React.useState(passeio.tipo ?? "opcional");
+
+  async function mudarTipo(novo: string) {
+    setTipo(novo);
+    const r = await atualizarItemPortal("passeios_opcionais", passeio.id, expedicaoId, { tipo: novo });
+    if (!r.ok) toast.error("Erro ao mudar o tipo", { description: r.error });
+    else router.refresh();
+  }
 
   async function salvar(k: keyof typeof v) {
     if (v[k] === salvoRef.current[k]) return;
@@ -677,10 +685,27 @@ function PasseioOpcionalCard({ expedicaoId, passeio }: { expedicaoId: string; pa
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="flex items-center gap-1.5">
-        <MessageCircle className="h-3.5 w-3.5 shrink-0 text-vinculado-600" />
-        <Input value={v.whatsapp_url} onChange={(e) => setV((s) => ({ ...s, whatsapp_url: e.target.value }))} onBlur={() => salvar("whatsapp_url")} placeholder="Link do WhatsApp (https://wa.me/55…)" />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <select
+          value={tipo}
+          onChange={(e) => mudarTipo(e.target.value)}
+          title="Tipo do passeio"
+          className="rounded-md border border-border bg-background px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+        >
+          <option value="opcional">Opcional — substitui o dia (com WhatsApp)</option>
+          <option value="adicional">Adicional — só “adquirido” (sem WhatsApp)</option>
+        </select>
       </div>
+      {tipo === "adicional" ? (
+        <p className="text-[11px] text-muted-foreground">
+          Não é oferecido no portal nem substitui o dia. Aparece apenas como “adquirido” para quem você marcar no perfil.
+        </p>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <MessageCircle className="h-3.5 w-3.5 shrink-0 text-vinculado-600" />
+          <Input value={v.whatsapp_url} onChange={(e) => setV((s) => ({ ...s, whatsapp_url: e.target.value }))} onBlur={() => salvar("whatsapp_url")} placeholder="Link do WhatsApp (https://wa.me/55…)" />
+        </div>
+      )}
     </div>
   );
 }

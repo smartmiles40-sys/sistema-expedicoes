@@ -48,6 +48,8 @@ export type AmigoPasseioOpcional = {
   descricao: string | null;
   foto_url: string | null;
   whatsapp_url: string | null;
+  /** 'opcional' substitui o dia inteiro (com WhatsApp); 'adicional' só marca "adquirido". */
+  tipo: string;
   /** Este passageiro já comprou? (marcado manualmente pelo operacional) */
   comprou: boolean;
 };
@@ -374,6 +376,7 @@ export async function entrarExpedAmigo(
               descricao: p.descricao,
               foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
               whatsapp_url: p.whatsapp_url,
+              tipo: p.tipo ?? "opcional",
               comprou: meusComprados.has(p.id),
             })),
         })),

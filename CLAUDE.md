@@ -429,6 +429,15 @@ role**, **só leitura**.
   oferta com botão "Contratar agora" (`whatsapp_url`); no **PDF não aparece nada** (fica
   idêntico ao de hoje — nenhuma oferta é impressa). Campo `passeios_opcionais` (com
   `comprou` por pax) em cada `AmigoRoteiroDia`; fetcher `listPasseiosOpcionais`.
+  - **Dois tipos (coluna `passeios_opcionais.tipo`, migration 0049; default `'opcional'`):**
+    `'opcional'` = o descrito acima (ao adquirir, **substitui o dia inteiro**, tem
+    WhatsApp, e é oferecido a quem não comprou). `'adicional'` = **NÃO substitui o dia**
+    e **NÃO tem WhatsApp** — só aparece como nota "Você adquiriu: {título}" (portal e PDF)
+    para quem o operacional marcar; **não é oferecido** a quem não comprou. No portal
+    (`DiaRoteiro`) e no PDF (`ViagemPDF`), `principal` = 1º contratado com `tipo !== 'adicional'`;
+    `adicional` contratado entra na lista de "adquiridos" (sem assumir o dia); `ofertas`
+    filtra `tipo !== 'adicional'`. Seletor de tipo no `PasseioOpcionalCard` do editor
+    (WhatsApp some quando `adicional`). ⚠️ Rodar a migration 0049 no Supabase.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.

@@ -744,12 +744,12 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
   const [aberto, setAberto] = React.useState(false);
   const passeiosOpc = d.passeios_opcionais ?? [];
   const contratados = passeiosOpc.filter((p) => p.comprou);
-  const ofertas = passeiosOpc.filter((p) => !p.comprou);
-  // Ao contratar um passeio opcional, o DIA INTEIRO vira esse passeio: foto, título e
-  // descrição passam a ser os do passeio; o programa original (e refeições/hospedagem/
-  // fotos do dia) some. `principal` é o passeio contratado que "assume" o dia.
-  const principal = contratados[0] ?? null;
-  const contratadosExtra = contratados.slice(1);
+  // Só o passeio do tipo "opcional" (com WhatsApp) SUBSTITUI o dia inteiro ao ser
+  // adquirido. O tipo "adicional" nunca assume o dia — só aparece como "adquirido".
+  // Ofertas (não-comprados) também só valem pra "opcional"; "adicional" não é oferecido.
+  const principal = contratados.find((p) => p.tipo !== "adicional") ?? null;
+  const contratadosExtra = contratados.filter((p) => p !== principal);
+  const ofertas = passeiosOpc.filter((p) => !p.comprou && p.tipo !== "adicional");
 
   const titulo = principal ? (principal.titulo || "Passeio contratado") : d.titulo;
   const descricao = principal ? principal.descricao : d.descricao;

@@ -522,6 +522,8 @@ export type PasseioOpcionalRow = {
   foto_arquivo_id: string | null;
   /** Link "Falar no WhatsApp". */
   whatsapp_url: string | null;
+  /** 'opcional' = substitui o dia inteiro (com WhatsApp); 'adicional' = só "adquirido" (sem WhatsApp, não substitui). Migration 0049. */
+  tipo: string;
   ordem: number;
   created_at: string;
   updated_at: string;

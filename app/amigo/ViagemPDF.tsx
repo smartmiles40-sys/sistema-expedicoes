@@ -388,7 +388,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           <View style={styles.secao}>
             <SecaoTitulo hint="Uma visão geral dia a dia. O detalhe completo vem logo abaixo.">Roteiro resumido</SecaoTitulo>
             {exp.roteiro.map((d, i) => {
-              const principal = (d.passeios_opcionais ?? []).find((p) => p.comprou) ?? null;
+              const principal = (d.passeios_opcionais ?? []).find((p) => p.comprou && p.tipo !== "adicional") ?? null;
               const titulo = principal ? principal.titulo || "Passeio contratado" : d.titulo;
               return (
                 <View key={i} style={styles.resumoDia} wrap={false}>
@@ -406,9 +406,12 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           <View style={styles.secao} break>
             <SecaoTitulo>Roteiro dia a dia (previsto)</SecaoTitulo>
             {exp.roteiro.map((d, i) => {
-              // Se a pessoa contratou um passeio opcional no dia, ELE assume o dia:
-              // foto, título e descrição viram os do passeio (nada do programa original).
-              const principal = (d.passeios_opcionais ?? []).find((p) => p.comprou) ?? null;
+              // Só o passeio "opcional" assume o dia (foto/título/descrição viram os
+              // do passeio). O "adicional" não substitui o dia — vira só uma nota
+              // "Você adquiriu" ao final, mantendo o programa original.
+              const contratados = (d.passeios_opcionais ?? []).filter((p) => p.comprou);
+              const principal = contratados.find((p) => p.tipo !== "adicional") ?? null;
+              const adquiridosExtra = contratados.filter((p) => p !== principal);
               const titulo = principal ? principal.titulo || "Passeio contratado" : d.titulo;
               const descricao = principal ? principal.descricao : d.descricao;
               const dbImg = principal
@@ -417,7 +420,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
                   : null
                 : d.fotos.map((f) => fotos.get(f.url)).find((x): x is string => !!x);
               const img = dbImg ?? pega(diaImgFallback(exp.destino, d.dia));
-              const temConteudo = Boolean(principal || descricao || d.refeicoes || d.hospedagem);
+              const temConteudo = Boolean(principal || descricao || d.refeicoes || d.hospedagem || adquiridosExtra.length);
               return (
                 <View key={i} style={styles.diaCard} wrap={false}>
                   <View style={styles.diaBanner}>
@@ -442,6 +445,12 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
                           {d.hospedagem ? <Text style={styles.tag}>Hospedagem: {d.hospedagem}</Text> : null}
                         </View>
                       ) : null}
+                      {adquiridosExtra.map((p, j) => (
+                        <View key={j}>
+                          <Text style={styles.voucherChip}>✓ Você adquiriu: {p.titulo || "Passeio adicional"}</Text>
+                          {p.descricao ? <Text style={styles.texto}>{p.descricao}</Text> : null}
+                        </View>
+                      ))}
                     </View>
                   )}
                 </View>
