@@ -744,12 +744,12 @@ function DiaRoteiro({ d, destino }: { d: AmigoRoteiroDia; destino: string }) {
   const [aberto, setAberto] = React.useState(false);
   const passeiosOpc = d.passeios_opcionais ?? [];
   const contratados = passeiosOpc.filter((p) => p.comprou);
-  // Só o passeio do tipo "opcional" (com WhatsApp) SUBSTITUI o dia inteiro ao ser
-  // adquirido. O tipo "adicional" nunca assume o dia — só aparece como "adquirido".
-  // Ofertas (não-comprados) também só valem pra "opcional"; "adicional" não é oferecido.
+  // Só o passeio do tipo "opcional" SUBSTITUI o dia inteiro ao ser adquirido. O tipo
+  // "adicional" nunca assume o dia — mas continua sendo OFERECIDO (com WhatsApp) e, se
+  // adquirido, aparece como "adquirido" sem tomar o dia.
   const principal = contratados.find((p) => p.tipo !== "adicional") ?? null;
   const contratadosExtra = contratados.filter((p) => p !== principal);
-  const ofertas = passeiosOpc.filter((p) => !p.comprou && p.tipo !== "adicional");
+  const ofertas = passeiosOpc.filter((p) => !p.comprou);
 
   const titulo = principal ? (principal.titulo || "Passeio contratado") : d.titulo;
   const descricao = principal ? principal.descricao : d.descricao;
