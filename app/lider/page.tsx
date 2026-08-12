@@ -606,15 +606,35 @@ function DiaBrief({ dia, info, multi, destaque, label, hoje }: { dia: LiderDia; 
   );
 }
 
+const prioridadeGrupoPax = (p: LiderPax) => (p.grupo === "G1" ? 0 : p.grupo === "G2" ? 1 : 2);
+
 function Secao({ titulo, pax, onVerDoc }: { titulo: string; pax: LiderPax[]; onVerDoc: VerDoc }) {
+  // G1 em cima, G2 embaixo, sem grupo por último; nome preserva a ordem já vinda.
+  const ordenados = [...pax].sort((a, b) => prioridadeGrupoPax(a) - prioridadeGrupoPax(b));
+  const distintos = new Set(ordenados.map((p) => p.grupo ?? "—"));
+  const separar = distintos.size > 1;
+  let ultimo: string | null | undefined;
   return (
     <div>
       <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</div>
       <div className="space-y-1.5">
-        {pax.length === 0 ? (
+        {ordenados.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">Ninguém ainda.</p>
         ) : (
-          pax.map((p) => <PaxLiderRow key={p.id} p={p} onVerDoc={onVerDoc} />)
+          ordenados.flatMap((p) => {
+            const nodes = [];
+            if (separar && p.grupo !== ultimo) {
+              ultimo = p.grupo;
+              const qtd = ordenados.filter((x) => x.grupo === p.grupo).length;
+              nodes.push(
+                <div key={`div-${p.grupo ?? "sem"}`} className={cn("mt-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", corGrupo(p.grupo))}>
+                  {p.grupo === "G1" ? "Grupo 1 (G1)" : p.grupo === "G2" ? "Grupo 2 (G2)" : "Sem grupo"} · {qtd}
+                </div>,
+              );
+            }
+            nodes.push(<PaxLiderRow key={p.id} p={p} onVerDoc={onVerDoc} />);
+            return nodes;
+          })
         )}
       </div>
     </div>
