@@ -432,7 +432,7 @@ function Aniversariantes({ exp }: { exp: LiderExpedicao }) {
           <ul className="space-y-1">
             {lista.map((x) => (
               <li key={x.p.id} className="flex items-center gap-2 rounded-lg bg-background/70 px-2.5 py-1.5">
-                <Avatar nome={x.p.nome_completo} size={22} className="shrink-0" />
+                <Avatar nome={x.p.nome_completo} size={22} className="shrink-0" src={x.p.foto_url ?? undefined} />
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{x.p.nome_completo}</span>
                 {x.idade != null && <span className="shrink-0 text-[11px] text-muted-foreground">faz {x.idade}</span>}
                 <span className="shrink-0 rounded-full bg-lista-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-lista-600">
@@ -633,9 +633,16 @@ function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
         onClick={() => setAberto((v) => !v)}
         className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left"
       >
-        <Avatar nome={p.nome_completo} size={28} className="shrink-0" />
+        <Avatar nome={p.nome_completo} size={28} className="shrink-0" src={p.foto_url ?? undefined} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{p.nome_completo}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[13px] font-medium">{p.nome_completo}</span>
+            {p.grupo && (
+              <span className={cn("shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none", corGrupo(p.grupo))}>
+                {p.grupo}
+              </span>
+            )}
+          </div>
           <div className="text-[10px] text-muted-foreground">{p.tipo} · {p.status_reserva}</div>
         </div>
         <Badge variant={COR_PRONTIDAO[p.prontidao]}>{p.prontidao}</Badge>

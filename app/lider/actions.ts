@@ -7,8 +7,10 @@ import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
 import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
+import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (fallback G1/G2 Egito)
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
+  GrupoExpedicaoRow,
 } from "@/types/database";
 
 const BUCKET = "arquivos-expedicoes";
@@ -92,6 +94,10 @@ export type LiderPax = {
   contato_emergencia_fone: string | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
+  /** Foto do passageiro (signed URL / rota mock) pra mostrar no avatar. */
+  foto_url: string | null;
+  /** Grupo G1/G2 do passageiro (grupo_id real, ou fallback Egito). */
+  grupo: string | null;
   prontidao: Prontidao;
   checagens: LiderChecagem[];
   arquivos: LiderArquivo[];
@@ -129,33 +135,60 @@ export async function buscarDadosLider(
   let reqs: PassageiroRequisitoRow[];
   let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string; descricao: string | null }[];
   let rl: RoteiroLiderDiaRow[] = [];
+  let gruposExp: GrupoExpedicaoRow[] = [];
+  // arquivo_id -> URL da foto (signed URL em prod, rota de download no mock).
+  const fotoUrl = new Map<string, string>();
 
   if (DEV_USE_MOCK_DATA) {
     pax = mockPassageiros;
     exps = mockExpedicoes;
     reqs = mockPassageiroRequisitos;
     arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria, descricao: a.descricao }));
+    for (const p of pax) if (p.foto_arquivo_id) fotoUrl.set(p.foto_arquivo_id, `/api/arquivos/${p.foto_arquivo_id}/download?inline=1`);
   } else {
     const sb = createServiceRoleClient();
     // Pagina (PostgREST corta em 1000) — senão o líder veria prontidão errada
     // quando a base passa de 1000 requisitos/arquivos.
-    const [er, paxAll, reqAll, arqAll] = await Promise.all([
+    const [er, paxAll, reqAll, arqAll, grpAll] = await Promise.all([
       sb.from("expedicoes").select("*"),
       fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
       fetchAllRows<PassageiroRequisitoRow>((from, to) => sb.from("passageiro_requisitos").select("*").order("id").range(from, to)),
       fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao").order("id").range(from, to)),
+      fetchAllRows<GrupoExpedicaoRow>((from, to) => sb.from("grupos_expedicao").select("*").order("id").range(from, to)),
     ]);
     exps = (er.data ?? []) as ExpedicaoRow[];
     pax = paxAll;
     reqs = reqAll;
     arqs = arqAll;
+    gruposExp = grpAll;
     try {
       rl = await fetchAllRows<RoteiroLiderDiaRow>((from, to) =>
         sb.from("roteiro_lider_dias").select("*").order("id").range(from, to));
     } catch {
       rl = [];
     }
+    // Signed URLs das fotos dos passageiros (mesmo padrão do ExpedAmigo).
+    const fotoIds = [...new Set(pax.map((p) => p.foto_arquivo_id).filter((id): id is string => !!id))];
+    if (fotoIds.length > 0) {
+      const { data: arqFotos } = await sb.from("arquivos").select("id,storage_path").in("id", fotoIds);
+      const pathById = new Map(((arqFotos ?? []) as { id: string; storage_path: string }[]).map((a) => [a.id, a.storage_path]));
+      for (const id of fotoIds) {
+        const sp = pathById.get(id);
+        if (!sp) continue;
+        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 604800); // 7 dias
+        if (data?.signedUrl) fotoUrl.set(id, data.signedUrl);
+      }
+    }
   }
+  // Mapa grupo_id -> nome ("G1"/"G2") pra marcar cada passageiro.
+  const grupoNomePorId = new Map(gruposExp.map((g) => [g.id, g.nome]));
+  const grupoDoPax = (p: PassageiroRow, destino: string): string | null => {
+    if (p.grupo_id && grupoNomePorId.has(p.grupo_id)) {
+      const nome = grupoNomePorId.get(p.grupo_id)!;
+      if (nome === "G1" || nome === "G2") return nome;
+    }
+    return ehExpedicaoEgito(destino) ? grupoEgito(p.nome_completo) : null;
+  };
 
   // Linha pendente de aprovação veio do formulário público e não vale como
   // cadastro — nem pra autorizar, nem como fonte da senha do 1º acesso (a data de
@@ -252,6 +285,8 @@ export async function buscarDadosLider(
           contato_emergencia_fone: p.contato_emergencia_fone,
           restricoes_alimentares: p.restricoes_alimentares,
           condicoes_medicas: p.condicoes_medicas,
+          foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
+          grupo: grupoDoPax(p, e.destino),
           prontidao: res.prontidao,
           checagens,
           arquivos: arquivosPax.map(semDescricao),
