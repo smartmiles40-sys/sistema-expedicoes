@@ -368,20 +368,25 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                 )}
 
                 {/* Com quem quer dividir o quarto (da inscrição) — só leitura */}
-                {(() => {
-                  const nome = passageiro?.acompanhante_nome?.trim();
-                  if (!nome) return null;
+                {passageiro && (() => {
+                  const nome = passageiro.acompanhante_nome?.trim();
                   return (
                     <div className="pt-4 border-t border-border space-y-2">
                       <h3 className="text-sm font-semibold flex items-center gap-1.5">
                         <BedDouble className="h-4 w-4 text-lista-600" /> Com quem quer dividir o quarto
                       </h3>
-                      <div className="grid grid-cols-1 gap-1.5 text-[12px] sm:grid-cols-2">
-                        <PerfilLinha label="Acompanhante(s)" value={passageiro?.acompanhante_nome} />
-                        <PerfilLinha label="Vínculo" value={passageiro?.acompanhante_vinculo} />
-                        <PerfilLinha label="Dividir quarto/cama" value={passageiro?.acompanhante_divide_quarto} />
-                        <PerfilLinha label="Prefere dividir com" value={passageiro?.acompanhante_dividir_com} />
-                      </div>
+                      {nome ? (
+                        <div className="grid grid-cols-1 gap-1.5 text-[12px] sm:grid-cols-2">
+                          <PerfilLinha label="Acompanhante(s)" value={passageiro.acompanhante_nome} />
+                          <PerfilLinha label="Vínculo" value={passageiro.acompanhante_vinculo} />
+                          <PerfilLinha label="Dividir quarto/cama" value={passageiro.acompanhante_divide_quarto} />
+                          <PerfilLinha label="Prefere dividir com" value={passageiro.acompanhante_dividir_com} />
+                        </div>
+                      ) : (
+                        <p className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[12px] font-medium text-muted-foreground">
+                          🧍 Viaja sozinho — não indicou acompanhante
+                        </p>
+                      )}
                       <p className="text-[11px] text-muted-foreground">
                         Informado na inscrição. A alocação real é feita na aba Rooming.
                       </p>
