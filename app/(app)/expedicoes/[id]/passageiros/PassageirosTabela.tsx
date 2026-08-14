@@ -9,11 +9,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EditableCell } from "@/components/tables/EditableCell";
-import { atualizarPassageiroCampo } from "@/app/(app)/expedicoes/actions";
+import { atualizarPassageiroCampo, alocarPassageiro, desalocarPassageiro } from "@/app/(app)/expedicoes/actions";
 import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { formatDate, daysUntil, cn, aniversarioNaViagem } from "@/lib/utils";
-import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO } from "@/lib/constants";
+import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO, CAPACIDADE_QUARTO } from "@/lib/constants";
 import type { ArquivoRow, AlocacaoQuartoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
@@ -191,6 +191,29 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     return { rooms, companheiros };
   }, [quartosDoPax, paxPorQuarto, quartosById, nomePorPax]);
 
+  // Trechos (hotéis) ordenados por check-in — a edição rápida atua na 1ª "reserva".
+  const trechos = React.useMemo(() => {
+    const m = new Map<string, { key: string; hotel: string | null; check_in: string | null; quartos: QuartoRow[] }>();
+    for (const q of quartos) {
+      const k = `${(q.hotel_cidade ?? "").trim()}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
+      if (!m.has(k)) m.set(k, { key: k, hotel: q.hotel_cidade, check_in: q.check_in, quartos: [] });
+      m.get(k)!.quartos.push(q);
+    }
+    return [...m.values()].sort((a, b) => (a.check_in ?? "").localeCompare(b.check_in ?? ""));
+  }, [quartos]);
+  const primeiroTrecho = trechos[0] ?? null;
+
+  async function mudarQuarto(paxId: string, novoQuartoId: string, atualQuartoId: string) {
+    const r = novoQuartoId
+      ? await alocarPassageiro(paxId, novoQuartoId, expedicaoId)
+      : atualQuartoId
+        ? await desalocarPassageiro(paxId, atualQuartoId, expedicaoId)
+        : null;
+    if (!r) return;
+    if (r.ok) router.refresh();
+    else toast.error("Não foi possível alterar o quarto", { description: r.error });
+  }
+
   // Duas caixas: Líderes (equipe) em cima e ExpedAmigos (passageiros) embaixo.
   const lideres = ordenados.filter((p) => p.tipo === "Líder");
   const expedAmigos = ordenados.filter((p) => p.tipo !== "Líder");
@@ -271,38 +294,73 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
           </div>
         </td>
         <td className="px-2.5">
-          {rooms.length > 0 ? (
-            <div
-              className="leading-tight"
-              title={rooms.map((r) => `${r.hotel_cidade ?? "Hotel"}: Quarto ${r.numero} (${r.tipo})`).join(" · ")}
-            >
-              <div className="text-[13px]">
-                Quarto {rooms[0].numero}
-                {rooms.length > 1 && <span className="text-muted-foreground"> +{rooms.length - 1}</span>}
-              </div>
-              {companheiros.length > 0 && (
-                <div className="max-w-[190px] truncate text-[11px] text-muted-foreground">com {companheiros.join(", ")}</div>
-              )}
-              {p.acompanhante_nome?.trim() && (() => {
-                const status = conferirAcompanhante(p.acompanhante_nome, companheiros);
-                return (
-                  <div
-                    className={cn(
-                      "max-w-[190px] truncate text-[10px]",
-                      status === "bate" ? "text-vinculado-600" : status === "nao_bate" ? "text-atencao-700" : "text-muted-foreground",
-                    )}
-                    title={status === "nao_bate" ? "O acompanhante indicado NÃO está neste quarto" : status === "bate" ? "Confere com o indicado" : undefined}
+          {(() => {
+            const idsPrimeiro = new Set(primeiroTrecho?.quartos.map((q) => q.id) ?? []);
+            const atual = (quartosDoPax.get(p.id) ?? []).find((id) => idsPrimeiro.has(id)) ?? "";
+            const outros = rooms.length - (atual ? 1 : 0);
+            const editavel = !somenteLeitura && primeiroTrecho !== null && primeiroTrecho.quartos.length > 0;
+            const matchLine = p.acompanhante_nome?.trim() ? (() => {
+              const status = conferirAcompanhante(p.acompanhante_nome, companheiros);
+              return (
+                <div
+                  className={cn(
+                    "max-w-[190px] truncate text-[10px]",
+                    status === "bate" ? "text-vinculado-600" : status === "nao_bate" ? "text-atencao-700" : "text-muted-foreground",
+                  )}
+                  title={status === "nao_bate" ? "O acompanhante indicado NÃO está neste quarto" : undefined}
+                >
+                  {status === "bate" ? "✓" : status === "nao_bate" ? "⚠" : ""} indicou: {p.acompanhante_nome!.trim()}
+                </div>
+              );
+            })() : null;
+
+            if (editavel) {
+              return (
+                <div className="space-y-0.5 leading-tight">
+                  <select
+                    value={atual}
+                    onChange={(e) => mudarQuarto(p.id, e.target.value, atual)}
+                    title={trechos.length > 1 ? `Altera o quarto no 1º hotel (${primeiroTrecho!.hotel ?? "Hotel"})` : "Definir/alterar o quarto"}
+                    className="max-w-[160px] rounded-md border border-editavel-600/40 bg-editavel-50/40 px-1.5 py-0.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
                   >
-                    {status === "bate" ? "✓" : status === "nao_bate" ? "⚠" : ""} indicou: {p.acompanhante_nome.trim()}
+                    <option value="">— sem quarto —</option>
+                    {[...primeiroTrecho!.quartos]
+                      .sort((a, b) => String(a.numero).localeCompare(String(b.numero), "pt-BR", { numeric: true }))
+                      .map((q) => {
+                        const oc = (paxPorQuarto.get(q.id) ?? []).length;
+                        const cap = CAPACIDADE_QUARTO[q.tipo] ?? 1;
+                        return <option key={q.id} value={q.id}>Quarto {q.numero} ({q.tipo}) · {oc}/{cap}</option>;
+                      })}
+                  </select>
+                  {companheiros.length > 0 && (
+                    <div className="max-w-[190px] truncate text-[11px] text-muted-foreground">com {companheiros.join(", ")}</div>
+                  )}
+                  {outros > 0 && <div className="text-[10px] text-muted-foreground">+{outros} em outro hotel</div>}
+                  {matchLine}
+                </div>
+              );
+            }
+
+            if (rooms.length > 0) {
+              return (
+                <div className="leading-tight" title={rooms.map((r) => `${r.hotel_cidade ?? "Hotel"}: Quarto ${r.numero} (${r.tipo})`).join(" · ")}>
+                  <div className="text-[13px]">
+                    Quarto {rooms[0].numero}
+                    {rooms.length > 1 && <span className="text-muted-foreground"> +{rooms.length - 1}</span>}
                   </div>
-                );
-              })()}
-            </div>
-          ) : p.acompanhante_nome?.trim() ? (
-            <span className="text-[12px] text-muted-foreground">Indicou: {p.acompanhante_nome.trim()}</span>
-          ) : (
-            <span className="text-[12px] text-muted-foreground">Viaja sozinho</span>
-          )}
+                  {companheiros.length > 0 && (
+                    <div className="max-w-[190px] truncate text-[11px] text-muted-foreground">com {companheiros.join(", ")}</div>
+                  )}
+                  {matchLine}
+                </div>
+              );
+            }
+            return p.acompanhante_nome?.trim() ? (
+              <span className="text-[12px] text-muted-foreground">Indicou: {p.acompanhante_nome.trim()}</span>
+            ) : (
+              <span className="text-[12px] text-muted-foreground">Viaja sozinho</span>
+            );
+          })()}
         </td>
         <td className="px-2.5">
           <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
