@@ -695,6 +695,27 @@ function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
             </div>
           )}
 
+          {/* Quarto (alocação real do Rooming) + com quem divide */}
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Quarto</div>
+            {p.quartos_alocados.length > 0 ? (
+              <div className="space-y-0.5 rounded-lg border border-border bg-muted/20 p-2.5 text-[12px]">
+                {p.quartos_alocados.map((q, i) => (
+                  <div key={i} className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">{q.hotel ?? "Hotel"}</span>
+                    <span className="font-medium">Quarto {q.numero} ({q.tipo})</span>
+                  </div>
+                ))}
+                <div className="pt-0.5">
+                  <span className="text-muted-foreground">Divide com: </span>
+                  <span className="font-medium">{p.companheiros_quarto.length > 0 ? p.companheiros_quarto.join(", ") : "sozinho no quarto"}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">Ainda não alocado em nenhum quarto.</p>
+            )}
+          </div>
+
           {/* Prontidão + documentos por exigência */}
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prontidão</div>

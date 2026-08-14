@@ -1,7 +1,7 @@
 "use server";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { mockPassageiros, mockExpedicoes, mockPassageiroRequisitos } from "@/lib/mock-data";
+import { mockPassageiros, mockExpedicoes, mockPassageiroRequisitos, mockQuartos, mockAlocacoes } from "@/lib/mock-data";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
@@ -10,7 +10,7 @@ import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (fallback G1/G2 Egito)
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
-  GrupoExpedicaoRow,
+  GrupoExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
 } from "@/types/database";
 
 const BUCKET = "arquivos-expedicoes";
@@ -98,6 +98,9 @@ export type LiderPax = {
   foto_url: string | null;
   /** Grupo G1/G2 do passageiro (grupo_id real, ou fallback Egito). */
   grupo: string | null;
+  /** Quartos alocados (por hotel) + com quem divide — das alocações do Rooming. */
+  quartos_alocados: { hotel: string | null; numero: string; tipo: string }[];
+  companheiros_quarto: string[];
   prontidao: Prontidao;
   checagens: LiderChecagem[];
   arquivos: LiderArquivo[];
@@ -136,6 +139,8 @@ export async function buscarDadosLider(
   let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string; descricao: string | null }[];
   let rl: RoteiroLiderDiaRow[] = [];
   let gruposExp: GrupoExpedicaoRow[] = [];
+  let quartos: QuartoRow[] = [];
+  let alocacoes: AlocacaoQuartoRow[] = [];
   // arquivo_id -> URL da foto (signed URL em prod, rota de download no mock).
   const fotoUrl = new Map<string, string>();
 
@@ -143,24 +148,30 @@ export async function buscarDadosLider(
     pax = mockPassageiros;
     exps = mockExpedicoes;
     reqs = mockPassageiroRequisitos;
+    quartos = mockQuartos;
+    alocacoes = mockAlocacoes;
     arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria, descricao: a.descricao }));
     for (const p of pax) if (p.foto_arquivo_id) fotoUrl.set(p.foto_arquivo_id, `/api/arquivos/${p.foto_arquivo_id}/download?inline=1`);
   } else {
     const sb = createServiceRoleClient();
     // Pagina (PostgREST corta em 1000) — senão o líder veria prontidão errada
     // quando a base passa de 1000 requisitos/arquivos.
-    const [er, paxAll, reqAll, arqAll, grpAll] = await Promise.all([
+    const [er, paxAll, reqAll, arqAll, grpAll, quaAll, aloAll] = await Promise.all([
       sb.from("expedicoes").select("*"),
       fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
       fetchAllRows<PassageiroRequisitoRow>((from, to) => sb.from("passageiro_requisitos").select("*").order("id").range(from, to)),
       fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao").order("id").range(from, to)),
       fetchAllRows<GrupoExpedicaoRow>((from, to) => sb.from("grupos_expedicao").select("*").order("id").range(from, to)),
+      fetchAllRows<QuartoRow>((from, to) => sb.from("quartos").select("*").order("id").range(from, to)),
+      fetchAllRows<AlocacaoQuartoRow>((from, to) => sb.from("passageiro_quarto").select("*").order("id").range(from, to)),
     ]);
     exps = (er.data ?? []) as ExpedicaoRow[];
     pax = paxAll;
     reqs = reqAll;
     arqs = arqAll;
     gruposExp = grpAll;
+    quartos = quaAll;
+    alocacoes = aloAll;
     try {
       rl = await fetchAllRows<RoteiroLiderDiaRow>((from, to) =>
         sb.from("roteiro_lider_dias").select("*").order("id").range(from, to));
@@ -188,6 +199,30 @@ export async function buscarDadosLider(
       if (nome === "G1" || nome === "G2") return nome;
     }
     return ehExpedicaoEgito(destino) ? grupoEgito(p.nome_completo) : null;
+  };
+
+  // Alocações reais (M2M) do Rooming: quarto real + companheiros por passageiro.
+  const quartoById = new Map(quartos.map((q) => [q.id, q]));
+  const nomePorPaxId = new Map(pax.map((p) => [p.id, p.nome_completo]));
+  const paxPorQuarto = new Map<string, string[]>();
+  const quartosDoPax = new Map<string, string[]>();
+  for (const a of alocacoes) {
+    if (!paxPorQuarto.has(a.quarto_id)) paxPorQuarto.set(a.quarto_id, []);
+    paxPorQuarto.get(a.quarto_id)!.push(a.passageiro_id);
+    if (!quartosDoPax.has(a.passageiro_id)) quartosDoPax.set(a.passageiro_id, []);
+    quartosDoPax.get(a.passageiro_id)!.push(a.quarto_id);
+  }
+  const infoQuarto = (p: PassageiroRow) => {
+    const qids = quartosDoPax.get(p.id) ?? [];
+    const quartos_alocados = qids
+      .map((qid) => quartoById.get(qid))
+      .filter((q): q is QuartoRow => !!q)
+      .sort((a, b) => (a.check_in ?? "").localeCompare(b.check_in ?? ""))
+      .map((q) => ({ hotel: q.hotel_cidade, numero: q.numero, tipo: q.tipo }));
+    const companheiros_quarto = [...new Set(
+      qids.flatMap((qid) => (paxPorQuarto.get(qid) ?? []).filter((id) => id !== p.id)),
+    )].map((id) => nomePorPaxId.get(id)).filter((n): n is string => !!n);
+    return { quartos_alocados, companheiros_quarto };
   };
 
   // Linha pendente de aprovação veio do formulário público e não vale como
@@ -287,6 +322,7 @@ export async function buscarDadosLider(
           condicoes_medicas: p.condicoes_medicas,
           foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
           grupo: grupoDoPax(p, e.destino),
+          ...infoQuarto(p),
           prontidao: res.prontidao,
           checagens,
           arquivos: arquivosPax.map(semDescricao),
