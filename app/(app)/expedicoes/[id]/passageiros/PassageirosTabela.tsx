@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown, Check } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
@@ -305,8 +305,16 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
             );
           })()}
         </td>
-        <td>
-          <EditableCell value={p.observacoes} onSave={(v) => atualizarPassageiroCampo(p.id, "observacoes", v)} placeholder="—" />
+        <td className="px-2.5">
+          {preencheuFormulario(p) ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-vinculado-100 px-1.5 py-0.5 text-[11px] font-medium text-vinculado-700">
+              <Check className="h-3 w-3" /> Preencheu
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              Pendente
+            </span>
+          )}
         </td>
       </tr>
     );
@@ -330,7 +338,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
                 <Th>Quarto</Th>
                 <Th>Status</Th>
                 <Th>Prontidão</Th>
-                <Th>Observações</Th>
+                <Th>Formulário</Th>
               </tr>
             </thead>
             <tbody>
@@ -573,6 +581,17 @@ function GrupoDivider({ grupo, total }: { grupo: string | null; total: number })
       </td>
     </tr>
   );
+}
+
+/** A pessoa preencheu o formulário de inscrição? (só a inscrição grava esses campos) */
+function preencheuFormulario(p: PassageiroRow): boolean {
+  const pv = p.perfil_viajante;
+  const temPerfil = !!pv && typeof pv === "object" && (
+    pv.confirmou_veracidade === true ||
+    [pv.profissao, pv.descricao_grupo, pv.anima_expedicao, pv.significado, pv.instagram, pv.camiseta, pv.musica]
+      .some((v) => v && String(v).trim() !== "")
+  );
+  return temPerfil || p.inscricao_origem === "Formulário público";
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
