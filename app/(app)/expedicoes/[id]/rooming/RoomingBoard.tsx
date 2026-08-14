@@ -39,6 +39,7 @@ import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { grupoEgito, ehExpedicaoEgito, type GrupoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
+import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 
 interface Props {
   expedicaoId: string;
@@ -488,22 +489,22 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
       const ws = wb.addWorksheet(nomeAba(t.hotel_cidade ?? "Hotel"));
       ws.columns = [
         { width: 16 }, { width: 16 }, { width: 34 }, { width: 12 },
-        { width: 18 }, { width: 16 }, { width: 18 }, { width: 18 },
+        { width: 18 }, { width: 16 }, { width: 18 }, { width: 18 }, { width: 34 },
       ];
-      const NCOL = 8;
+      const NCOL = 9;
 
-      ws.mergeCells("A1:H1");
+      ws.mergeCells("A1:I1");
       const titulo = ws.getCell("A1");
       titulo.value = `Rooming — ${t.hotel_cidade ?? "Hotel"}`;
       titulo.font = { bold: true, size: 14 };
 
-      ws.mergeCells("A2:H2");
+      ws.mergeCells("A2:I2");
       const sub = ws.getCell("A2");
       sub.value = `Check-in: ${t.check_in ? formatDate(t.check_in) : "—"}    •    Check-out: ${t.check_out ? formatDate(t.check_out) : "—"}`;
       sub.font = { italic: true, color: { argb: "FF64748B" } };
 
       const head = ws.getRow(4);
-      head.values = ["Quarto", "Tipo do quarto", "Passageiro", "Tipo", "Data de nascimento", "Nº passaporte", "Venc. passaporte", "CPF"];
+      head.values = ["Quarto", "Tipo do quarto", "Passageiro", "Tipo", "Data de nascimento", "Nº passaporte", "Venc. passaporte", "CPF", "Acompanhante indicado (confere?)"];
       head.height = 18;
       for (let col = 1; col <= NCOL; col++) {
         const c = head.getCell(col);
@@ -529,7 +530,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
           const pr = prioridadeQuarto(q);
           if (pr !== grupoAtual) {
             grupoAtual = pr;
-            ws.mergeCells(`A${r}:H${r}`);
+            ws.mergeCells(`A${r}:I${r}`);
             const gc = ws.getRow(r).getCell(1);
             gc.value = rotuloGrupoExport(g);
             gc.font = { bold: true, color: { argb: "FF1E293B" } };
@@ -557,6 +558,20 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
             c.border = { top: borda, left: borda, bottom: ultima ? separador : borda, right: borda };
             if (col <= 2 && i === 0) c.font = { bold: true };
             if (!p) c.font = { italic: true, color: { argb: "FF94A3B8" } };
+          }
+          // Col 9: acompanhante indicado x companheiros REAIS deste quarto.
+          if (p && p.acompanhante_nome?.trim()) {
+            const companheiros = ocup.filter((x) => x.id !== p.id).map((x) => x.nome_completo);
+            const status = conferirAcompanhante(p.acompanhante_nome, companheiros);
+            const c9 = row.getCell(9);
+            if (status === "bate") {
+              c9.value = `✓ ${p.acompanhante_nome.trim()}`;
+              c9.font = { color: { argb: "FF16A34A" } };
+            } else if (status === "nao_bate") {
+              c9.value = `⚠ DIVERGE — indicou ${p.acompanhante_nome.trim()}`;
+              c9.font = { bold: true, color: { argb: "FF92400E" } };
+              c9.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
+            }
           }
           r++;
         });
