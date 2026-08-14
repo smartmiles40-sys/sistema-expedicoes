@@ -101,6 +101,8 @@ export type LiderPax = {
   /** Quartos alocados (por hotel) + com quem divide — das alocações do Rooming. */
   quartos_alocados: { hotel: string | null; numero: string; tipo: string }[];
   companheiros_quarto: string[];
+  /** Acompanhante indicado na inscrição (pra conferir com o quarto real). */
+  acompanhante_nome: string | null;
   prontidao: Prontidao;
   checagens: LiderChecagem[];
   arquivos: LiderArquivo[];
@@ -323,6 +325,7 @@ export async function buscarDadosLider(
           foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
           grupo: grupoDoPax(p, e.destino),
           ...infoQuarto(p),
+          acompanhante_nome: p.acompanhante_nome,
           prontidao: res.prontidao,
           checagens,
           arquivos: arquivosPax.map(semDescricao),

@@ -19,6 +19,7 @@ import {
   type LiderDados, type LiderExpedicao, type LiderPax, type LiderArquivo,
 } from "./actions";
 import { Logo, LogoMark } from "@/components/ui/Logo";
+import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
 type VerDoc = (a: LiderArquivo, download?: boolean) => void;
@@ -710,9 +711,21 @@ function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
                   <span className="text-muted-foreground">Divide com: </span>
                   <span className="font-medium">{p.companheiros_quarto.length > 0 ? p.companheiros_quarto.join(", ") : "sozinho no quarto"}</span>
                 </div>
+                {p.acompanhante_nome?.trim() && (() => {
+                  const status = conferirAcompanhante(p.acompanhante_nome, p.companheiros_quarto);
+                  return (
+                    <div className={cn("pt-0.5 text-[11px]", status === "bate" ? "text-vinculado-600" : "text-atencao-700")}>
+                      {status === "bate" ? "✓ Bate com o indicado" : "⚠ Não bate"} — indicou: {p.acompanhante_nome.trim()}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
-              <p className="text-[12px] text-muted-foreground">Ainda não alocado em nenhum quarto.</p>
+              <p className="text-[12px] text-muted-foreground">
+                {p.acompanhante_nome?.trim()
+                  ? `Ainda não alocado. Indicou: ${p.acompanhante_nome.trim()}`
+                  : "Ainda não alocado em nenhum quarto."}
+              </p>
             )}
           </div>
 
