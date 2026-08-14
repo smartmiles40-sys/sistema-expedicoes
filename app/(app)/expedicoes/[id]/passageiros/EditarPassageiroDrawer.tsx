@@ -84,10 +84,13 @@ interface Props {
   usuarios: Tables<"usuarios">[];
   /** Posição cronológica desta expedição na história da pessoa (1ª, 2ª...). */
   posicaoFidelidade?: number | null;
+  /** Quartos reais alocados (por hotel) e companheiros — vindos das alocações do Rooming. */
+  quartosAlocados?: { hotel: string | null; numero: string; tipo: string }[];
+  companheirosQuarto?: string[];
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, dataEmbarque, dataRetorno, prontidao, usuarios, posicaoFidelidade, onOpenChange }: Props) {
+export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, destino, dataEmbarque, dataRetorno, prontidao, usuarios, posicaoFidelidade, quartosAlocados = [], companheirosQuarto = [], onOpenChange }: Props) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const open = passageiro !== null;
@@ -373,8 +376,30 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                   return (
                     <div className="pt-4 border-t border-border space-y-2">
                       <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                        <BedDouble className="h-4 w-4 text-lista-600" /> Com quem quer dividir o quarto
+                        <BedDouble className="h-4 w-4 text-lista-600" /> Quarto e acompanhante
                       </h3>
+                      {/* Alocação REAL (Rooming): quarto por hotel + companheiros */}
+                      {quartosAlocados.length > 0 ? (
+                        <div className="rounded-md border border-vinculado-600/30 bg-vinculado-50/40 p-2.5 text-[12px]">
+                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-vinculado-700">Alocado no Rooming</div>
+                          <ul className="space-y-0.5">
+                            {quartosAlocados.map((q, i) => (
+                              <li key={i} className="flex justify-between gap-2">
+                                <span className="text-muted-foreground">{q.hotel ?? "Hotel"}</span>
+                                <span className="font-medium">Quarto {q.numero} ({q.tipo})</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="mt-1.5">
+                            <span className="text-muted-foreground">Divide com: </span>
+                            <span className="font-medium">{companheirosQuarto.length > 0 ? companheirosQuarto.join(", ") : "sozinho no quarto"}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[12px] text-muted-foreground">Ainda não alocado em nenhum quarto (aba Rooming).</p>
+                      )}
+                      {/* Preferência INDICADA na inscrição */}
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Indicado na inscrição</div>
                       {nome ? (
                         <div className="grid grid-cols-1 gap-1.5 text-[12px] sm:grid-cols-2">
                           <PerfilLinha label="Acompanhante(s)" value={passageiro.acompanhante_nome} />

@@ -14,7 +14,7 @@ import { LiveBadge } from "@/components/ui/LiveBadge";
 import { useRealtimeRefresh } from "@/lib/hooks/useRealtimeRefresh";
 import { formatDate, daysUntil, cn, aniversarioNaViagem } from "@/lib/utils";
 import { STATUS_RESERVA, TIPO_PASSAGEIRO, COR_PRONTIDAO } from "@/lib/constants";
-import type { ArquivoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
+import type { ArquivoRow, AlocacaoQuartoRow, PassageiroRow, QuartoRow, StatusReserva, UsuarioRow } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import type { PessoaAgregada } from "@/lib/data/pessoas";
 import { toast } from "sonner";
@@ -41,6 +41,8 @@ interface Props {
   expedicaoId: string;
   passageiros: PassageiroRow[];
   quartos: QuartoRow[];
+  /** Alocações reais (M2M passageiro_quarto) — fonte do quarto/companheiros. */
+  alocacoes: AlocacaoQuartoRow[];
   arquivos: ArquivoRow[];
   dataEmbarque: string;
   dataRetorno: string;
@@ -56,7 +58,7 @@ interface Props {
   isAdmin: boolean;
 }
 
-export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade, grupos, isAdmin }: Props) {
+export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes, arquivos, dataEmbarque, dataRetorno, destino, prontidao, usuarios, pessoas, posicoesFidelidade, grupos, isAdmin }: Props) {
   const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
@@ -156,6 +158,34 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
   });
 
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
+  const nomePorPax = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p.nome_completo])), [passageiros]);
+
+  // Alocações reais (M2M): quarto -> pax e pax -> quartos. O legado `quarto_id`
+  // NÃO é atualizado pelo Rooming, então a fonte da verdade é `passageiro_quarto`.
+  const { paxPorQuarto, quartosDoPax } = React.useMemo(() => {
+    const pq = new Map<string, string[]>();
+    const qp = new Map<string, string[]>();
+    for (const a of alocacoes) {
+      if (!pq.has(a.quarto_id)) pq.set(a.quarto_id, []);
+      pq.get(a.quarto_id)!.push(a.passageiro_id);
+      if (!qp.has(a.passageiro_id)) qp.set(a.passageiro_id, []);
+      qp.get(a.passageiro_id)!.push(a.quarto_id);
+    }
+    return { paxPorQuarto: pq, quartosDoPax: qp };
+  }, [alocacoes]);
+
+  /** Quartos (ordenados por hotel/check-in) e companheiros reais de um passageiro. */
+  const infoQuarto = React.useCallback((p: PassageiroRow) => {
+    const qids = quartosDoPax.get(p.id) ?? [];
+    const rooms = qids
+      .map((qid) => quartosById.get(qid))
+      .filter((q): q is QuartoRow => !!q)
+      .sort((a, b) => (a.check_in ?? "").localeCompare(b.check_in ?? ""));
+    const companheiros = [...new Set(
+      qids.flatMap((qid) => (paxPorQuarto.get(qid) ?? []).filter((id) => id !== p.id)),
+    )].map((id) => nomePorPax.get(id)).filter((n): n is string => !!n);
+    return { rooms, companheiros };
+  }, [quartosDoPax, paxPorQuarto, quartosById, nomePorPax]);
 
   // Duas caixas: Líderes (equipe) em cima e ExpedAmigos (passageiros) embaixo.
   const lideres = ordenados.filter((p) => p.tipo === "Líder");
@@ -166,7 +196,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
     const validadeDias = daysUntil(p.validade_passaporte);
     const embarqueDias = daysUntil(dataEmbarque);
     const validadeAlerta = validadeDias != null && embarqueDias != null ? validadeDias - embarqueDias < 180 : false;
-    const quarto = p.quarto_id ? quartosById.get(p.quarto_id) : null;
+    const { rooms, companheiros } = infoQuarto(p);
     const aniv = aniversarioNaViagem(p.data_nascimento, dataEmbarque, dataRetorno);
     return (
       <tr key={p.id} className="border-b border-border hover:bg-accent/30">
@@ -236,8 +266,25 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
             {validadeAlerta && <span className="text-[10px] block">⚠ &lt; 6m do embarque</span>}
           </div>
         </td>
-        <td className="px-2.5 text-muted-foreground">
-          {quarto ? `${quarto.numero} (${quarto.tipo})` : "—"}
+        <td className="px-2.5">
+          {rooms.length > 0 ? (
+            <div
+              className="leading-tight"
+              title={rooms.map((r) => `${r.hotel_cidade ?? "Hotel"}: Quarto ${r.numero} (${r.tipo})`).join(" · ")}
+            >
+              <div className="text-[13px]">
+                Quarto {rooms[0].numero}
+                {rooms.length > 1 && <span className="text-muted-foreground"> +{rooms.length - 1}</span>}
+              </div>
+              {companheiros.length > 0 && (
+                <div className="max-w-[190px] truncate text-[11px] text-muted-foreground">com {companheiros.join(", ")}</div>
+              )}
+            </div>
+          ) : p.acompanhante_nome?.trim() ? (
+            <span className="text-[12px] text-muted-foreground">Indicou: {p.acompanhante_nome.trim()}</span>
+          ) : (
+            <span className="text-[12px] text-muted-foreground">Viaja sozinho</span>
+          )}
         </td>
         <td className="px-2.5">
           <Badge variant={STATUS_VARIANT[p.status_reserva]}>{p.status_reserva}</Badge>
@@ -493,6 +540,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, arquivos,
         prontidao={passageiroEditando ? prontidaoByPax.get(passageiroEditando.id) ?? null : null}
         usuarios={usuarios}
         posicaoFidelidade={passageiroEditando ? posicoesFidelidade[passageiroEditando.id] ?? null : null}
+        quartosAlocados={passageiroEditando ? infoQuarto(passageiroEditando).rooms.map((r) => ({ hotel: r.hotel_cidade, numero: r.numero, tipo: r.tipo })) : []}
+        companheirosQuarto={passageiroEditando ? infoQuarto(passageiroEditando).companheiros : []}
         onOpenChange={(open) => !open && setEditandoId(null)}
       />
 

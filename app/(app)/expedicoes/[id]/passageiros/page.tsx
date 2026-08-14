@@ -1,4 +1,4 @@
-import { listPassageiros, listQuartos, getProntidaoExpedicao, listUsuarios } from "@/lib/data/expedicoes";
+import { listPassageiros, listQuartos, listAlocacoes, getProntidaoExpedicao, listUsuarios } from "@/lib/data/expedicoes";
 import { getExpedicao } from "@/lib/data/expedicoes";
 import { listArquivosExpedicao } from "@/lib/data/arquivos";
 import { listPessoas } from "@/lib/data/pessoas";
@@ -14,9 +14,10 @@ export default async function PassageirosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [pax, quartos, expedicao, arquivos, prontidao, usuarios, pessoas, grupos, user] = await Promise.all([
+  const [pax, quartos, alocacoes, expedicao, arquivos, prontidao, usuarios, pessoas, grupos, user] = await Promise.all([
     listPassageiros(id),
     listQuartos(id),
+    listAlocacoes(id),
     getExpedicao(id),
     listArquivosExpedicao(id),
     getProntidaoExpedicao(id),
@@ -35,6 +36,7 @@ export default async function PassageirosPage({
         expedicaoId={id}
         passageiros={pax}
         quartos={quartos}
+        alocacoes={alocacoes}
         arquivos={arquivos}
         dataEmbarque={expedicao.data_embarque}
         dataRetorno={expedicao.data_retorno}
