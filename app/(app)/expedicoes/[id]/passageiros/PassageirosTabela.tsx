@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown, Check } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown, Check, Filter, X } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
@@ -63,6 +63,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   const [busca, setBusca] = React.useState("");
   const [statusFiltro, setStatusFiltro] = React.useState<string | null>(null);
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
+  // Clicando no cabeçalho "Formulário": mostra só quem ainda NÃO preencheu.
+  const [soPendentes, setSoPendentes] = React.useState(false);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [existenteOpen, setExistenteOpen] = React.useState(false);
@@ -132,6 +134,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   const filtrados = passageiros.filter((p) => {
     if (statusFiltro && p.status_reserva !== statusFiltro) return false;
     if (tipoFiltro && p.tipo !== tipoFiltro) return false;
+    if (soPendentes && preencheuFormulario(p)) return false;
     if (busca.trim()) {
       const q = busca.toLowerCase();
       const hay = `${p.nome_completo} ${p.cpf ?? ""} ${p.passaporte ?? ""}`.toLowerCase();
@@ -338,7 +341,20 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
                 <Th>Quarto</Th>
                 <Th>Status</Th>
                 <Th>Prontidão</Th>
-                <Th>Formulário</Th>
+                <th className="text-left px-2.5 whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setSoPendentes((v) => !v)}
+                    title={soPendentes ? "Mostrando só pendentes — clique para ver todos" : "Clique para filtrar só os pendentes"}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide transition-colors",
+                      soPendentes ? "text-atencao-700" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Formulário
+                    <Filter className={cn("h-3 w-3", soPendentes && "fill-atencao-200")} />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -468,6 +484,20 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
           <StatPill label="Aptos" value={prontidao.filter((p) => p.resultado.prontidao === "Apto").length} variant="vinculado" />
           <StatPill label="Atenção" value={prontidao.filter((p) => p.resultado.prontidao === "Atenção").length} variant="atencao" />
           <StatPill label="Bloqueados" value={prontidao.filter((p) => p.resultado.prontidao === "Bloqueado").length} variant="critico" />
+          <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+          <button
+            type="button"
+            onClick={() => setSoPendentes((v) => !v)}
+            title="Filtrar só quem ainda não preencheu o formulário"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+              soPendentes ? "border-atencao-600 bg-atencao-100 text-atencao-700" : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Filter className="h-3 w-3" />
+            Formulário pendente: {passageiros.filter((p) => !preencheuFormulario(p)).length}
+            {soPendentes && <X className="h-3 w-3" />}
+          </button>
         </div>
       )}
 
