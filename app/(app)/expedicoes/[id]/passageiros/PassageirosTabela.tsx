@@ -25,6 +25,7 @@ import { AdicionarExistenteDrawer } from "./AdicionarExistenteDrawer";
 import { ProntidaoPaxDrawer } from "./ProntidaoPaxDrawer";
 import { FidelidadeBadge } from "./FidelidadeBadge";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
+import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 import { sincronizarExpedicaoBitrix } from "./bitrix-sync-actions";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
@@ -282,6 +283,20 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
               {companheiros.length > 0 && (
                 <div className="max-w-[190px] truncate text-[11px] text-muted-foreground">com {companheiros.join(", ")}</div>
               )}
+              {p.acompanhante_nome?.trim() && (() => {
+                const status = conferirAcompanhante(p.acompanhante_nome, companheiros);
+                return (
+                  <div
+                    className={cn(
+                      "max-w-[190px] truncate text-[10px]",
+                      status === "bate" ? "text-vinculado-600" : status === "nao_bate" ? "text-atencao-700" : "text-muted-foreground",
+                    )}
+                    title={status === "nao_bate" ? "O acompanhante indicado NÃO está neste quarto" : status === "bate" ? "Confere com o indicado" : undefined}
+                  >
+                    {status === "bate" ? "✓" : status === "nao_bate" ? "⚠" : ""} indicou: {p.acompanhante_nome.trim()}
+                  </div>
+                );
+              })()}
             </div>
           ) : p.acompanhante_nome?.trim() ? (
             <span className="text-[12px] text-muted-foreground">Indicou: {p.acompanhante_nome.trim()}</span>

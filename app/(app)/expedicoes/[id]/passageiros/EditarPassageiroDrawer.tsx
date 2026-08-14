@@ -45,6 +45,7 @@ import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { SaudeCampos } from "./SaudeCampos";
 import { FidelidadeBadge } from "./FidelidadeBadge";
 import { MudarExpedicao } from "./MudarExpedicao";
+import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 
 const schema = z.object({
   nome_completo: z.string().min(2, "Mínimo 2 caracteres"),
@@ -412,6 +413,22 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                           🧍 Viaja sozinho — não indicou acompanhante
                         </p>
                       )}
+                      {/* Confere: o indicado está no mesmo quarto? */}
+                      {quartosAlocados.length > 0 && nome && (() => {
+                        const status = conferirAcompanhante(passageiro.acompanhante_nome, companheirosQuarto);
+                        if (status === "bate") {
+                          return (
+                            <p className="inline-flex items-center gap-1.5 rounded-md bg-vinculado-50 px-2.5 py-1 text-[12px] font-medium text-vinculado-700">
+                              ✓ Bate — está no mesmo quarto que o indicado.
+                            </p>
+                          );
+                        }
+                        return (
+                          <p className="inline-flex items-center gap-1.5 rounded-md bg-atencao-50 px-2.5 py-1 text-[12px] font-medium text-atencao-700">
+                            ⚠ Não bate — o acompanhante indicado não está neste quarto.
+                          </p>
+                        );
+                      })()}
                       <p className="text-[11px] text-muted-foreground">
                         Informado na inscrição. A alocação real é feita na aba Rooming.
                       </p>
