@@ -510,13 +510,13 @@ export async function entrarExpedAmigo(
  */
 export async function registrarAcessoExpedamigo(
   cpfRaw: string,
-  evento: "login" | "download_pdf" | "viagem_aberta",
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher",
   expedicaoId?: string | null,
 ): Promise<void> {
   try {
     const cpf = soDigitosCpf(cpfRaw ?? "");
     if (cpf.length !== 11) return;
-    if (!["login", "download_pdf", "viagem_aberta"].includes(evento)) return;
+    if (!["login", "download_pdf", "viagem_aberta", "download_voucher"].includes(evento)) return;
     const expId = expedicaoId || null;
     if (DEV_USE_MOCK_DATA) {
       mockExpedamigoAcessos.push({

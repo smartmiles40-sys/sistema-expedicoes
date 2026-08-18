@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { ScrollText, Search, LogIn, FileDown, BookOpen } from "lucide-react";
+import { ScrollText, Search, LogIn, FileDown, BookOpen, Ticket } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { StatPill } from "@/components/ui/StatPill";
@@ -12,7 +12,7 @@ export type AcessoLog = {
   id: string;
   cpf: string;
   nome: string | null;
-  evento: "login" | "download_pdf" | "viagem_aberta";
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher";
   expedicao_nome: string | null;
   created_at: string;
 };
@@ -21,6 +21,7 @@ const EVENTOS: { chave: AcessoLog["evento"]; label: string; variant: "lista" | "
   { chave: "login", label: "Login", variant: "lista", Icon: LogIn },
   { chave: "viagem_aberta", label: "Abriu viagem", variant: "atencao", Icon: BookOpen },
   { chave: "download_pdf", label: "Baixou PDF", variant: "vinculado", Icon: FileDown },
+  { chave: "download_voucher", label: "Baixou voucher", variant: "vinculado", Icon: Ticket },
 ];
 const EVENTO_META = new Map(EVENTOS.map((e) => [e.chave, e]));
 

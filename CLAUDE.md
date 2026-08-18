@@ -451,9 +451,11 @@ role**, **só leitura**.
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.
 - **Log de acesso ao portal (migration 0043):** tabela `expedamigo_acessos` registra
-  3 eventos — `login` (login explícito; auto-restore de sessão NÃO loga), `viagem_aberta`
-  (abriu um card de viagem) e `download_pdf` (baixou o PDF, que é gerado no cliente → um
-  server action `registrarAcessoExpedamigo` é chamado no clique). Só CPF + evento +
+  4 eventos — `login` (login explícito; auto-restore de sessão NÃO loga), `viagem_aberta`
+  (abriu um card de viagem), `download_pdf` (baixou o PDF, gerado no cliente) e
+  `download_voucher` (baixou QUALQUER voucher/ingresso/seguro — `onDownload={logVoucher}`
+  nos `VoucherLink`/`IngressoLink`; migration **0050** amplia o CHECK do `evento`). Um
+  server action `registrarAcessoExpedamigo` é chamado no clique. Só CPF + evento +
   expedição + data/hora (SEM IP/dispositivo, por LGPD). O login é logado server-side no
   `entrarExpedAmigo`; os outros via `registrarAcessoExpedamigo` (best-effort, nunca quebra
   o portal). Visualização no operacional: **`/acessos-expedamigo`** (`AcessosTabela`, busca +

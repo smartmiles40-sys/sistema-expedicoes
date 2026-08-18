@@ -308,6 +308,8 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
   const heroImg = heroDoDestino(exp.destino) ?? exp.roteiro.flatMap((d) => d.fotos).map((f) => f.url).find(Boolean) ?? null;
   const cidades = [...new Set(exp.roteiro.map((d) => d.cidade).filter(Boolean))].slice(0, 6) as string[];
   const ano = (exp.data_embarque ?? "").slice(0, 4);
+  // Log de acesso ao baixar QUALQUER voucher/ingresso/seguro (best-effort).
+  const logVoucher = () => void registrarAcessoExpedamigo(cpf, "download_voucher", exp.id);
 
   async function baixarPdf() {
     setGerandoPdf(true);
@@ -447,7 +449,7 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                         {v.chegada ? ` · Chegada: ${v.chegada}` : ""}
                       </div>
                       {v.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{v.observacoes}</div>}
-                      {v.voucher_url && <VoucherLink url={v.voucher_url} />}
+                      {v.voucher_url && <VoucherLink url={v.voucher_url} onDownload={logVoucher} />}
                     </li>
                   ))}
                 </ul>
@@ -462,7 +464,7 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                 <div className="mt-2">
                   <div className="mb-1 text-[11px] font-semibold text-[#09282B]/70 dark:text-white/70">Seu voucher de voo</div>
                   <div className="flex flex-wrap gap-2">
-                    {exp.vouchers_voo.map((v, i) => <IngressoLink key={i} ing={v} />)}
+                    {exp.vouchers_voo.map((v, i) => <IngressoLink key={i} ing={v} onDownload={logVoucher} />)}
                   </div>
                 </div>
               )}
@@ -490,7 +492,7 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                         {[p.data ? formatDate(p.data) : null, p.horario, p.local].filter(Boolean).join(" · ")}
                       </div>
                       {p.observacoes && <div className="mt-0.5 text-[11px] text-muted-foreground">{p.observacoes}</div>}
-                      {p.voucher_url && <VoucherLink url={p.voucher_url} />}
+                      {p.voucher_url && <VoucherLink url={p.voucher_url} onDownload={logVoucher} />}
                     </li>
                   ))}
                 </ul>
@@ -504,12 +506,12 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                 <div className="space-y-2">
                   {exp.ingressos_mp.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {exp.ingressos_mp.map((ing, i) => <IngressoLink key={i} ing={ing} />)}
+                      {exp.ingressos_mp.map((ing, i) => <IngressoLink key={i} ing={ing} onDownload={logVoucher} />)}
                     </div>
                   )}
                   {exp.ingressos_trem.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {exp.ingressos_trem.map((ing, i) => <IngressoLink key={i} ing={ing} />)}
+                      {exp.ingressos_trem.map((ing, i) => <IngressoLink key={i} ing={ing} onDownload={logVoucher} />)}
                     </div>
                   )}
                 </div>
@@ -521,7 +523,7 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
               <div>
                 <SubTitulo icone={<ShieldCheck className="h-3.5 w-3.5" />}>Seguro viagem</SubTitulo>
                 <div className="flex flex-wrap gap-2">
-                  {exp.seguros.map((s, i) => <IngressoLink key={i} ing={s} />)}
+                  {exp.seguros.map((s, i) => <IngressoLink key={i} ing={s} onDownload={logVoucher} />)}
                 </div>
               </div>
             )}
@@ -529,7 +531,7 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
             {/* Hospedagem / quarto */}
             <div>
               <SubTitulo icone={<BedDouble className="h-3.5 w-3.5" />}>Hospedagem</SubTitulo>
-              {exp.hospedagem_voucher_url && <div className="mb-2"><VoucherLink url={exp.hospedagem_voucher_url} /></div>}
+              {exp.hospedagem_voucher_url && <div className="mb-2"><VoucherLink url={exp.hospedagem_voucher_url} onDownload={logVoucher} /></div>}
               {exp.quartos.length > 0 ? (
                 <ul className="space-y-1.5">
                   {exp.quartos.map((q, i) => (
@@ -915,12 +917,13 @@ function PasseioOpcionalCard({ p }: { p: AmigoRoteiroDia["passeios_opcionais"][n
   );
 }
 
-function VoucherLink({ url }: { url: string }) {
+function VoucherLink({ url, onDownload }: { url: string; onDownload?: () => void }) {
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={onDownload}
       className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-editavel-700 hover:bg-accent"
     >
       <Download className="h-3 w-3" /> Baixar voucher
@@ -928,12 +931,13 @@ function VoucherLink({ url }: { url: string }) {
   );
 }
 
-function IngressoLink({ ing }: { ing: { nome: string; url: string } }) {
+function IngressoLink({ ing, onDownload }: { ing: { nome: string; url: string }; onDownload?: () => void }) {
   return (
     <a
       href={ing.url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={onDownload}
       className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-editavel-700 hover:bg-accent"
     >
       <Download className="h-3 w-3 shrink-0" />
