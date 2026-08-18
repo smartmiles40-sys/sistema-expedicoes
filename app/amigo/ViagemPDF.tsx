@@ -591,6 +591,21 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           </View>
         )}
 
+        {/* ---- Seguro viagem ---- */}
+        {exp.seguros.length > 0 && (
+          <View style={styles.secao}>
+            <SecaoTitulo hint="Toque no seguro para abrir ou baixar o arquivo.">Seguro viagem</SecaoTitulo>
+            {exp.seguros.map((s, i) => (
+              <View key={i} style={styles.item} wrap={false}>
+                <Text style={styles.itemTitulo}>{s.nome}</Text>
+                {s.url
+                  ? <Link src={s.url} style={styles.ingressoLink}>Abrir / baixar seguro</Link>
+                  : <Text style={styles.voucherChip}>Disponível no portal</Text>}
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.footer} fixed>
           <Text style={styles.footerBrand}>Se Tu For, Eu Vou! · Viagens</Text>
           <Text style={styles.footerPage} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
