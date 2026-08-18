@@ -111,6 +111,8 @@ export type AmigoExpedicao = {
   /** Ingressos do próprio passageiro (só os dele) — Peru. */
   ingressos_mp: AmigoIngresso[];
   ingressos_trem: AmigoIngresso[];
+  /** Seguro viagem do próprio passageiro (só os dele) — todas as expedições. */
+  seguros: AmigoIngresso[];
 };
 export type AmigoDados = {
   nome: string;
@@ -304,6 +306,21 @@ export async function entrarExpedAmigo(
     ingressoArqs = (data ?? []) as IngressoArq[];
   }
 
+  // Seguro viagem (categoria "Seguros") das linhas da PRÓPRIA pessoa — pra todos.
+  let seguroArqs: IngressoArq[] = [];
+  if (DEV_USE_MOCK_DATA) {
+    seguroArqs = (await listArquivosMock())
+      .filter((a) => a.categoria === "Seguros" && a.passageiro_id && meusIds.includes(a.passageiro_id))
+      .map((a) => ({ id: a.id, nome: a.nome, passageiro_id: a.passageiro_id, descricao: a.descricao }));
+  } else if (sb && meusIds.length > 0) {
+    const { data } = await sb
+      .from("arquivos")
+      .select("id,nome,passageiro_id,descricao")
+      .eq("categoria", "Seguros")
+      .in("passageiro_id", meusIds);
+    seguroArqs = (data ?? []) as IngressoArq[];
+  }
+
   // Resolve as URLs dos arquivos (fotos do roteiro + vouchers de voo/passeio + ingressos)
   // das expedições futuras da pessoa: signed URL (prod) ou rota de download do mock (dev).
   const fotoUrl = new Map<string, string>(); // arquivo_id -> url
@@ -319,6 +336,7 @@ export async function entrarExpedAmigo(
     for (const e of exps) if (e.hospedagem_voucher_arquivo_id && expIdsFuturas.has(e.id)) idsRelevantes.add(e.hospedagem_voucher_arquivo_id);
     for (const p of passeiosOpc) if (p.foto_arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.foto_arquivo_id);
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
+    for (const a of seguroArqs) idsRelevantes.add(a.id);
 
     if (DEV_USE_MOCK_DATA) {
       for (const id of idsRelevantes) fotoUrl.set(id, `/api/arquivos/${id}/download?inline=1`);
@@ -438,6 +456,10 @@ export async function entrarExpedAmigo(
         .filter((x) => x.url),
       ingressos_trem: ingressoArqs
         .filter((a) => !!row && a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
+        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
+      seguros: seguroArqs
+        .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
     });

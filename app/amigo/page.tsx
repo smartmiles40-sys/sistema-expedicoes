@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
   CalendarDays, Ticket, Info, ChevronRight, Megaphone, Download, ArrowLeft,
-  Sparkles, Check, MessageCircle,
+  Sparkles, Check, MessageCircle, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -504,6 +504,16 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                       {exp.ingressos_trem.map((ing, i) => <IngressoLink key={i} ing={ing} />)}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Seguro viagem (só o do próprio passageiro) */}
+            {exp.seguros.length > 0 && (
+              <div>
+                <SubTitulo icone={<ShieldCheck className="h-3.5 w-3.5" />}>Seguro viagem</SubTitulo>
+                <div className="flex flex-wrap gap-2">
+                  {exp.seguros.map((s, i) => <IngressoLink key={i} ing={s} />)}
                 </div>
               </div>
             )}

@@ -385,7 +385,10 @@ role**, **só leitura**.
   "seu localizador" + Passeios/ingressos + Hospedagem/rooming; cada voo e passeio pode
   ter 1 voucher anexado → botão "Baixar voucher"); **Informações do destino**;
   **Avisos e boas práticas** (com tipo/cor); **Links úteis**.
-  Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro.
+  Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro,
+  EXCETO os que fazem sentido pra viagem: ingressos Machu Picchu/trem (Peru) e o
+  **Seguro viagem** (categoria "Seguros", `seguroArqs` — pra TODAS as expedições;
+  seção "Seguro viagem" no bloco Vouchers, filtrada por `passageiro_id === row.id`).
   Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
 - **Baixar PDF da viagem:** botão por viagem (`app/amigo/ViagemPDF.tsx`, **`@react-pdf/renderer`**)
   gerado **no cliente** sob demanda (import() dinâmico → fora do bundle principal). Reaproveita
