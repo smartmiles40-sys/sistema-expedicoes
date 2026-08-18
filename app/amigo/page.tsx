@@ -458,7 +458,15 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                   <Campo label="Seu localizador" valor={exp.voo.localizador} mono />
                 </div>
               )}
-              {exp.voos_grupo.length === 0 && !exp.voo.companhia && !exp.voo.localizador && (
+              {exp.vouchers_voo.length > 0 && (
+                <div className="mt-2">
+                  <div className="mb-1 text-[11px] font-semibold text-[#09282B]/70 dark:text-white/70">Seu voucher de voo</div>
+                  <div className="flex flex-wrap gap-2">
+                    {exp.vouchers_voo.map((v, i) => <IngressoLink key={i} ing={v} />)}
+                  </div>
+                </div>
+              )}
+              {exp.voos_grupo.length === 0 && exp.vouchers_voo.length === 0 && !exp.voo.companhia && !exp.voo.localizador && (
                 <p className="text-[12px] text-muted-foreground">
                   As informações dos seus voos serão disponibilizadas aqui em breve.
                 </p>

@@ -591,6 +591,21 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           </View>
         )}
 
+        {/* ---- Seu voucher de voo ---- */}
+        {exp.vouchers_voo.length > 0 && (
+          <View style={styles.secao}>
+            <SecaoTitulo hint="Toque no voucher para abrir ou baixar o arquivo.">Seu voucher de voo</SecaoTitulo>
+            {exp.vouchers_voo.map((v, i) => (
+              <View key={i} style={styles.item} wrap={false}>
+                <Text style={styles.itemTitulo}>{v.nome}</Text>
+                {v.url
+                  ? <Link src={v.url} style={styles.ingressoLink}>Abrir / baixar voucher</Link>
+                  : <Text style={styles.voucherChip}>Disponível no portal</Text>}
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* ---- Seguro viagem ---- */}
         {exp.seguros.length > 0 && (
           <View style={styles.secao}>
