@@ -260,14 +260,32 @@ export async function entrarExpedAmigo(
   const quartoById = new Map(quartos.map((q) => [q.id, q]));
 
   const cancelada = (e: ExpedicaoRow | undefined): boolean => !e || e.status === "Cancelada";
-  const unidades: { exp: ExpedicaoRow; row: PassageiroRow | null }[] = ehAdmin
-    ? exps
-        .filter((e) => !cancelada(e) && (e.data_embarque ?? "").slice(0, 10) >= hoje)
-        .map((e) => ({ exp: e, row: null }))
-    : minhasRows
-        .filter((row) => row.expedicao_id && row.status_reserva !== "Cancelado" && row.liberado_expedamigo === true)
-        .map((row) => ({ exp: expById.get(row.expedicao_id as string) as ExpedicaoRow, row }))
-        .filter((u) => !cancelada(u.exp));
+
+  // Linha da PRÓPRIA pessoa por expedição (a mais recente). Vale também pra Líder/Master:
+  // quando ela é passageira de uma expedição, é a linha DELA que traz ingressos, vouchers,
+  // rooming e localizador — senão esses dados pessoais não apareceriam.
+  const minhaRowPorExp = new Map<string, PassageiroRow>();
+  for (const r of minhasRows) {
+    if (!r.expedicao_id || r.status_reserva === "Cancelado") continue;
+    const ex = minhaRowPorExp.get(r.expedicao_id);
+    if (!ex || r.created_at > ex.created_at) minhaRowPorExp.set(r.expedicao_id, r);
+  }
+
+  const unidadesMap = new Map<string, { exp: ExpedicaoRow; row: PassageiroRow | null }>();
+  // Passageiro (inclusive Líder/Master): as expedições DELE que estão liberadas — passado ou futuro.
+  for (const [expId, row] of minhaRowPorExp) {
+    if (row.liberado_expedamigo !== true) continue;
+    const e = expById.get(expId);
+    if (e && !cancelada(e)) unidadesMap.set(expId, { exp: e, row });
+  }
+  // Admin master: também enxerga TODAS as futuras não-canceladas (com a linha dele, se for passageiro).
+  if (ehAdmin) {
+    for (const e of exps) {
+      if (cancelada(e) || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
+      if (!unidadesMap.has(e.id)) unidadesMap.set(e.id, { exp: e, row: minhaRowPorExp.get(e.id) ?? null });
+    }
+  }
+  const unidades = [...unidadesMap.values()];
   const expIdsFuturas = new Set<string>(unidades.map((u) => u.exp.id));
 
   // Ingressos (categoria "Bilhetes") das linhas da PRÓPRIA pessoa — só os dela.

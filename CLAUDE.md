@@ -373,6 +373,12 @@ role**, **só leitura**.
   A 1ª liberação é o **onboarding** da pessoa; depois disso, novas expedições dela entram
   **auto-liberadas** (`jaOnboarded` em `materializarInscricao`). O portal filtra por
   `liberado_expedamigo` (mostra as liberadas, inclusive antigas; não-canceladas).
+- **Líder/Master também vê os PRÓPRIOS ingressos/vouchers:** quando o viajante é
+  passageiro de uma expedição, o portal usa a **linha dele** (`minhaRowPorExp`), então
+  ingressos (Machu Picchu/trem), vouchers, rooming e localizador aparecem — inclusive
+  pra quem é Líder ou Master. Antes o caminho de admin/master forçava `row: null` e
+  esses dados sumiam. O master continua vendo TODAS as futuras (com a linha dele quando
+  é passageiro) + as próprias viagens **liberadas** (passado/futuro).
 - **Card recolhível:** cada viagem abre **recolhida** (igual à Área do Líder);
   clica no hero pra expandir. Dentro: **Roteiro dia a dia (previsto)** — cada dia
   também é recolhível, com fotos; **Vouchers** (item único que agrupa Voos de grupo +
