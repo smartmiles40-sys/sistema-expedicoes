@@ -70,6 +70,9 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   const [sort, setSort] = React.useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const toggleSort = (col: string) =>
     setSort((s) => (s?.col === col ? { col, dir: s.dir === "asc" ? "desc" : "asc" } : { col, dir: "asc" }));
+  // Divisão por grupo (G1/G2): opcional, ligada por botão. Só faz sentido quando a
+  // expedição tem grupos — nem todas têm.
+  const [dividirPorGrupo, setDividirPorGrupo] = React.useState(false);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [existenteOpen, setExistenteOpen] = React.useState(false);
@@ -153,6 +156,11 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     const g = grupoLabel(p);
     return g === "G1" ? 0 : g === "G2" ? 1 : 2;
   }, [grupoLabel]);
+  // A expedição tem passageiros marcados como G1/G2? (mostra o botão de divisão)
+  const temGrupos = React.useMemo(
+    () => passageiros.some((p) => { const g = grupoLabel(p); return g === "G1" || g === "G2"; }),
+    [passageiros, grupoLabel],
+  );
 
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
   const nomePorPax = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p.nome_completo])), [passageiros]);
@@ -230,16 +238,22 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     return String(va).localeCompare(String(vb), "pt-BR");
   };
 
-  // Sem ordenação manual: G1 → G2 → sem grupo, e ordem de cadastro dentro do grupo.
-  // Com ordenação: pela coluna clicada (a divisão Líderes/ExpedAmigos é mantida abaixo).
+  // A lista está "agrupada por grupo" quando: ordena pela coluna Grupo, OU o botão
+  // "Dividir por grupo" está ligado e não há ordenação manual por outra coluna.
+  const agrupado = sort?.col === "grupo" || (!sort && dividirPorGrupo && temGrupos);
+
+  // Com ordenação manual: pela coluna clicada. Senão: por grupo (se ligado) e ordem
+  // de cadastro. A divisão Líderes/ExpedAmigos é mantida abaixo (split por tipo).
   const ordenados = [...filtrados].sort((a, b) => {
     if (sort) {
       const c = compararColuna(a, b, sort.col);
       if (c !== 0) return sort.dir === "asc" ? c : -c;
       return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
     }
-    const gA = prioridadeGrupoPax(a), gB = prioridadeGrupoPax(b);
-    if (gA !== gB) return gA - gB;
+    if (dividirPorGrupo && temGrupos) {
+      const gA = prioridadeGrupoPax(a), gB = prioridadeGrupoPax(b);
+      if (gA !== gB) return gA - gB;
+    }
     return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
   });
 
@@ -493,8 +507,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
                 (() => {
                   // Só separa por grupo se houver mais de um grupo na seção.
                   const distintos = new Set(linhas.map((p) => grupoLabel(p) ?? "—"));
-                  // Divisor por grupo só no modo padrão (ou quando a ordenação é por grupo).
-                  const separar = distintos.size > 1 && (!sort || sort.col === "grupo");
+                  // Divisor por grupo só quando a lista está de fato agrupada por grupo.
+                  const separar = distintos.size > 1 && agrupado;
                   // Quantos passageiros em cada grupo (pra mostrar ao lado do rótulo).
                   const contagem = new Map<string, number>();
                   for (const p of linhas) {
@@ -569,6 +583,19 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
             value={tipoFiltro}
             onChange={setTipoFiltro}
           />
+          {temGrupos && (
+            <button
+              type="button"
+              onClick={() => setDividirPorGrupo((v) => !v)}
+              title="Separa a lista por grupo (G1/G2), com faixas"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                dividirPorGrupo ? "border-editavel-600 bg-editavel-100 text-editavel-700" : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Users className="h-3 w-3" /> Dividir por grupo
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <LiveBadge status={realtimeStatus} />
