@@ -480,8 +480,10 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
   **G1 E G2** (`usaGrupos` em `PassageirosTabela`). Onde não usa, um botão admin
   **"Adicionar divisão por grupos"** (`ativarDivisaoGrupos`) cria os dois grupos e ativa;
   **"Remover divisão"** (`removerDivisaoGrupos`) apaga os grupos + zera `grupo_id` de todos.
-  Ex.: Egito Outubro só tem G1 → não usa grupos → sem coluna. (Rooming/Área do Líder ainda
-  usam o `grupoLabel` com fallback legado do Egito.)
+  Ex.: Egito Outubro só tem G1 → não usa grupos → sem coluna. **Rooming e Área do Líder
+  seguem a MESMA regra:** `grupoDoPax` retorna `null` quando a expedição não tem G1+G2
+  (no board via `usaGrupos`; na `lider/actions` via `expUsaGrupos`), então nada de grupo
+  no board/export/roster do líder onde a divisão não está ativada.
 - **Botão rápido G1/G2 (subgrupos numa expedição, admin):** coluna **"Grupo"** na aba
   Passageiros com um seletor (G1 / G2 / —) **só pra admin** (`isAdmin` na `page.tsx`).
   `definirGrupoRapido` (`passageiros/grupo-actions.ts`, service role + checa `papel==="admin"`)

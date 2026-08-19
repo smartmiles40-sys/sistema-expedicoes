@@ -195,12 +195,18 @@ export async function buscarDadosLider(
   }
   // Mapa grupo_id -> nome ("G1"/"G2") pra marcar cada passageiro.
   const grupoNomePorId = new Map(gruposExp.map((g) => [g.id, g.nome]));
-  const grupoDoPax = (p: PassageiroRow, destino: string): string | null => {
+  // Divisão por grupos é OPT-IN: só as expedições com G1 E G2 usam grupos.
+  const expComG1 = new Set(gruposExp.filter((g) => g.nome === "G1").map((g) => g.expedicao_id));
+  const expUsaGrupos = new Set(
+    gruposExp.filter((g) => g.nome === "G2" && expComG1.has(g.expedicao_id)).map((g) => g.expedicao_id),
+  );
+  const grupoDoPax = (p: PassageiroRow, exp: ExpedicaoRow): string | null => {
+    if (!expUsaGrupos.has(exp.id)) return null;
     if (p.grupo_id && grupoNomePorId.has(p.grupo_id)) {
       const nome = grupoNomePorId.get(p.grupo_id)!;
       if (nome === "G1" || nome === "G2") return nome;
     }
-    return ehExpedicaoEgito(destino) ? grupoEgito(p.nome_completo) : null;
+    return ehExpedicaoEgito(exp.destino) ? grupoEgito(p.nome_completo) : null;
   };
 
   // Alocações reais (M2M) do Rooming: quarto real + companheiros por passageiro.
@@ -323,7 +329,7 @@ export async function buscarDadosLider(
           restricoes_alimentares: p.restricoes_alimentares,
           condicoes_medicas: p.condicoes_medicas,
           foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
-          grupo: grupoDoPax(p, e.destino),
+          grupo: grupoDoPax(p, e),
           ...infoQuarto(p),
           acompanhante_nome: p.acompanhante_nome,
           prontidao: res.prontidao,

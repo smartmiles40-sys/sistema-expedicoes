@@ -126,19 +126,24 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
-  // Grupo (G1/G2) de cada pax: prefere a atribuição real (grupo_id → nome "G1"/"G2");
-  // se não houver e for Egito, cai no legado hardcoded (dev-grupos-egito).
+  // Divisão por grupos é OPT-IN: só vale quando a expedição tem G1 E G2 (mesma regra
+  // da aba Passageiros). Sem isso, nada de grupo no board/export (nem o legado Egito).
   const grupoNomePorId = React.useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.nome])), [grupos]);
+  const usaGrupos = React.useMemo(
+    () => (grupos ?? []).some((g) => g.nome === "G1") && (grupos ?? []).some((g) => g.nome === "G2"),
+    [grupos],
+  );
   const ehEgito = ehExpedicaoEgito(destino);
   const grupoDoPax = React.useCallback(
     (p: PassageiroRow): GrupoEgito | null => {
+      if (!usaGrupos) return null;
       if (p.grupo_id) {
         const nome = grupoNomePorId.get(p.grupo_id);
         if (nome === "G1" || nome === "G2") return nome;
       }
       return ehEgito ? grupoEgito(p.nome_completo) : null;
     },
-    [grupoNomePorId, ehEgito],
+    [usaGrupos, grupoNomePorId, ehEgito],
   );
   const quartoEditando = editandoId ? quartos.find((q) => q.id === editandoId) ?? null : null;
 
