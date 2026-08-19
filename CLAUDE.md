@@ -589,8 +589,11 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
 - **Perfil & conexões (migration 0038):** o form ganhou 2 etapas — "Perfil & conexões"
   (profissão, "como se descreve em grupo", "o que te anima", significado, @Instagram,
   camiseta, música, foto opcional) e "Próximos passos" (texto + checkbox obrigatório
-  `confirmou_veracidade`). Guardados no jsonb `passageiros.perfil_viajante` (por reserva,
-  não propaga) + `passageiros.foto_arquivo_id`. A foto é subida no staging como o
+  `confirmou_veracidade`). Guardados no jsonb `passageiros.perfil_viajante` +
+  `passageiros.foto_arquivo_id`. **Ambos PROPAGAM entre as expedições da pessoa** (estão em
+  `CAMPOS_PESSOAIS`, como o anexo do passaporte) — foto e perfil ficam iguais em todas as
+  linhas dela; só o **acompanhante/dividir quarto** (`acompanhante_*`) continua por-reserva.
+  A foto é subida no staging como o
   passaporte (`inscricoes_pendentes.foto_arquivo_id`, linkada na aprovação). Selects com
   opções fixas no `InscricaoForm`. Fila mostra tudo no grupo "Perfil & conexões".
   - **Pré-preenchimento seletivo (só no form, via `agregarPerfil`/`montarValores`):**
@@ -598,8 +601,8 @@ função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identifica
     grupo"**, **@Instagram**, **camiseta** e **música** (`CAMPOS_PERFIL_CARRY`) vêm
     pré-preenchidos do histórico; **"o que te anima"**, **"significado especial"** e a
     **Conexão/acompanhante** voltam SEMPRE em branco (respondidos a cada expedição). Isso
-    é só UX de pré-preencher — o `perfil_viajante` continua salvo por reserva e NÃO propaga
-    na aprovação.
+    é só UX de pré-preencher no FORM; o `perfil_viajante` gravado **propaga** entre as
+    expedições da pessoa (via `CAMPOS_PESSOAIS`), junto com a `foto_arquivo_id`.
 
 ## 🧪 Como rodar
 

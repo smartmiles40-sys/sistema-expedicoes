@@ -301,6 +301,10 @@ const CAMPOS_PESSOAIS = [
   "passaporte",
   "validade_passaporte",
   "passaporte_arquivo_id",
+  // Foto e Perfil do viajante são PESSOAIS (propagam entre expedições, como o
+  // passaporte). Acompanhante/dividir quarto continua por-reserva (não entra aqui).
+  "foto_arquivo_id",
+  "perfil_viajante",
   "data_nascimento",
   "email",
   "telefone",
