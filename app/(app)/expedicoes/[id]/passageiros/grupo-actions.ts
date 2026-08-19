@@ -69,3 +69,65 @@ export async function definirGrupoRapido(
   revalidatePath(`/expedicoes/${expedicaoId}/grupos`);
   return { ok: true };
 }
+
+/**
+ * Ativa a divisão por grupos numa expedição: garante que os grupos "G1" e "G2"
+ * existam (cria os que faltarem). A partir daí a coluna Grupo aparece na tabela.
+ * Só admin.
+ */
+export async function ativarDivisaoGrupos(
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (eu?.papel !== "admin") return { ok: false, error: "Apenas admin pode ativar grupos." };
+  if (DEV_USE_MOCK_DATA) {
+    const agora = new Date().toISOString();
+    for (const nome of ["G1", "G2"] as const) {
+      if (!mockGrupos.some((g) => g.expedicao_id === expedicaoId && g.nome === nome)) {
+        mockGrupos.push({
+          id: `grp-${mockGrupos.length + 1}-${nome}`, expedicao_id: expedicaoId, nome,
+          data_embarque: null, data_retorno: null, pax_planejados: 0, observacoes: null,
+          ordem: nome === "G1" ? 1 : 2, created_at: agora, updated_at: agora,
+        } as GrupoExpedicaoRow);
+      }
+    }
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { data: exist } = await sb.from("grupos_expedicao").select("nome").eq("expedicao_id", expedicaoId);
+  const nomes = new Set(((exist ?? []) as { nome: string }[]).map((g) => g.nome));
+  const criar = (["G1", "G2"] as const).filter((n) => !nomes.has(n))
+    .map((nome) => ({ expedicao_id: expedicaoId, nome, pax_planejados: 0, ordem: nome === "G1" ? 1 : 2 }));
+  if (criar.length) {
+    const { error } = await sb.from("grupos_expedicao").insert(criar);
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
+/**
+ * Remove a divisão por grupos: apaga os grupos "G1"/"G2" da expedição e zera o
+ * grupo_id dos passageiros dela. Só admin. (A coluna Grupo some.)
+ */
+export async function removerDivisaoGrupos(
+  expedicaoId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (eu?.papel !== "admin") return { ok: false, error: "Apenas admin pode remover grupos." };
+  if (DEV_USE_MOCK_DATA) {
+    for (let i = mockGrupos.length - 1; i >= 0; i--) if (mockGrupos[i].expedicao_id === expedicaoId) mockGrupos.splice(i, 1);
+    for (const p of mockPassageiros) if (p.expedicao_id === expedicaoId) p.grupo_id = null;
+    revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  await sb.from("passageiros").update({ grupo_id: null }).eq("expedicao_id", expedicaoId);
+  const { error } = await sb.from("grupos_expedicao").delete().eq("expedicao_id", expedicaoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}

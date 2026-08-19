@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { Input } from "@/components/ui/Input";
 import { EditableCell } from "@/components/tables/EditableCell";
 import { atualizarPassageiroCampo, alocarPassageiro, desalocarPassageiro } from "@/app/(app)/expedicoes/actions";
@@ -29,7 +30,7 @@ import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (preview G1/G2 Egito)
 import { sincronizarExpedicaoBitrix } from "./bitrix-sync-actions";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
-import { definirGrupoRapido, type GrupoRapido } from "./grupo-actions";
+import { definirGrupoRapido, ativarDivisaoGrupos, removerDivisaoGrupos, type GrupoRapido } from "./grupo-actions";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
   Lead: "lista",
@@ -70,9 +71,20 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   const [sort, setSort] = React.useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const toggleSort = (col: string) =>
     setSort((s) => (s?.col === col ? { col, dir: s.dir === "asc" ? "desc" : "asc" } : { col, dir: "asc" }));
-  // Divisão por grupo (G1/G2): opcional, ligada por botão. Só faz sentido quando a
-  // expedição tem grupos — nem todas têm.
-  const [dividirPorGrupo, setDividirPorGrupo] = React.useState(false);
+  // Divisão por grupo: a expedição "usa grupos" quando tem G1 E G2 (ativada por botão,
+  // admin). Só então a coluna Grupo aparece e a lista é dividida por grupo.
+  const usaGrupos = React.useMemo(
+    () => grupos.some((g) => g.nome === "G1") && grupos.some((g) => g.nome === "G2"),
+    [grupos],
+  );
+  const [ativandoGrupos, setAtivandoGrupos] = React.useState(false);
+  async function ativarGrupos() {
+    setAtivandoGrupos(true);
+    const r = await ativarDivisaoGrupos(expedicaoId);
+    setAtivandoGrupos(false);
+    if (r.ok) { toast.success("Divisão por grupos ativada (G1/G2)"); router.refresh(); }
+    else toast.error("Não foi possível ativar", { description: r.error });
+  }
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [existenteOpen, setExistenteOpen] = React.useState(false);
@@ -156,11 +168,6 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     const g = grupoLabel(p);
     return g === "G1" ? 0 : g === "G2" ? 1 : 2;
   }, [grupoLabel]);
-  // A expedição tem passageiros marcados como G1/G2? (mostra o botão de divisão)
-  const temGrupos = React.useMemo(
-    () => passageiros.some((p) => { const g = grupoLabel(p); return g === "G1" || g === "G2"; }),
-    [passageiros, grupoLabel],
-  );
 
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
   const nomePorPax = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p.nome_completo])), [passageiros]);
@@ -238,19 +245,19 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     return String(va).localeCompare(String(vb), "pt-BR");
   };
 
-  // A lista está "agrupada por grupo" quando: ordena pela coluna Grupo, OU o botão
-  // "Dividir por grupo" está ligado e não há ordenação manual por outra coluna.
-  const agrupado = sort?.col === "grupo" || (!sort && dividirPorGrupo && temGrupos);
+  // A lista está "agrupada por grupo" quando a expedição usa grupos e ou ordena pela
+  // coluna Grupo, ou não há ordenação manual por outra coluna.
+  const agrupado = usaGrupos && (sort?.col === "grupo" || !sort);
 
-  // Com ordenação manual: pela coluna clicada. Senão: por grupo (se ligado) e ordem
-  // de cadastro. A divisão Líderes/ExpedAmigos é mantida abaixo (split por tipo).
+  // Com ordenação manual: pela coluna clicada. Senão: por grupo (se usa grupos) e
+  // ordem de cadastro. A divisão Líderes/ExpedAmigos é mantida abaixo (split por tipo).
   const ordenados = [...filtrados].sort((a, b) => {
     if (sort) {
       const c = compararColuna(a, b, sort.col);
       if (c !== 0) return sort.dir === "asc" ? c : -c;
       return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
     }
-    if (dividirPorGrupo && temGrupos) {
+    if (usaGrupos) {
       const gA = prioridadeGrupoPax(a), gB = prioridadeGrupoPax(b);
       if (gA !== gB) return gA - gB;
     }
@@ -300,30 +307,32 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
             {p.tipo}
           </Badge>
         </td>
-        <td className="px-2.5">
-          {(() => {
-            const l = grupoLabel(p);
-            const cor = (g: string) => cn(
-              "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-              g === "G1" ? "bg-editavel-100 text-editavel-700" : g === "G2" ? "bg-lista-100 text-lista-600" : "bg-atencao-100 text-atencao-700",
-            );
-            if (isAdmin) {
-              return (
-                <select
-                  value={l === "G1" || l === "G2" ? l : ""}
-                  onChange={(e) => mudarGrupo(p.id, (e.target.value || null) as GrupoRapido | null)}
-                  title="Definir grupo (G1/G2)"
-                  className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
-                >
-                  <option value="">—</option>
-                  <option value="G1">G1</option>
-                  <option value="G2">G2</option>
-                </select>
+        {usaGrupos && (
+          <td className="px-2.5">
+            {(() => {
+              const l = grupoLabel(p);
+              const cor = (g: string) => cn(
+                "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                g === "G1" ? "bg-editavel-100 text-editavel-700" : g === "G2" ? "bg-lista-100 text-lista-600" : "bg-atencao-100 text-atencao-700",
               );
-            }
-            return l ? <span className={cor(l)}>{l}</span> : <span className="text-muted-foreground">—</span>;
-          })()}
-        </td>
+              if (isAdmin) {
+                return (
+                  <select
+                    value={l === "G1" || l === "G2" ? l : ""}
+                    onChange={(e) => mudarGrupo(p.id, (e.target.value || null) as GrupoRapido | null)}
+                    title="Definir grupo (G1/G2)"
+                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+                  >
+                    <option value="">—</option>
+                    <option value="G1">G1</option>
+                    <option value="G2">G2</option>
+                  </select>
+                );
+              }
+              return l ? <span className={cor(l)}>{l}</span> : <span className="text-muted-foreground">—</span>;
+            })()}
+          </td>
+        )}
         <td>
           <EditableCell value={p.cpf} onSave={(v) => atualizarPassageiroCampo(p.id, "cpf", v)} />
         </td>
@@ -475,7 +484,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
                 <ThOrd col="id">ID</ThOrd>
                 <ThOrd col="nome">Nome</ThOrd>
                 <ThOrd col="tipo">Tipo</ThOrd>
-                <ThOrd col="grupo">Grupo</ThOrd>
+                {usaGrupos && <ThOrd col="grupo">Grupo</ThOrd>}
                 <ThOrd col="cpf">CPF</ThOrd>
                 <ThOrd col="passaporte">Passaporte</ThOrd>
                 <ThOrd col="validade">Validade</ThOrd>
@@ -501,7 +510,7 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
             <tbody>
               {linhas.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
+                  <td colSpan={usaGrupos ? 11 : 10} className="text-center text-muted-foreground py-6 text-[12px]">{vazio}</td>
                 </tr>
               ) : (
                 (() => {
@@ -583,18 +592,27 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
             value={tipoFiltro}
             onChange={setTipoFiltro}
           />
-          {temGrupos && (
+          {isAdmin && !usaGrupos && (
             <button
               type="button"
-              onClick={() => setDividirPorGrupo((v) => !v)}
-              title="Separa a lista por grupo (G1/G2), com faixas"
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-                dividirPorGrupo ? "border-editavel-600 bg-editavel-100 text-editavel-700" : "border-border text-muted-foreground hover:text-foreground",
-              )}
+              onClick={ativarGrupos}
+              disabled={ativandoGrupos}
+              title="Cria os grupos G1 e G2 e passa a mostrar a coluna Grupo"
+              className="inline-flex items-center gap-1 rounded-full border border-editavel-600 bg-editavel-50 px-2 py-0.5 text-[11px] font-medium text-editavel-700 transition-colors hover:bg-editavel-100 disabled:opacity-50"
             >
-              <Users className="h-3 w-3" /> Dividir por grupo
+              <Users className="h-3 w-3" /> {ativandoGrupos ? "Ativando…" : "Adicionar divisão por grupos"}
             </button>
+          )}
+          {isAdmin && usaGrupos && (
+            <ConfirmDeleteButton
+              triggerLabel="Remover divisão"
+              ariaLabel="Remover divisão por grupos"
+              title="Remover a divisão por grupos?"
+              description="Apaga os grupos G1/G2 desta expedição e desmarca o grupo de todos os passageiros. A coluna Grupo some. Não afeta os quartos já montados."
+              successMessage="Divisão por grupos removida"
+              onConfirm={() => removerDivisaoGrupos(expedicaoId)}
+              onDeleted={() => router.refresh()}
+            />
           )}
         </div>
         <div className="flex items-center gap-2">

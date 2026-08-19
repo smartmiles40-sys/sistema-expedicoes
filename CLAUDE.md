@@ -475,6 +475,13 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
 - **Vínculo de grupos irmãos:** `expedicoes.viagem_grupo` (rótulo compartilhado entre
   irmãs) + `expedicoes.grupo_rotulo` ("G1"/"G2"), ambos nuláveis (migration 0029).
   Não confundir com `grupos_expedicao` (subgrupos DENTRO de uma expedição).
+- **Divisão por grupos é OPT-IN por expedição:** a coluna **"Grupo"** (e a separação
+  G1/G2 na lista) só aparece quando a expedição **usa grupos** = tem `grupos_expedicao`
+  **G1 E G2** (`usaGrupos` em `PassageirosTabela`). Onde não usa, um botão admin
+  **"Adicionar divisão por grupos"** (`ativarDivisaoGrupos`) cria os dois grupos e ativa;
+  **"Remover divisão"** (`removerDivisaoGrupos`) apaga os grupos + zera `grupo_id` de todos.
+  Ex.: Egito Outubro só tem G1 → não usa grupos → sem coluna. (Rooming/Área do Líder ainda
+  usam o `grupoLabel` com fallback legado do Egito.)
 - **Botão rápido G1/G2 (subgrupos numa expedição, admin):** coluna **"Grupo"** na aba
   Passageiros com um seletor (G1 / G2 / —) **só pra admin** (`isAdmin` na `page.tsx`).
   `definirGrupoRapido` (`passageiros/grupo-actions.ts`, service role + checa `papel==="admin"`)
