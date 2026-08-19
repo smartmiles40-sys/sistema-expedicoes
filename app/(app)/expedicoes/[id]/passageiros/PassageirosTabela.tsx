@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown, Check, Filter, X } from "lucide-react";
+import { Download, Plus, RefreshCw, Search, Upload, UserPlus, Users, Crown, Check, Filter, X, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatPill } from "@/components/ui/StatPill";
@@ -66,6 +66,10 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   const [tipoFiltro, setTipoFiltro] = React.useState<string | null>(null);
   // Clicando no cabeçalho "Formulário": mostra só quem ainda NÃO preencheu.
   const [soPendentes, setSoPendentes] = React.useState(false);
+  // Ordenação por coluna (estilo planilha): clica no cabeçalho pra ordenar.
+  const [sort, setSort] = React.useState<{ col: string; dir: "asc" | "desc" } | null>(null);
+  const toggleSort = (col: string) =>
+    setSort((s) => (s?.col === col ? { col, dir: s.dir === "asc" ? "desc" : "asc" } : { col, dir: "asc" }));
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [existenteOpen, setExistenteOpen] = React.useState(false);
@@ -150,17 +154,6 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     return g === "G1" ? 0 : g === "G2" ? 1 : 2;
   }, [grupoLabel]);
 
-  // Líderes primeiro; depois G1 antes de G2; dentro do grupo, ordem de cadastro.
-  const ordenados = [...filtrados].sort((a, b) => {
-    const liderA = a.tipo === "Líder" ? 0 : 1;
-    const liderB = b.tipo === "Líder" ? 0 : 1;
-    if (liderA !== liderB) return liderA - liderB;
-    const gA = prioridadeGrupoPax(a);
-    const gB = prioridadeGrupoPax(b);
-    if (gA !== gB) return gA - gB;
-    return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
-  });
-
   const quartosById = new Map(quartos.map((q) => [q.id, q]));
   const nomePorPax = React.useMemo(() => new Map(passageiros.map((p) => [p.id, p.nome_completo])), [passageiros]);
 
@@ -213,6 +206,42 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     if (r.ok) router.refresh();
     else toast.error("Não foi possível alterar o quarto", { description: r.error });
   }
+
+  // Valor de ordenação por coluna (string ou número).
+  const ORDEM_PRONTIDAO: Record<string, number> = { Apto: 0, Atenção: 1, Bloqueado: 2 };
+  const valorOrd = (p: PassageiroRow, col: string): string | number => {
+    switch (col) {
+      case "id": return indiceById.get(p.id) ?? 0;
+      case "nome": return p.nome_completo.toLowerCase();
+      case "tipo": return p.tipo;
+      case "grupo": return prioridadeGrupoPax(p);
+      case "cpf": return cpfDigitos(p.cpf) ?? "";
+      case "passaporte": return (p.passaporte ?? "").toLowerCase();
+      case "validade": return p.validade_passaporte ?? "9999-99-99"; // sem validade vai pro fim
+      case "quarto": { const r = infoQuarto(p).rooms[0]; return r ? (Number(r.numero) || 0) : Number.POSITIVE_INFINITY; }
+      case "status": return Math.max(0, (STATUS_RESERVA as readonly string[]).indexOf(p.status_reserva));
+      case "prontidao": { const pr = prontidaoByPax.get(p.id); return pr ? (ORDEM_PRONTIDAO[pr.resultado.prontidao] ?? 3) : 4; }
+      default: return 0;
+    }
+  };
+  const compararColuna = (a: PassageiroRow, b: PassageiroRow, col: string) => {
+    const va = valorOrd(a, col), vb = valorOrd(b, col);
+    if (typeof va === "number" && typeof vb === "number") return va - vb;
+    return String(va).localeCompare(String(vb), "pt-BR");
+  };
+
+  // Sem ordenação manual: G1 → G2 → sem grupo, e ordem de cadastro dentro do grupo.
+  // Com ordenação: pela coluna clicada (a divisão Líderes/ExpedAmigos é mantida abaixo).
+  const ordenados = [...filtrados].sort((a, b) => {
+    if (sort) {
+      const c = compararColuna(a, b, sort.col);
+      if (c !== 0) return sort.dir === "asc" ? c : -c;
+      return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
+    }
+    const gA = prioridadeGrupoPax(a), gB = prioridadeGrupoPax(b);
+    if (gA !== gB) return gA - gB;
+    return (indiceById.get(a.id) ?? 0) - (indiceById.get(b.id) ?? 0);
+  });
 
   // Duas caixas: Líderes (equipe) em cima e ExpedAmigos (passageiros) embaixo.
   const lideres = ordenados.filter((p) => p.tipo === "Líder");
@@ -396,6 +425,31 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
     );
   }
 
+  // Cabeçalho clicável que ordena por aquela coluna (crescente ↔ decrescente).
+  function ThOrd({ col, children }: { col: string; children: React.ReactNode }) {
+    const ativo = sort?.col === col;
+    return (
+      <th className="text-left px-2.5 whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => toggleSort(col)}
+          title="Ordenar por esta coluna"
+          className={cn(
+            "inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide transition-colors",
+            ativo ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {children}
+          {ativo ? (
+            sort!.dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronsUpDown className="h-3 w-3 opacity-40" />
+          )}
+        </button>
+      </th>
+    );
+  }
+
   function SecaoPax({ titulo, linhas, vazio }: { titulo: React.ReactNode; linhas: PassageiroRow[]; vazio: string }) {
     return (
       <div className="rounded-2xl border border-border overflow-hidden bg-background shadow-sm">
@@ -404,16 +458,16 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
           <table className="w-full table-dense">
             <thead className="bg-muted/40 border-b border-border">
               <tr>
-                <Th>ID</Th>
-                <Th>Nome</Th>
-                <Th>Tipo</Th>
-                <Th>Grupo</Th>
-                <Th>CPF</Th>
-                <Th>Passaporte</Th>
-                <Th>Validade</Th>
-                <Th>Quarto</Th>
-                <Th>Status</Th>
-                <Th>Prontidão</Th>
+                <ThOrd col="id">ID</ThOrd>
+                <ThOrd col="nome">Nome</ThOrd>
+                <ThOrd col="tipo">Tipo</ThOrd>
+                <ThOrd col="grupo">Grupo</ThOrd>
+                <ThOrd col="cpf">CPF</ThOrd>
+                <ThOrd col="passaporte">Passaporte</ThOrd>
+                <ThOrd col="validade">Validade</ThOrd>
+                <ThOrd col="quarto">Quarto</ThOrd>
+                <ThOrd col="status">Status</ThOrd>
+                <ThOrd col="prontidao">Prontidão</ThOrd>
                 <th className="text-left px-2.5 whitespace-nowrap">
                   <button
                     type="button"
@@ -439,7 +493,8 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
                 (() => {
                   // Só separa por grupo se houver mais de um grupo na seção.
                   const distintos = new Set(linhas.map((p) => grupoLabel(p) ?? "—"));
-                  const separar = distintos.size > 1;
+                  // Divisor por grupo só no modo padrão (ou quando a ordenação é por grupo).
+                  const separar = distintos.size > 1 && (!sort || sort.col === "grupo");
                   // Quantos passageiros em cada grupo (pra mostrar ao lado do rótulo).
                   const contagem = new Map<string, number>();
                   for (const p of linhas) {
@@ -695,14 +750,6 @@ function preencheuFormulario(p: PassageiroRow): boolean {
       .some((v) => v && String(v).trim() !== "")
   );
   return temPerfil || p.inscricao_origem === "Formulário público";
-}
-
-function Th({ children }: { children?: React.ReactNode }) {
-  return (
-    <th className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap px-2.5">
-      {children}
-    </th>
-  );
 }
 
 function FilterPills<T extends string>({
