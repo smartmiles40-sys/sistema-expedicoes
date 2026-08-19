@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2 } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -11,6 +11,7 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter,
 } from "@/components/ui/Drawer";
 import { cn, formatDate } from "@/lib/utils";
+import { formatarCpf } from "@/lib/cpf";
 import { Eye } from "lucide-react";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import {
@@ -18,6 +19,7 @@ import {
   adicionarFotoRoteiro, excluirFotoRoteiro, definirVoucherHospedagem,
   excluirPasseioOpcional,
 } from "./actions";
+import { liberarExpedamigoTodos } from "../passageiros/expedamigo-actions";
 import type {
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
   ExpedicaoAvisoRow, RoteiroDiaFotoRow, PasseioOpcionalRow,
@@ -36,7 +38,7 @@ type Campo = {
 };
 
 export function PortalEditor({
-  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, hospedagemVoucherArquivoId,
+  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, hospedagemVoucherArquivoId, isAdmin = false,
 }: {
   expedicaoId: string;
   roteiro: RoteiroDiaRow[];
@@ -47,6 +49,7 @@ export function PortalEditor({
   fotos: RoteiroDiaFotoRow[];
   passeiosOpcionais: PasseioOpcionalRow[];
   hospedagemVoucherArquivoId: string | null;
+  isAdmin?: boolean;
 }) {
   const somenteLeitura = useSomenteLeitura();
   const fotosPorDia = React.useMemo(() => {
@@ -90,6 +93,8 @@ export function PortalEditor({
           O que você preencher aqui aparece para o passageiro em <span className="font-mono">/amigo</span>.
         </p>
       </div>
+
+      {isAdmin && <LiberarTodosCard expedicaoId={expedicaoId} />}
 
       <VoucherHospedagem expedicaoId={expedicaoId} arquivoId={hospedagemVoucherArquivoId} />
 
@@ -896,6 +901,99 @@ function DiaInline({
 }
 
 /** Voucher ÚNICO da hospedagem (nível da expedição) — mesmo hotel p/ todos. */
+/** Card admin: libera o ExpedAmigo pra TODOS de uma vez e mostra as senhas provisórias. */
+function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
+  const router = useRouter();
+  const [carregando, setCarregando] = React.useState(false);
+  const [confirmar, setConfirmar] = React.useState(false);
+  const [resultado, setResultado] = React.useState<
+    { total: number; jaTinhamSenha: number; senhas: { nome: string; cpf: string; senha: string }[] } | null
+  >(null);
+
+  async function liberar() {
+    setCarregando(true);
+    const r = await liberarExpedamigoTodos(expedicaoId);
+    setCarregando(false);
+    setConfirmar(false);
+    if (r.ok) {
+      setResultado({ total: r.total, jaTinhamSenha: r.jaTinhamSenha, senhas: r.senhas });
+      toast.success(`ExpedAmigo liberado para ${r.total} passageiro(s)`);
+      router.refresh();
+    } else {
+      toast.error("Não foi possível liberar", { description: r.error });
+    }
+  }
+
+  function copiarLista() {
+    if (!resultado) return;
+    const txt = resultado.senhas.map((s) => `${s.nome} — CPF ${formatarCpf(s.cpf)} — senha ${s.senha}`).join("\n");
+    navigator.clipboard.writeText(txt).then(() => toast.success("Lista copiada")).catch(() => {});
+  }
+
+  return (
+    <div className="rounded-xl border border-editavel-600/30 bg-editavel-50/40 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-editavel-100 text-editavel-700"><KeyRound className="h-4 w-4" /></span>
+          <div>
+            <h3 className="text-sm font-semibold leading-none">Liberar portal para todos</h3>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Libera o ExpedAmigo de todos os passageiros desta expedição e gera a senha provisória de quem ainda não tem.
+            </p>
+          </div>
+        </div>
+        {!confirmar ? (
+          <Button size="sm" onClick={() => setConfirmar(true)} disabled={carregando}>
+            <KeyRound className="h-3 w-3" /> Liberar para todos
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-muted-foreground">Confirmar?</span>
+            <Button size="sm" onClick={liberar} disabled={carregando}>{carregando ? "Liberando…" : "Sim, liberar"}</Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmar(false)} disabled={carregando}>Cancelar</Button>
+          </div>
+        )}
+      </div>
+
+      {resultado && (
+        <div className="mt-3 rounded-lg border border-border bg-background p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[12px]">
+              <span className="font-semibold text-vinculado-700">{resultado.total} liberados</span>
+              {resultado.jaTinhamSenha > 0 && <span className="text-muted-foreground"> · {resultado.jaTinhamSenha} já tinham senha própria</span>}
+              {resultado.senhas.length > 0 && <span className="text-muted-foreground"> · {resultado.senhas.length} com senha provisória</span>}
+            </p>
+            {resultado.senhas.length > 0 && (
+              <Button size="sm" variant="outline" onClick={copiarLista}><Copy className="h-3 w-3" /> Copiar lista</Button>
+            )}
+          </div>
+          {resultado.senhas.length > 0 && (
+            <div className="mt-2 max-h-72 overflow-auto rounded-md border border-border">
+              <table className="w-full text-[12px]">
+                <thead className="sticky top-0 bg-muted/60 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <tr><th className="px-2 py-1">Passageiro</th><th className="px-2 py-1">CPF</th><th className="px-2 py-1">Senha provisória</th></tr>
+                </thead>
+                <tbody>
+                  {resultado.senhas.map((s, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-2 py-1">{s.nome}</td>
+                      <td className="px-2 py-1 font-mono">{formatarCpf(s.cpf)}</td>
+                      <td className="px-2 py-1 font-mono font-semibold">{s.senha}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Repasse a senha provisória para cada viajante — no 1º acesso ele troca por uma própria.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VoucherHospedagem({ expedicaoId, arquivoId }: { expedicaoId: string; arquivoId: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);

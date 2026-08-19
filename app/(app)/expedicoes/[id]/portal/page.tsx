@@ -4,6 +4,7 @@ import {
 } from "@/lib/data/expedicoes";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { PortalEditor } from "./PortalEditor";
 
 export default async function PortalPage({
@@ -21,6 +22,9 @@ export default async function PortalPage({
     listRoteiroFotos(id),
     listPasseiosOpcionais(id),
   ]);
+
+  const user = await getCurrentUser();
+  const isAdmin = user?.papel === "admin";
 
   // Voucher único da hospedagem (coluna em expedicoes, migration 0030).
   let hospedagemVoucherArquivoId: string | null = null;
@@ -46,6 +50,7 @@ export default async function PortalPage({
       fotos={fotos}
       passeiosOpcionais={passeiosOpcionais}
       hospedagemVoucherArquivoId={hospedagemVoucherArquivoId}
+      isAdmin={isAdmin}
     />
   );
 }

@@ -50,6 +50,66 @@ export async function liberarExpedamigo(passageiroId: string, expedicaoId: strin
   return { ok: true, senhaProvisoria, jaTemSenha };
 }
 
+export type LiberarTodosResult =
+  | { ok: true; total: number; jaTinhamSenha: number; senhas: { nome: string; cpf: string; senha: string }[] }
+  | { ok: false; error: string };
+
+/**
+ * Libera o ExpedAmigo desta expedição pra TODOS os passageiros ativos (admin).
+ * Marca todas as linhas como liberadas e garante a senha por pessoa: quem não tem,
+ * recebe uma provisória aleatória (devolvida na lista `senhas` pra o admin repassar);
+ * quem já criou a própria senha (hash) entra em `jaTinhamSenha` e não é regerado.
+ */
+export async function liberarExpedamigoTodos(expedicaoId: string): Promise<LiberarTodosResult> {
+  if (!(await exigirAdmin())) return { ok: false, error: "Apenas admin pode liberar o ExpedAmigo." };
+  if (DEV_USE_MOCK_DATA) return { ok: true, total: 0, jaTinhamSenha: 0, senhas: [] };
+
+  const sb = createServiceRoleClient();
+  const { data: pax } = await sb
+    .from("passageiros")
+    .select("id, nome_completo, cpf, status_reserva")
+    .eq("expedicao_id", expedicaoId);
+  const ativos = ((pax ?? []) as { id: string; nome_completo: string; cpf: string | null; status_reserva: string }[])
+    .filter((p) => p.status_reserva !== "Cancelado");
+  if (ativos.length === 0) return { ok: true, total: 0, jaTinhamSenha: 0, senhas: [] };
+
+  // 1) Marca todos como liberados.
+  const up = await sb.from("passageiros")
+    .update({ liberado_expedamigo: true })
+    .eq("expedicao_id", expedicaoId)
+    .neq("status_reserva", "Cancelado");
+  if (up.error) return { ok: false, error: up.error.message };
+
+  // 2) Garante a senha por pessoa (CPF), sem regerar quem já tem.
+  const cpfs = [...new Set(ativos.map((p) => soDigitosCpf(p.cpf ?? "")).filter((c) => c.length === 11))];
+  const { data: creds } = cpfs.length
+    ? await sb.from("acesso_senhas").select("cpf, senha_hash, senha_provisoria").in("cpf", cpfs)
+    : { data: [] as { cpf: string; senha_hash: string | null; senha_provisoria: string | null }[] };
+  const credByCpf = new Map(((creds ?? []) as { cpf: string; senha_hash: string | null; senha_provisoria: string | null }[])
+    .map((c) => [soDigitosCpf(c.cpf), c]));
+
+  const senhas: { nome: string; cpf: string; senha: string }[] = [];
+  const novos: { cpf: string; senha_provisoria: string; senha_hash: null }[] = [];
+  let jaTinhamSenha = 0;
+  const vistos = new Set<string>();
+  for (const p of ativos) {
+    const cpf = soDigitosCpf(p.cpf ?? "");
+    if (cpf.length !== 11 || vistos.has(cpf)) continue;
+    vistos.add(cpf);
+    const cred = credByCpf.get(cpf);
+    if (cred?.senha_hash) { jaTinhamSenha++; continue; }
+    if (cred?.senha_provisoria) { senhas.push({ nome: p.nome_completo, cpf, senha: cred.senha_provisoria }); continue; }
+    const senha = gerarSenhaAleatoria();
+    novos.push({ cpf, senha_provisoria: senha, senha_hash: null });
+    senhas.push({ nome: p.nome_completo, cpf, senha });
+  }
+  if (novos.length) await sb.from("acesso_senhas").upsert(novos, { onConflict: "cpf" });
+
+  revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
+  revalidatePath(`/expedicoes/${expedicaoId}/portal`);
+  return { ok: true, total: ativos.length, jaTinhamSenha, senhas };
+}
+
 /** Bloqueia o ExpedAmigo desta expedição pro passageiro (admin). */
 export async function bloquearExpedamigo(passageiroId: string, expedicaoId: string): Promise<{ ok: boolean; error?: string }> {
   if (!(await exigirAdmin())) return { ok: false, error: "Apenas admin." };
