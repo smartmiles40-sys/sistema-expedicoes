@@ -545,13 +545,14 @@ export function PassageirosTabela({ expedicaoId, passageiros, quartos, alocacoes
   }
 
   function exportarCSV() {
-    const header = ["Nome", "Tipo", "CPF", "Passaporte", "Validade", "Email", "Telefone", "Status", "Quarto"];
+    const header = ["Nome", "Tipo", "CPF", "Passaporte", "Validade", "Nascimento", "Email", "Telefone", "Status", "Quarto"];
     const linhas = ordenados.map((p) => [
       p.nome_completo,
       p.tipo,
       p.cpf ?? "",
       p.passaporte ?? "",
       p.validade_passaporte ?? "",
+      p.data_nascimento ?? "",
       p.email ?? "",
       p.telefone ?? "",
       p.status_reserva,
