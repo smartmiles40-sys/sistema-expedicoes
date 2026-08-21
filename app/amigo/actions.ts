@@ -499,8 +499,9 @@ export async function entrarExpedAmigo(
         .map((url, i, all) => ({ nome: all.length > 1 ? `Ingresso Trem Machu Picchu ${i + 1}` : "Ingresso Trem Machu Picchu", url })),
       seguros: seguroArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
-        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
-        .filter((x) => x.url),
+        .map((a) => fotoUrl.get(a.id) ?? "")
+        .filter((url) => url)
+        .map((url, i, all) => ({ nome: all.length > 1 ? `Seguro viagem ${i + 1}` : "Seu seguro viagem", url })),
       vouchers_voo: vvoucherArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => fotoUrl.get(a.id) ?? "")

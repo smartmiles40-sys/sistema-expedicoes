@@ -533,7 +533,11 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
             {/* Hospedagem / quarto */}
             <div>
               <SubTitulo icone={<BedDouble className="h-3.5 w-3.5" />}>Hospedagem</SubTitulo>
-              {exp.hospedagem_voucher_url && <div className="mb-2"><VoucherLink url={exp.hospedagem_voucher_url} onDownload={logVoucher} /></div>}
+              {exp.hospedagem_voucher_url && (
+                <div className="mb-2">
+                  <IngressoLink ing={{ nome: "Voucher da hospedagem", url: exp.hospedagem_voucher_url }} onDownload={logVoucher} />
+                </div>
+              )}
               {exp.quartos.length > 0 ? (
                 <ul className="space-y-1.5">
                   {exp.quartos.map((q, i) => (
