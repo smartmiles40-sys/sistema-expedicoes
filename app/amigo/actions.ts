@@ -502,10 +502,12 @@ export async function entrarExpedAmigo(
         .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
+      // Rótulo amigável ("Seu cartão de embarque"), não o nome do arquivo; numera se >1.
       cartoes_embarque: cartaoArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
-        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
-        .filter((x) => x.url),
+        .map((a) => fotoUrl.get(a.id) ?? "")
+        .filter((url) => url)
+        .map((url, i, all) => ({ nome: all.length > 1 ? `Cartão de embarque ${i + 1}` : "Seu cartão de embarque", url })),
     });
   }
 
