@@ -486,22 +486,26 @@ export async function entrarExpedAmigo(
         .filter((a) => a.expedicao_id === e.id)
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((a) => ({ tipo: a.tipo, titulo: a.titulo, conteudo: a.conteudo })),
+      // Rótulos amigáveis (não o nome do arquivo); numera quando há mais de um.
       ingressos_mp: ingressoArqs
         .filter((a) => !!row && a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Machu Picchu"))
-        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
-        .filter((x) => x.url),
+        .map((a) => fotoUrl.get(a.id) ?? "")
+        .filter((url) => url)
+        .map((url, i, all) => ({ nome: all.length > 1 ? `Ingresso Machu Picchu ${i + 1}` : "Ingresso Machu Picchu", url })),
       ingressos_trem: ingressoArqs
         .filter((a) => !!row && a.passageiro_id === row.id && (a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
-        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
-        .filter((x) => x.url),
+        .map((a) => fotoUrl.get(a.id) ?? "")
+        .filter((url) => url)
+        .map((url, i, all) => ({ nome: all.length > 1 ? `Ingresso Trem Machu Picchu ${i + 1}` : "Ingresso Trem Machu Picchu", url })),
       seguros: seguroArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
       vouchers_voo: vvoucherArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
-        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
-        .filter((x) => x.url),
+        .map((a) => fotoUrl.get(a.id) ?? "")
+        .filter((url) => url)
+        .map((url, i, all) => ({ nome: all.length > 1 ? `Voucher de voo ${i + 1}` : "Seu voucher de voo", url })),
       // Rótulo amigável ("Seu cartão de embarque"), não o nome do arquivo; numera se >1.
       cartoes_embarque: cartaoArqs
         .filter((a) => !!row && a.passageiro_id === row.id)

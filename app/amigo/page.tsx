@@ -461,11 +461,8 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                 </div>
               )}
               {exp.vouchers_voo.length > 0 && (
-                <div className="mt-2">
-                  <div className="mb-1 text-[11px] font-semibold text-[#09282B]/70 dark:text-white/70">Seu voucher de voo</div>
-                  <div className="flex flex-wrap gap-2">
-                    {exp.vouchers_voo.map((v, i) => <IngressoLink key={i} ing={v} onDownload={logVoucher} />)}
-                  </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {exp.vouchers_voo.map((v, i) => <IngressoLink key={i} ing={v} onDownload={logVoucher} />)}
                 </div>
               )}
               {exp.cartoes_embarque.length > 0 && (
