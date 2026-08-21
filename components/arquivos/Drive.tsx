@@ -16,6 +16,7 @@ import {
   Folder,
   Eye,
   FileSignature,
+  PlaneTakeoff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,7 @@ const ICONES: Record<CategoriaArquivo, React.ComponentType<{ className?: string 
   Seguros: ShieldCheck,
   Hospedagem: Building,
   Vouchers: Receipt,
+  "Cartão de embarque": PlaneTakeoff,
   Outros: Folder,
 };
 

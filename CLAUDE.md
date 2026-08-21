@@ -388,8 +388,11 @@ role**, **só leitura**.
   Seções sem conteúdo ficam ocultas. NÃO expõe documentos do próprio passageiro,
   EXCETO os que fazem sentido pra viagem: ingressos Machu Picchu/trem (Peru) e o
   **Seguro viagem** (categoria "Seguros", `seguroArqs` — pra TODAS as expedições;
-  seção "Seguro viagem" no bloco Vouchers, filtrada por `passageiro_id === row.id`).
-  Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
+  seção "Seguro viagem" no bloco Vouchers, filtrada por `passageiro_id === row.id`) e
+  o **Cartão de embarque** (categoria "Cartão de embarque", `cartaoArqs` → campo
+  `cartoes_embarque` — o operacional faz o check-in e anexa no Drive do passageiro;
+  aparece no bloco Voos do portal e no PDF; migration **0051** amplia o enum
+  `categoria_arquivo`). Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
 - **Baixar PDF da viagem:** botão por viagem (`app/amigo/ViagemPDF.tsx`, **`@react-pdf/renderer`**)
   gerado **no cliente** sob demanda (import() dinâmico → fora do bundle principal). Reaproveita
   os dados já carregados (sem rota/re-login). Capa + roteiro (com fotos embutidas, JPG/PNG via

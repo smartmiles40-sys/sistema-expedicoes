@@ -606,6 +606,21 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           </View>
         )}
 
+        {/* ---- Cartão de embarque ---- */}
+        {exp.cartoes_embarque.length > 0 && (
+          <View style={styles.secao}>
+            <SecaoTitulo hint="Toque no cartão para abrir ou baixar o arquivo.">Seu cartão de embarque</SecaoTitulo>
+            {exp.cartoes_embarque.map((c, i) => (
+              <View key={i} style={styles.item} wrap={false}>
+                <Text style={styles.itemTitulo}>{c.nome}</Text>
+                {c.url
+                  ? <Link src={c.url} style={styles.ingressoLink}>Abrir / baixar cartão</Link>
+                  : <Text style={styles.voucherChip}>Disponível no portal</Text>}
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* ---- Seguro viagem ---- */}
         {exp.seguros.length > 0 && (
           <View style={styles.secao}>

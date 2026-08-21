@@ -302,6 +302,7 @@ export type CategoriaArquivo =
   | "Seguros"
   | "Hospedagem"
   | "Vouchers"
+  | "Cartão de embarque"
   | "Outros";
 
 export type ArquivoRow = {

@@ -231,6 +231,7 @@ export const CATEGORIA_ARQUIVO = [
   "Seguros",
   "Hospedagem",
   "Vouchers",
+  "Cartão de embarque",
   "Outros",
 ] as const;
 export type CategoriaArquivo = (typeof CATEGORIA_ARQUIVO)[number];

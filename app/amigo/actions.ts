@@ -115,6 +115,8 @@ export type AmigoExpedicao = {
   seguros: AmigoIngresso[];
   /** Vouchers de voo do próprio passageiro (categoria "Vouchers" por pax). */
   vouchers_voo: AmigoIngresso[];
+  /** Cartão de embarque do próprio passageiro (categoria "Cartão de embarque"). */
+  cartoes_embarque: AmigoIngresso[];
 };
 export type AmigoDados = {
   nome: string;
@@ -323,6 +325,21 @@ export async function entrarExpedAmigo(
     seguroArqs = (data ?? []) as IngressoArq[];
   }
 
+  // Cartão de embarque do PRÓPRIO passageiro (categoria "Cartão de embarque") — pra todos.
+  let cartaoArqs: IngressoArq[] = [];
+  if (DEV_USE_MOCK_DATA) {
+    cartaoArqs = (await listArquivosMock())
+      .filter((a) => a.categoria === "Cartão de embarque" && a.passageiro_id && meusIds.includes(a.passageiro_id))
+      .map((a) => ({ id: a.id, nome: a.nome, passageiro_id: a.passageiro_id, descricao: a.descricao }));
+  } else if (sb && meusIds.length > 0) {
+    const { data } = await sb
+      .from("arquivos")
+      .select("id,nome,passageiro_id,descricao")
+      .eq("categoria", "Cartão de embarque")
+      .in("passageiro_id", meusIds);
+    cartaoArqs = (data ?? []) as IngressoArq[];
+  }
+
   // Vouchers de voo do PRÓPRIO passageiro (categoria "Vouchers" com passageiro_id) — pra todos.
   let vvoucherArqs: IngressoArq[] = [];
   if (DEV_USE_MOCK_DATA) {
@@ -355,6 +372,7 @@ export async function entrarExpedAmigo(
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
     for (const a of seguroArqs) idsRelevantes.add(a.id);
     for (const a of vvoucherArqs) idsRelevantes.add(a.id);
+    for (const a of cartaoArqs) idsRelevantes.add(a.id);
 
     if (DEV_USE_MOCK_DATA) {
       for (const id of idsRelevantes) fotoUrl.set(id, `/api/arquivos/${id}/download?inline=1`);
@@ -481,6 +499,10 @@ export async function entrarExpedAmigo(
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
       vouchers_voo: vvoucherArqs
+        .filter((a) => !!row && a.passageiro_id === row.id)
+        .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
+      cartoes_embarque: cartaoArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => ({ nome: a.nome, url: fotoUrl.get(a.id) ?? "" }))
         .filter((x) => x.url),
