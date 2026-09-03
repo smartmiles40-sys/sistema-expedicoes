@@ -418,6 +418,24 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
       <div className="relative bg-[var(--portal-bg)]">
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <div className="relative mx-auto max-w-3xl space-y-10 px-4 py-12">
+        {/* Extensão contratada — selo no topo (migration 0052) */}
+        {exp.extensoes_contratadas.length > 0 && (
+          <div className="rounded-2xl border border-[var(--brand-lime)]/40 bg-[var(--brand-lime)]/10 p-5 text-white">
+            <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-[var(--brand-lime)]">
+              <Sparkles className="h-4 w-4" /> {exp.extensoes_contratadas.length === 1 ? "Você contratou uma extensão" : "Você contratou extensões"}
+            </div>
+            <ul className="mt-3 space-y-3">
+              {exp.extensoes_contratadas.map((x, i) => (
+                <li key={i}>
+                  <div className="text-[16px] font-bold leading-tight">{x.nome}</div>
+                  {x.descricao && <p className="mt-1 text-[13px] leading-relaxed text-white/80">{x.descricao}</p>}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[12px] text-white/65">Os dias e voos da sua extensão já estão incluídos no roteiro abaixo.</p>
+          </div>
+        )}
+
         {/* Roteiro dia a dia */}
         {exp.roteiro.length > 0 && (
           <Bloco id={`roteiro-${exp.id}`} icone={<CalendarDays className="h-4 w-4" />} titulo="Roteiro dia a dia" sub="O previsto para cada dia da sua jornada.">

@@ -40,6 +40,7 @@ import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
 import { ExpedamigoPainel } from "./ExpedamigoPainel";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { PasseiosOpcionaisCompra } from "./PasseiosOpcionaisCompra";
+import { ExtensoesCompra } from "./ExtensoesCompra";
 import type { ArquivoRow, PassageiroRow, Tables, SaudePassageiro } from "@/types/database";
 import type { ProntidaoPassageiro } from "@/lib/data/expedicoes";
 import { SaudeCampos } from "./SaudeCampos";
@@ -466,6 +467,9 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
 
                 {/* Passeios opcionais comprados (marcação manual; some se não houver oferta) */}
                 {passageiro && <PasseiosOpcionaisCompra passageiroId={passageiro.id} expedicaoId={expedicaoId} />}
+
+                {/* Extensões contratadas (marcação manual; some se não houver extensão) */}
+                {passageiro && <ExtensoesCompra passageiroId={passageiro.id} expedicaoId={expedicaoId} />}
 
                 {/* ExpedAmigo (só admin — o painel se auto-esconde) */}
                 {passageiro && <ExpedamigoPainel passageiroId={passageiro.id} expedicaoId={expedicaoId} />}

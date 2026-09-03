@@ -4,7 +4,7 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
 import {
   mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
-  mockExpedicaoAvisos, mockRoteiroDiaFotos, mockPasseiosOpcionais,
+  mockExpedicaoAvisos, mockRoteiroDiaFotos, mockPasseiosOpcionais, mockExtensoes,
 } from "@/lib/mock-data";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { removeArquivoMock } from "@/lib/data/arquivos-mock";
@@ -21,7 +21,7 @@ async function negarSeLeitura(): Promise<{ ok: false; error: string } | null> {
  * CRUD genérico das tabelas de conteúdo do Portal do ExpedAmigo (migrations 0021/0022).
  * O cliente passa o nome da tabela; validamos contra uma allowlist.
  */
-const TABELAS = ["roteiro_dias", "expedicao_voos", "expedicao_passeios", "expedicao_info", "expedicao_avisos", "passeios_opcionais"] as const;
+const TABELAS = ["roteiro_dias", "expedicao_voos", "expedicao_passeios", "expedicao_info", "expedicao_avisos", "passeios_opcionais", "extensoes"] as const;
 export type TabelaPortal = (typeof TABELAS)[number];
 
 type Valores = Record<string, string | number | boolean | null>;
@@ -34,6 +34,7 @@ const MOCKS: Record<TabelaPortal, MockRow[]> = {
   expedicao_info: mockExpedicaoInfo as unknown as MockRow[],
   expedicao_avisos: mockExpedicaoAvisos as unknown as MockRow[],
   passeios_opcionais: mockPasseiosOpcionais as unknown as MockRow[],
+  extensoes: mockExtensoes as unknown as MockRow[],
 };
 
 const BUCKET = "arquivos-expedicoes";

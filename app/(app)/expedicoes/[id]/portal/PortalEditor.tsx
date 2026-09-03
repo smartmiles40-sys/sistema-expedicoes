@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2, KeyRound } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2, KeyRound, Route } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -22,7 +22,7 @@ import {
 import { liberarExpedamigoTodos } from "../passageiros/expedamigo-actions";
 import type {
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
-  ExpedicaoAvisoRow, RoteiroDiaFotoRow, PasseioOpcionalRow,
+  ExpedicaoAvisoRow, RoteiroDiaFotoRow, PasseioOpcionalRow, ExtensaoRow,
 } from "@/types/database";
 
 type Valor = string | number | boolean | null;
@@ -35,10 +35,12 @@ type Campo = {
   full?: boolean;
   placeholder?: string;
   opcoes?: string[];
+  /** Select com pares valor→rótulo distintos (ex.: extensão: id → nome; "" → grupo principal). */
+  opcoesPares?: { value: string; label: string }[];
 };
 
 export function PortalEditor({
-  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, hospedagemVoucherArquivoId, isAdmin = false,
+  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, extensoes, hospedagemVoucherArquivoId, isAdmin = false,
 }: {
   expedicaoId: string;
   roteiro: RoteiroDiaRow[];
@@ -48,6 +50,7 @@ export function PortalEditor({
   avisos: ExpedicaoAvisoRow[];
   fotos: RoteiroDiaFotoRow[];
   passeiosOpcionais: PasseioOpcionalRow[];
+  extensoes: ExtensaoRow[];
   hospedagemVoucherArquivoId: string | null;
   isAdmin?: boolean;
 }) {
@@ -62,6 +65,16 @@ export function PortalEditor({
     for (const p of passeiosOpcionais) (m[p.roteiro_dia_id] ??= []).push(p);
     return m;
   }, [passeiosOpcionais]);
+  // Pares valor→rótulo para o seletor "Faz parte de" (dias/voos): "" = grupo principal.
+  const paresExtensao = React.useMemo(
+    () => [{ value: "", label: "Grupo principal (todos veem)" }, ...extensoes.map((e) => ({ value: e.id, label: e.nome }))],
+    [extensoes],
+  );
+  const nomeExtensao = React.useCallback(
+    (id: string | null | undefined) => (id ? extensoes.find((e) => e.id === id)?.nome ?? null : null),
+    [extensoes],
+  );
+  const temExtensoes = extensoes.length > 0;
 
   // A aba do ExpedAmigo é 100% autoria de conteúdo — para perfis somente-leitura
   // não faz sentido mostrar o editor. Mostramos um aviso e escondemos os controles.
@@ -98,7 +111,28 @@ export function PortalEditor({
 
       <VoucherHospedagem expedicaoId={expedicaoId} arquivoId={hospedagemVoucherArquivoId} />
 
-      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} />
+      <Secao
+        tabela="extensoes"
+        titulo="Extensões da viagem"
+        descricao="Dias extras que só um subgrupo faz (Mar Vermelho, Alexandria…). Depois marque quem contratou no perfil do passageiro, e amarre dias/voos à extensão."
+        icone={<Route className="h-4 w-4" />}
+        expedicaoId={expedicaoId}
+        itens={extensoes as unknown as Item[]}
+        campos={[
+          { key: "nome", label: "Nome da extensão", type: "text", required: true, full: true, placeholder: "Extensão Mar Vermelho — +3 dias" },
+          { key: "descricao", label: "Descrição (aparece no topo da extensão no portal)", type: "textarea", full: true },
+        ]}
+        resumo={(r) => (
+          <>
+            <div className="text-[13px] font-medium inline-flex items-center gap-1">
+              <Route className="h-3 w-3 text-lista-600" /> {String(r.nome ?? "")}
+            </div>
+            <div className="text-[11px] text-muted-foreground line-clamp-1">{String(r.descricao ?? "Sem descrição")}</div>
+          </>
+        )}
+      />
+
+      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} paresExtensao={paresExtensao} nomeExtensao={nomeExtensao} />
 
       <Secao
         tabela="expedicao_voos"
@@ -117,12 +151,18 @@ export function PortalEditor({
           { key: "chegada", label: "Chegada", type: "text", placeholder: "13/08 03:10" },
           { key: "localizador", label: "Localizador", type: "text" },
           { key: "observacoes", label: "Observações", type: "textarea", full: true },
+          ...(temExtensoes
+            ? [{ key: "extensao_id", label: "Faz parte de", type: "select" as const, full: true, opcoesPares: paresExtensao }]
+            : []),
         ]}
         resumo={(r) => (
           <>
             <div className="text-[13px] font-medium">
               {String(r.trecho ?? "")}: {String(r.origem ?? "—")} → {String(r.destino ?? "—")}
               {r.arquivo_id ? <span className="text-vinculado-600"> · voucher ✓</span> : null}
+              {nomeExtensao(r.extensao_id as string | null) ? (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-700"><Route className="h-2.5 w-2.5" />{nomeExtensao(r.extensao_id as string | null)}</span>
+              ) : null}
             </div>
             <div className="text-[11px] text-muted-foreground">
               {[r.companhia, r.numero_voo, r.partida].filter(Boolean).join(" · ") || "sem detalhes"}
@@ -428,9 +468,9 @@ function ItemDrawer({
                         onChange={(e) => set(c.key, e.target.value)}
                         className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
                       >
-                        {(c.opcoes ?? []).map((o) => (
-                          <option key={o} value={o}>{o}</option>
-                        ))}
+                        {c.opcoesPares
+                          ? c.opcoesPares.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))
+                          : (c.opcoes ?? []).map((o) => (<option key={o} value={o}>{o}</option>))}
                       </select>
                     ) : (
                       <Input
@@ -716,12 +756,14 @@ function PasseioOpcionalCard({ expedicaoId, passeio }: { expedicaoId: string; pa
 
 /** Editor INLINE do roteiro dia a dia — edita direto na tela, salva ao sair do campo. */
 function RoteiroInline({
-  expedicaoId, dias, fotosPorDia, passeiosOpcPorDia,
+  expedicaoId, dias, fotosPorDia, passeiosOpcPorDia, paresExtensao, nomeExtensao,
 }: {
   expedicaoId: string;
   dias: RoteiroDiaRow[];
   fotosPorDia: Record<string, RoteiroDiaFotoRow[]>;
   passeiosOpcPorDia: Record<string, PasseioOpcionalRow[]>;
+  paresExtensao: { value: string; label: string }[];
+  nomeExtensao: (id: string | null | undefined) => string | null;
 }) {
   const router = useRouter();
   const [addBusy, setAddBusy] = React.useState(false);
@@ -746,8 +788,8 @@ function RoteiroInline({
       }
     }
     const payload = base
-      ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao }
-      : { dia: maxDia + 1, data: proxData, titulo: `Dia ${maxDia + 1}`, cidade: null, refeicoes: null, hospedagem: null, descricao: null };
+      ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao, extensao_id: base.extensao_id }
+      : { dia: maxDia + 1, data: proxData, titulo: `Dia ${maxDia + 1}`, cidade: null, refeicoes: null, hospedagem: null, descricao: null, extensao_id: null };
     const r = await criarItemPortal("roteiro_dias", expedicaoId, payload);
     setAddBusy(false);
     if (r.ok) { setAbertos((s) => new Set(s).add(r.id)); router.refresh(); }
@@ -782,6 +824,8 @@ function RoteiroInline({
               dia={d}
               fotos={fotosPorDia[d.id] ?? []}
               passeiosOpc={passeiosOpcPorDia[d.id] ?? []}
+              paresExtensao={paresExtensao}
+              nomeExtensao={nomeExtensao}
               aberto={abertos.has(d.id)}
               onToggle={() => toggle(d.id)}
               onDuplicar={() => adicionar(d)}
@@ -794,17 +838,22 @@ function RoteiroInline({
 }
 
 function DiaInline({
-  expedicaoId, dia, fotos, passeiosOpc, aberto, onToggle, onDuplicar,
+  expedicaoId, dia, fotos, passeiosOpc, paresExtensao, nomeExtensao, aberto, onToggle, onDuplicar,
 }: {
   expedicaoId: string;
   dia: RoteiroDiaRow;
   fotos: RoteiroDiaFotoRow[];
   passeiosOpc: PasseioOpcionalRow[];
+  paresExtensao: { value: string; label: string }[];
+  nomeExtensao: (id: string | null | undefined) => string | null;
   aberto: boolean;
   onToggle: () => void;
   onDuplicar: () => void;
 }) {
   const router = useRouter();
+  const temExtensoes = paresExtensao.length > 1;
+  const [extensaoId, setExtensaoId] = React.useState(dia.extensao_id ?? "");
+  const nomeExt = nomeExtensao(dia.extensao_id);
   const [v, setV] = React.useState(() => ({
     dia: String(dia.dia ?? ""),
     data: dia.data ? String(dia.data).slice(0, 10) : "",
@@ -814,6 +863,13 @@ function DiaInline({
     hospedagem: dia.hospedagem ?? "",
     descricao: dia.descricao ?? "",
   }));
+
+  async function mudarExtensao(novo: string) {
+    setExtensaoId(novo);
+    const r = await atualizarItemPortal("roteiro_dias", dia.id, expedicaoId, { extensao_id: novo === "" ? null : novo });
+    if (!r.ok) toast.error("Erro ao vincular à extensão", { description: r.error });
+    else router.refresh();
+  }
   const salvoRef = React.useRef({ ...v });
   const [status, setStatus] = React.useState<"idle" | "saving" | "saved">("idle");
 
@@ -847,7 +903,12 @@ function DiaInline({
         <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <span className="flex h-6 min-w-[2.1rem] items-center justify-center rounded bg-[var(--brand-dark)] px-1 text-[11px] font-bold text-white">D{v.dia || "?"}</span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">{v.titulo || "—"}</span>
+            <span className="flex items-center gap-1.5 truncate text-[13px] font-medium">
+              {v.titulo || "—"}
+              {nomeExt ? (
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-700"><Route className="h-2.5 w-2.5" />{nomeExt}</span>
+              ) : null}
+            </span>
             <span className="block truncate text-[11px] text-muted-foreground">
               {v.data ? formatDate(v.data) : "sem data"}{v.cidade ? ` · ${v.cidade}` : ""}{nFotos ? ` · ${nFotos} foto${nFotos === 1 ? "" : "s"}` : ""}{nPasseios ? ` · ${nPasseios} passeio${nPasseios === 1 ? "" : "s"} opcional${nPasseios === 1 ? "" : "is"}` : ""}
             </span>
@@ -882,6 +943,19 @@ function DiaInline({
             <div className="space-y-1"><Label>Refeições</Label><Input value={v.refeicoes} onChange={onCampo("refeicoes")} onBlur={() => salvar("refeicoes")} placeholder="Café, Almoço" /></div>
           </div>
           <div className="space-y-1"><Label>Hospedagem</Label><Input value={v.hospedagem} onChange={onCampo("hospedagem")} onBlur={() => salvar("hospedagem")} /></div>
+          {temExtensoes && (
+            <div className="space-y-1">
+              <Label>Faz parte de</Label>
+              <select
+                value={extensaoId}
+                onChange={(e) => mudarExtensao(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+              >
+                {paresExtensao.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">Dias de extensão só aparecem no portal para quem contratou aquela extensão.</p>
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Descrição</Label>
             <textarea value={v.descricao} onChange={onCampo("descricao")} onBlur={() => salvar("descricao")} rows={4}

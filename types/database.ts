@@ -433,6 +433,8 @@ export type RoteiroDiaRow = {
   cidade: string | null;
   refeicoes: string | null;
   hospedagem: string | null;
+  /** Extensão a que este dia pertence (null = grupo principal, todos veem). Migration 0052. */
+  extensao_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;
@@ -452,6 +454,8 @@ export type ExpedicaoVooRow = {
   observacoes: string | null;
   /** Voucher anexado (arquivos.id), migration 0024. */
   arquivo_id: string | null;
+  /** Extensão a que este voo pertence (null = grupo principal, todos veem). Migration 0052. */
+  extensao_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;
@@ -535,6 +539,25 @@ export type PasseioOpcionalCompraRow = {
   id: string;
   passageiro_id: string;
   passeio_opcional_id: string;
+  created_at: string;
+};
+
+// ===== Extensões da expedição (dias/voos extras por subgrupo, migration 0052) =====
+export type ExtensaoRow = {
+  id: string;
+  expedicao_id: string;
+  nome: string;
+  descricao: string | null;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Contratação de uma extensão por um passageiro — presença = contratou. */
+export type PassageiroExtensaoRow = {
+  id: string;
+  passageiro_id: string;
+  extensao_id: string;
   created_at: string;
 };
 
@@ -650,6 +673,8 @@ export type Database = {
       expedicao_avisos: { Row: ExpedicaoAvisoRow; Insert: Partial<ExpedicaoAvisoRow> & Pick<ExpedicaoAvisoRow, "expedicao_id" | "titulo" | "conteudo">; Update: Partial<ExpedicaoAvisoRow> };
       passeios_opcionais: { Row: PasseioOpcionalRow; Insert: Partial<PasseioOpcionalRow> & Pick<PasseioOpcionalRow, "expedicao_id" | "roteiro_dia_id">; Update: Partial<PasseioOpcionalRow> };
       passeio_opcional_compras: { Row: PasseioOpcionalCompraRow; Insert: Partial<PasseioOpcionalCompraRow> & Pick<PasseioOpcionalCompraRow, "passageiro_id" | "passeio_opcional_id">; Update: Partial<PasseioOpcionalCompraRow> };
+      extensoes: { Row: ExtensaoRow; Insert: Partial<ExtensaoRow> & Pick<ExtensaoRow, "expedicao_id" | "nome">; Update: Partial<ExtensaoRow> };
+      passageiro_extensao: { Row: PassageiroExtensaoRow; Insert: Partial<PassageiroExtensaoRow> & Pick<PassageiroExtensaoRow, "passageiro_id" | "extensao_id">; Update: Partial<PassageiroExtensaoRow> };
       roteiro_lider_dias: { Row: RoteiroLiderDiaRow; Insert: Partial<RoteiroLiderDiaRow> & Pick<RoteiroLiderDiaRow, "expedicao_id">; Update: Partial<RoteiroLiderDiaRow> };
       acesso_senhas: { Row: AcessoSenhaRow; Insert: Partial<AcessoSenhaRow> & Pick<AcessoSenhaRow, "cpf" | "senha_hash">; Update: Partial<AcessoSenhaRow> };
       requisitos_destino: { Row: RequisitoDestinoRow; Insert: Partial<RequisitoDestinoRow> & Pick<RequisitoDestinoRow, "destino" | "tipo" | "descricao">; Update: Partial<RequisitoDestinoRow> };

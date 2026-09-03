@@ -5,7 +5,7 @@ import {
   mockPassageiros, mockExpedicoes, mockLinksExpedicao, mockQuartos, mockAlocacoes,
   mockRoteiroDias, mockExpedicaoVoos, mockExpedicaoPasseios, mockExpedicaoInfo,
   mockRoteiroDiaFotos, mockExpedicaoAvisos, mockExpedamigoAcessos,
-  mockPasseiosOpcionais, mockPasseioOpcionalCompras,
+  mockPasseiosOpcionais, mockPasseioOpcionalCompras, mockExtensoes, mockPassageiroExtensao,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
@@ -15,6 +15,7 @@ import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
   RoteiroDiaFotoRow, ExpedicaoAvisoRow, PasseioOpcionalRow, PasseioOpcionalCompraRow,
+  ExtensaoRow, PassageiroExtensaoRow,
 } from "@/types/database";
 
 /** Arquivo de ingresso (Bilhetes) do passageiro — só os campos que o portal usa. */
@@ -90,6 +91,8 @@ export type AmigoPasseio = {
 export type AmigoInfoPdf = { url: string; label: string };
 export type AmigoInfo = { titulo: string; conteudo: string; pdfs: AmigoInfoPdf[] };
 export type AmigoIngresso = { nome: string; url: string };
+/** Extensão que ESTE passageiro contratou (dias/voos extras). Migration 0052. */
+export type AmigoExtensao = { nome: string; descricao: string | null };
 
 export type AmigoExpedicao = {
   id: string;
@@ -117,6 +120,8 @@ export type AmigoExpedicao = {
   vouchers_voo: AmigoIngresso[];
   /** Cartão de embarque do próprio passageiro (categoria "Cartão de embarque"). */
   cartoes_embarque: AmigoIngresso[];
+  /** Extensões contratadas por este passageiro — selo/nota no topo (migration 0052). */
+  extensoes_contratadas: AmigoExtensao[];
 };
 export type AmigoDados = {
   nome: string;
@@ -161,6 +166,8 @@ export async function entrarExpedAmigo(
   let rtFotos: RoteiroDiaFotoRow[];
   let passeiosOpc: PasseioOpcionalRow[];
   let comprasOpc: PasseioOpcionalCompraRow[];
+  let extensoesAll: ExtensaoRow[];
+  let contratacoes: PassageiroExtensaoRow[];
 
   const sb = DEV_USE_MOCK_DATA ? null : createServiceRoleClient();
 
@@ -178,9 +185,11 @@ export async function entrarExpedAmigo(
     rtFotos = mockRoteiroDiaFotos;
     passeiosOpc = mockPasseiosOpcionais;
     comprasOpc = mockPasseioOpcionalCompras;
+    extensoesAll = mockExtensoes;
+    contratacoes = mockPassageiroExtensao;
   } else {
     const cli = sb!;
-    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll, poAll, pocAll] = await Promise.all([
+    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll, poAll, pocAll, extAll, ctAll] = await Promise.all([
       fetchAllRows<PassageiroRow>((from, to) => cli.from("passageiros").select("*").order("id").range(from, to)),
       cli.from("expedicoes").select("*"),
       fetchAllRows<LinkExpedicaoRow>((from, to) => cli.from("links_expedicao").select("*").order("id").range(from, to)),
@@ -194,6 +203,8 @@ export async function entrarExpedAmigo(
       fetchAllRows<RoteiroDiaFotoRow>((from, to) => cli.from("roteiro_dia_fotos").select("*").order("id").range(from, to)),
       fetchAllRows<PasseioOpcionalRow>((from, to) => cli.from("passeios_opcionais").select("*").order("id").range(from, to)),
       fetchAllRows<PasseioOpcionalCompraRow>((from, to) => cli.from("passeio_opcional_compras").select("*").order("id").range(from, to)),
+      fetchAllRows<ExtensaoRow>((from, to) => cli.from("extensoes").select("*").order("id").range(from, to)),
+      fetchAllRows<PassageiroExtensaoRow>((from, to) => cli.from("passageiro_extensao").select("*").order("id").range(from, to)),
     ]);
     pax = paxAll;
     exps = (er.data ?? []) as ExpedicaoRow[];
@@ -208,6 +219,8 @@ export async function entrarExpedAmigo(
     rtFotos = ftAll;
     passeiosOpc = poAll;
     comprasOpc = pocAll;
+    extensoesAll = extAll;
+    contratacoes = ctAll;
   }
 
   // 1) Acha as linhas da pessoa pelo CPF. Admin não precisa ser passageiro.
@@ -397,6 +410,12 @@ export async function entrarExpedAmigo(
     const meusComprados = new Set(
       row ? comprasOpc.filter((c) => c.passageiro_id === row.id).map((c) => c.passeio_opcional_id) : [],
     );
+    // Extensões contratadas por ESTE passageiro. Dia/voo de extensão só aparece pra quem
+    // contratou; `extensao_id` nulo = grupo principal (todos veem). Migration 0052.
+    const minhasExtensoes = new Set(
+      row ? contratacoes.filter((c) => c.passageiro_id === row.id).map((c) => c.extensao_id) : [],
+    );
+    const veSegmento = (extId: string | null) => extId == null || minhasExtensoes.has(extId);
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)
@@ -430,7 +449,7 @@ export async function entrarExpedAmigo(
       quartos: meusQuartos,
       hospedagem_voucher_url: e.hospedagem_voucher_arquivo_id ? fotoUrl.get(e.hospedagem_voucher_arquivo_id) ?? null : null,
       roteiro: roteiro
-        .filter((r) => r.expedicao_id === e.id)
+        .filter((r) => r.expedicao_id === e.id && veSegmento(r.extensao_id))
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((r) => ({
           id: r.id, dia: r.dia, data: r.data, titulo: r.titulo, descricao: r.descricao,
@@ -453,7 +472,7 @@ export async function entrarExpedAmigo(
             })),
         })),
       voos_grupo: voosGrupo
-        .filter((v) => v.expedicao_id === e.id)
+        .filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id))
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((v) => ({
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,
@@ -513,6 +532,10 @@ export async function entrarExpedAmigo(
         .map((a) => fotoUrl.get(a.id) ?? "")
         .filter((url) => url)
         .map((url, i, all) => ({ nome: all.length > 1 ? `Cartão de embarque ${i + 1}` : "Seu cartão de embarque", url })),
+      extensoes_contratadas: extensoesAll
+        .filter((x) => x.expedicao_id === e.id && minhasExtensoes.has(x.id))
+        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        .map((x) => ({ nome: x.nome, descricao: x.descricao })),
     });
   }
 

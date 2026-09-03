@@ -1,6 +1,6 @@
 import {
   listRoteiro, listVoosExpedicao, listPasseios, listInfoDestino, listAvisos, listRoteiroFotos,
-  listPasseiosOpcionais,
+  listPasseiosOpcionais, listExtensoes,
 } from "@/lib/data/expedicoes";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
@@ -13,7 +13,7 @@ export default async function PortalPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais] = await Promise.all([
+  const [roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, extensoes] = await Promise.all([
     listRoteiro(id),
     listVoosExpedicao(id),
     listPasseios(id),
@@ -21,6 +21,7 @@ export default async function PortalPage({
     listAvisos(id),
     listRoteiroFotos(id),
     listPasseiosOpcionais(id),
+    listExtensoes(id),
   ]);
 
   const user = await getCurrentUser();
@@ -49,6 +50,7 @@ export default async function PortalPage({
       avisos={avisos}
       fotos={fotos}
       passeiosOpcionais={passeiosOpcionais}
+      extensoes={extensoes}
       hospedagemVoucherArquivoId={hospedagemVoucherArquivoId}
       isAdmin={isAdmin}
     />

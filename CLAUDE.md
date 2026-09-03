@@ -450,6 +450,29 @@ role**, **só leitura**.
     contratado entra na lista de "adquiridos" (sem assumir o dia); `ofertas` = todos os
     não-comprados (ambos os tipos). Seletor de tipo no `PasseioOpcionalCard` do editor
     (WhatsApp sempre visível). ⚠️ Rodar a migration 0049 no Supabase.
+- **Extensões da expedição (migration 0052):** subgrupo de passageiros que fica dias a
+  mais (destino/hotel/voos próprios). Uma expedição pode ter **VÁRIAS** extensões
+  independentes. Mesmo padrão dos passeios opcionais (catálogo + junção presença=contratou):
+  - **Tabelas:** `extensoes` (`nome`, `descricao`, `ordem` por expedição) + junção
+    `passageiro_extensao` (`passageiro_id` × `extensao_id`, unique — presença = contratou).
+    E duas colunas nuláveis de vínculo: **`roteiro_dias.extensao_id`** e
+    **`expedicao_voos.extensao_id`** (`on delete set null`) — `null` = grupo principal
+    (todos veem); preenchido = só quem contratou aquela extensão vê. A **hospedagem** da
+    extensão sai do campo `hospedagem`/fotos dos dias marcados. Fetcher `listExtensoes`.
+  - **Autoria (aba ExpedAmigo):** seção **"Extensões da viagem"** (CRUD genérico —
+    `extensoes` entrou na allowlist `TABELAS` + `MOCKS`). Cada **dia** do roteiro e cada
+    **voo** ganham um seletor **"Faz parte de: Grupo principal ▸ / Extensão X"** (só
+    aparece se houver extensões; `Campo.opcoesPares` valor→rótulo, `"" → null`). Badge
+    roxo (`Route`) no dia/voo amarrado.
+  - **Quem contratou:** marcado no **perfil do passageiro** (drawer), seção
+    `ExtensoesCompra.tsx` (auto-carrega via `listExtensoesDoPax`; toggle =
+    `marcarExtensao`, ambos em `passageiros/extensoes-actions.ts`) — espelha
+    `PasseiosOpcionaisCompra`.
+  - **Portal + PDF:** `entrarExpedAmigo` calcula `minhasExtensoes` (set do `row`) e
+    filtra roteiro/voos por `veSegmento(extensao_id)` (nulo passa sempre). Campo
+    `extensoes_contratadas` (`AmigoExtensao[]`) vira **selo no topo** da viagem
+    (`app/amigo/page.tsx`) e uma seção "Sua extensão" na capa do PDF (`ViagemPDF.tsx`).
+    Admin (row null) não contrata nada → só vê o grupo principal.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.

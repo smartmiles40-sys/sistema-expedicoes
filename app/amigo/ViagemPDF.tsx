@@ -383,6 +383,21 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           </View>
         </View>
 
+        {/* ---- Extensão contratada (migration 0052) ---- */}
+        {exp.extensoes_contratadas.length > 0 && (
+          <View style={styles.secao}>
+            <SecaoTitulo hint="Os dias e voos da sua extensão já estão incluídos neste roteiro.">
+              {exp.extensoes_contratadas.length === 1 ? "Sua extensão" : "Suas extensões"}
+            </SecaoTitulo>
+            {exp.extensoes_contratadas.map((x, i) => (
+              <View key={i} style={styles.resumoDia} wrap={false}>
+                <Text style={styles.resumoDiaTit}>{x.nome}</Text>
+                {x.descricao ? <Text style={styles.resumoDiaMeta}>{x.descricao}</Text> : null}
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* ---- Roteiro resumido ---- */}
         {exp.roteiro.length > 0 && (
           <View style={styles.secao}>
