@@ -435,6 +435,8 @@ export type RoteiroDiaRow = {
   hospedagem: string | null;
   /** Extensão a que este dia pertence (null = grupo principal, todos veem). Migration 0052. */
   extensao_id: string | null;
+  /** true = só aparece para quem NÃO contratou extensão (ex.: último dia do grupo base). Migration 0053. */
+  apenas_sem_extensao: boolean;
   ordem: number;
   created_at: string;
   updated_at: string;
@@ -456,6 +458,8 @@ export type ExpedicaoVooRow = {
   arquivo_id: string | null;
   /** Extensão a que este voo pertence (null = grupo principal, todos veem). Migration 0052. */
   extensao_id: string | null;
+  /** true = só aparece para quem NÃO contratou extensão (ex.: voo de volta do grupo base). Migration 0053. */
+  apenas_sem_extensao: boolean;
   ordem: number;
   created_at: string;
   updated_at: string;

@@ -459,6 +459,13 @@ role**, **só leitura**.
     **`expedicao_voos.extensao_id`** (`on delete set null`) — `null` = grupo principal
     (todos veem); preenchido = só quem contratou aquela extensão vê. A **hospedagem** da
     extensão sai do campo `hospedagem`/fotos dos dias marcados. Fetcher `listExtensoes`.
+  - **3º estado — "só quem NÃO fez extensão" (migration 0053):** colunas
+    `roteiro_dias.apenas_sem_extensao` / `expedicao_voos.apenas_sem_extensao` (bool). Quem
+    estende tem um FINAL diferente, então o **último dia / voo de volta do grupo base**
+    é marcado assim e **some pra quem contratou qualquer extensão**. No portal:
+    `veSegmento(extId, apenasSemExt)` = extId≠null→só quem contratou; senão apenasSemExt→só
+    quem tem `minhasExtensoes.size===0`; senão todos. No editor o seletor "Faz parte de"
+    ganha a opção (sentinela `"__base__"` no select, traduzida pra `apenas_sem_extensao`).
   - **Autoria (aba ExpedAmigo):** seção **"Extensões da viagem"** (CRUD genérico —
     `extensoes` entrou na allowlist `TABELAS` + `MOCKS`). Cada **dia** do roteiro e cada
     **voo** ganham um seletor **"Faz parte de: Grupo principal ▸ / Extensão X"** (só

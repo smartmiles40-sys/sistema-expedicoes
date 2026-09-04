@@ -411,11 +411,14 @@ export async function entrarExpedAmigo(
       row ? comprasOpc.filter((c) => c.passageiro_id === row.id).map((c) => c.passeio_opcional_id) : [],
     );
     // Extensões contratadas por ESTE passageiro. Dia/voo de extensão só aparece pra quem
-    // contratou; `extensao_id` nulo = grupo principal (todos veem). Migration 0052.
+    // contratou; `extensao_id` nulo = grupo principal. `apenas_sem_extensao` = só quem NÃO
+    // estende (ex.: último dia/volta do grupo base, que muda pra quem fica). Migrations 0052/0053.
     const minhasExtensoes = new Set(
       row ? contratacoes.filter((c) => c.passageiro_id === row.id).map((c) => c.extensao_id) : [],
     );
-    const veSegmento = (extId: string | null) => extId == null || minhasExtensoes.has(extId);
+    const semExtensao = minhasExtensoes.size === 0;
+    const veSegmento = (extId: string | null, apenasSemExt: boolean | null | undefined): boolean =>
+      extId != null ? minhasExtensoes.has(extId) : apenasSemExt ? semExtensao : true;
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)
@@ -449,7 +452,7 @@ export async function entrarExpedAmigo(
       quartos: meusQuartos,
       hospedagem_voucher_url: e.hospedagem_voucher_arquivo_id ? fotoUrl.get(e.hospedagem_voucher_arquivo_id) ?? null : null,
       roteiro: roteiro
-        .filter((r) => r.expedicao_id === e.id && veSegmento(r.extensao_id))
+        .filter((r) => r.expedicao_id === e.id && veSegmento(r.extensao_id, r.apenas_sem_extensao))
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((r) => ({
           id: r.id, dia: r.dia, data: r.data, titulo: r.titulo, descricao: r.descricao,
@@ -472,7 +475,7 @@ export async function entrarExpedAmigo(
             })),
         })),
       voos_grupo: voosGrupo
-        .filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id))
+        .filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao))
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
         .map((v) => ({
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,

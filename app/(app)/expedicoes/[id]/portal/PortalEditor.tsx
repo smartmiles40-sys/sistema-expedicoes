@@ -65,13 +65,24 @@ export function PortalEditor({
     for (const p of passeiosOpcionais) (m[p.roteiro_dia_id] ??= []).push(p);
     return m;
   }, [passeiosOpcionais]);
-  // Pares valor→rótulo para o seletor "Faz parte de" (dias/voos): "" = grupo principal.
+  // Pares valor→rótulo para o seletor "Faz parte de" (dias/voos):
+  // "" = grupo principal (todos) · "__base__" = só quem NÃO estende · id = extensão X.
+  const SEG_BASE = "__base__";
   const paresExtensao = React.useMemo(
-    () => [{ value: "", label: "Grupo principal (todos veem)" }, ...extensoes.map((e) => ({ value: e.id, label: e.nome }))],
+    () => [
+      { value: "", label: "Grupo principal (todos veem)" },
+      { value: SEG_BASE, label: "Só quem NÃO fez extensão (ex.: último dia / volta do grupo)" },
+      ...extensoes.map((e) => ({ value: e.id, label: e.nome })),
+    ],
     [extensoes],
   );
-  const nomeExtensao = React.useCallback(
-    (id: string | null | undefined) => (id ? extensoes.find((e) => e.id === id)?.nome ?? null : null),
+  // Rótulo curto do segmento de um dia/voo (badge). null = grupo principal (sem badge).
+  const segmentoLabel = React.useCallback(
+    (extensaoId: string | null | undefined, apenasSemExtensao: boolean | null | undefined): string | null => {
+      if (extensaoId) return extensoes.find((e) => e.id === extensaoId)?.nome ?? null;
+      if (apenasSemExtensao) return "Só quem não estende";
+      return null;
+    },
     [extensoes],
   );
   const temExtensoes = extensoes.length > 0;
@@ -132,7 +143,7 @@ export function PortalEditor({
         )}
       />
 
-      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} paresExtensao={paresExtensao} nomeExtensao={nomeExtensao} />
+      <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} paresExtensao={paresExtensao} segmentoLabel={segmentoLabel} />
 
       <Secao
         tabela="expedicao_voos"
@@ -160,8 +171,8 @@ export function PortalEditor({
             <div className="text-[13px] font-medium">
               {String(r.trecho ?? "")}: {String(r.origem ?? "—")} → {String(r.destino ?? "—")}
               {r.arquivo_id ? <span className="text-vinculado-600"> · voucher ✓</span> : null}
-              {nomeExtensao(r.extensao_id as string | null) ? (
-                <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-700"><Route className="h-2.5 w-2.5" />{nomeExtensao(r.extensao_id as string | null)}</span>
+              {segmentoLabel(r.extensao_id as string | null, r.apenas_sem_extensao as boolean | null) ? (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-700"><Route className="h-2.5 w-2.5" />{segmentoLabel(r.extensao_id as string | null, r.apenas_sem_extensao as boolean | null)}</span>
               ) : null}
             </div>
             <div className="text-[11px] text-muted-foreground">
@@ -388,8 +399,11 @@ function ItemDrawer({
       const atual = item?.[c.key];
       if (c.type === "checkbox") v[c.key] = atual == null ? c.key === "incluso" : Boolean(atual);
       else if (c.type === "date") v[c.key] = atual ? String(atual).slice(0, 10) : "";
-      else if (c.type === "select") v[c.key] = atual == null ? (c.opcoes?.[0] ?? "") : String(atual);
-      else v[c.key] = atual == null ? "" : String(atual);
+      else if (c.type === "select") {
+        // O select de segmento (extensao_id) tem um 3º estado que mora noutra coluna.
+        if (c.key === "extensao_id" && item?.apenas_sem_extensao) v[c.key] = "__base__";
+        else v[c.key] = atual == null ? (c.opcoes?.[0] ?? "") : String(atual);
+      } else v[c.key] = atual == null ? "" : String(atual);
     }
     return v;
   });
@@ -413,6 +427,11 @@ function ItemDrawer({
       if (c.type === "checkbox") payload[c.key] = Boolean(raw);
       else if (c.type === "number") payload[c.key] = raw === "" || raw == null ? null : Number(raw);
       else payload[c.key] = raw === "" ? null : raw;
+    }
+    // Segmento (extensao_id): o sentinela "__base__" mora na coluna apenas_sem_extensao.
+    if ("extensao_id" in payload) {
+      if (payload.extensao_id === "__base__") { payload.extensao_id = null; payload.apenas_sem_extensao = true; }
+      else payload.apenas_sem_extensao = false;
     }
 
     setSalvando(true);
@@ -756,14 +775,14 @@ function PasseioOpcionalCard({ expedicaoId, passeio }: { expedicaoId: string; pa
 
 /** Editor INLINE do roteiro dia a dia — edita direto na tela, salva ao sair do campo. */
 function RoteiroInline({
-  expedicaoId, dias, fotosPorDia, passeiosOpcPorDia, paresExtensao, nomeExtensao,
+  expedicaoId, dias, fotosPorDia, passeiosOpcPorDia, paresExtensao, segmentoLabel,
 }: {
   expedicaoId: string;
   dias: RoteiroDiaRow[];
   fotosPorDia: Record<string, RoteiroDiaFotoRow[]>;
   passeiosOpcPorDia: Record<string, PasseioOpcionalRow[]>;
   paresExtensao: { value: string; label: string }[];
-  nomeExtensao: (id: string | null | undefined) => string | null;
+  segmentoLabel: (extensaoId: string | null | undefined, apenasSemExtensao: boolean | null | undefined) => string | null;
 }) {
   const router = useRouter();
   const [addBusy, setAddBusy] = React.useState(false);
@@ -788,8 +807,8 @@ function RoteiroInline({
       }
     }
     const payload = base
-      ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao, extensao_id: base.extensao_id }
-      : { dia: maxDia + 1, data: proxData, titulo: `Dia ${maxDia + 1}`, cidade: null, refeicoes: null, hospedagem: null, descricao: null, extensao_id: null };
+      ? { dia: maxDia + 1, data: base.data, titulo: base.titulo, cidade: base.cidade, refeicoes: base.refeicoes, hospedagem: base.hospedagem, descricao: base.descricao, extensao_id: base.extensao_id, apenas_sem_extensao: base.apenas_sem_extensao }
+      : { dia: maxDia + 1, data: proxData, titulo: `Dia ${maxDia + 1}`, cidade: null, refeicoes: null, hospedagem: null, descricao: null, extensao_id: null, apenas_sem_extensao: false };
     const r = await criarItemPortal("roteiro_dias", expedicaoId, payload);
     setAddBusy(false);
     if (r.ok) { setAbertos((s) => new Set(s).add(r.id)); router.refresh(); }
@@ -825,7 +844,7 @@ function RoteiroInline({
               fotos={fotosPorDia[d.id] ?? []}
               passeiosOpc={passeiosOpcPorDia[d.id] ?? []}
               paresExtensao={paresExtensao}
-              nomeExtensao={nomeExtensao}
+              segmentoLabel={segmentoLabel}
               aberto={abertos.has(d.id)}
               onToggle={() => toggle(d.id)}
               onDuplicar={() => adicionar(d)}
@@ -838,22 +857,24 @@ function RoteiroInline({
 }
 
 function DiaInline({
-  expedicaoId, dia, fotos, passeiosOpc, paresExtensao, nomeExtensao, aberto, onToggle, onDuplicar,
+  expedicaoId, dia, fotos, passeiosOpc, paresExtensao, segmentoLabel, aberto, onToggle, onDuplicar,
 }: {
   expedicaoId: string;
   dia: RoteiroDiaRow;
   fotos: RoteiroDiaFotoRow[];
   passeiosOpc: PasseioOpcionalRow[];
   paresExtensao: { value: string; label: string }[];
-  nomeExtensao: (id: string | null | undefined) => string | null;
+  segmentoLabel: (extensaoId: string | null | undefined, apenasSemExtensao: boolean | null | undefined) => string | null;
   aberto: boolean;
   onToggle: () => void;
   onDuplicar: () => void;
 }) {
   const router = useRouter();
-  const temExtensoes = paresExtensao.length > 1;
-  const [extensaoId, setExtensaoId] = React.useState(dia.extensao_id ?? "");
-  const nomeExt = nomeExtensao(dia.extensao_id);
+  // Há extensões quando o seletor tem mais que "grupo principal" + "só sem extensão".
+  const temExtensoes = paresExtensao.length > 2;
+  const segAtual = dia.apenas_sem_extensao ? "__base__" : (dia.extensao_id ?? "");
+  const [extensaoId, setExtensaoId] = React.useState(segAtual);
+  const nomeExt = segmentoLabel(dia.extensao_id, dia.apenas_sem_extensao);
   const [v, setV] = React.useState(() => ({
     dia: String(dia.dia ?? ""),
     data: dia.data ? String(dia.data).slice(0, 10) : "",
@@ -866,8 +887,11 @@ function DiaInline({
 
   async function mudarExtensao(novo: string) {
     setExtensaoId(novo);
-    const r = await atualizarItemPortal("roteiro_dias", dia.id, expedicaoId, { extensao_id: novo === "" ? null : novo });
-    if (!r.ok) toast.error("Erro ao vincular à extensão", { description: r.error });
+    const payload = novo === "__base__"
+      ? { extensao_id: null, apenas_sem_extensao: true }
+      : { extensao_id: novo === "" ? null : novo, apenas_sem_extensao: false };
+    const r = await atualizarItemPortal("roteiro_dias", dia.id, expedicaoId, payload);
+    if (!r.ok) toast.error("Erro ao vincular ao segmento", { description: r.error });
     else router.refresh();
   }
   const salvoRef = React.useRef({ ...v });
@@ -953,7 +977,7 @@ function DiaInline({
               >
                 {paresExtensao.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
-              <p className="text-[11px] text-muted-foreground">Dias de extensão só aparecem no portal para quem contratou aquela extensão.</p>
+              <p className="text-[11px] text-muted-foreground">Dia de extensão aparece só para quem contratou. “Só quem não fez extensão” é para o final do grupo base (último dia/volta), que some para quem estende.</p>
             </div>
           )}
           <div className="space-y-1">
