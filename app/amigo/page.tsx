@@ -551,7 +551,9 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
             {/* Hospedagem / quarto */}
             <div>
               <SubTitulo icone={<BedDouble className="h-3.5 w-3.5" />}>Hospedagem</SubTitulo>
-              {exp.hospedagem_voucher_url && (
+              {/* Se a pessoa contratou uma extensão com voucher próprio, mostra só o(s)
+                  dela — o voucher da hospedagem base fica oculto pra ela. */}
+              {exp.hospedagem_voucher_url && !exp.extensoes_contratadas.some((x) => x.hospedagem_voucher_url) && (
                 <div className="mb-2">
                   <IngressoLink ing={{ nome: "Voucher da hospedagem", url: exp.hospedagem_voucher_url }} onDownload={logVoucher} />
                 </div>
