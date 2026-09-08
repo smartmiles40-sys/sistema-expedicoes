@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy, ChevronDown, ChevronRight } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy, ChevronDown, ChevronRight, Route } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -51,6 +51,10 @@ interface Props {
   destino?: string | null;
   /** Grupos (G1/G2…) da expedição — mapeia grupo_id → nome pra montar os quartos por grupo. */
   grupos?: { id: string; nome: string }[];
+  /** Extensões da expedição (migration 0052) — pra vincular hotéis a uma extensão. */
+  extensoes?: { id: string; nome: string }[];
+  /** Quem contratou cada extensão (passageiro↔extensão). */
+  contratacoesExtensao?: { passageiro_id: string; extensao_id: string }[];
 }
 
 const CAPACIDADE = CAPACIDADE_QUARTO;
@@ -64,9 +68,9 @@ const CORES_CONEXAO = ["#2563eb", "#16a34a", "#db2777", "#d97706", "#7c3aed", "#
  * pra diferenças bobas (espaço no fim, "Hungharda " vs "Hungharda") NÃO separarem
  * o mesmo hotel em dois trechos — o que fazia um quarto editado "pular" de seção.
  */
-function trechoKey(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
+function trechoKey(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id?: string | null }): string {
   const hotel = (q.hotel_cidade ?? "").trim().replace(/\s+/g, " ");
-  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
+  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}|${q.extensao_id ?? ""}`;
 }
 
 /** Normaliza nome pra casar acompanhante (minúsculas, sem acento, espaços colapsados). */
@@ -92,6 +96,8 @@ type Trecho = {
   hotel_cidade: string | null;
   check_in: string | null;
   check_out: string | null;
+  /** Extensão a que este hotel pertence (só quem contratou entra na alocação). null = todos. */
+  extensao_id: string | null;
   quartos: QuartoRow[];
 };
 
@@ -106,14 +112,14 @@ function rotuloGrupoExport(g: GrupoEgito | "misto" | null): string {
         : "Sem grupo definido";
 }
 
-export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino, grupos }: Props) {
+export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, destino, grupos, extensoes, contratacoesExtensao }: Props) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [autoOpen, setAutoOpen] = React.useState(false);
   // Quando setado, o drawer de auto-criação abre com hotel/datas pré-preenchidos
   // (botão "Adicionar quarto" numa seção/hotel existente). null = criar do zero.
-  const [autoPrefill, setAutoPrefill] = React.useState<{ hotel_cidade: string; check_in: string; check_out: string } | null>(null);
+  const [autoPrefill, setAutoPrefill] = React.useState<{ hotel_cidade: string; check_in: string; check_out: string; extensao_id?: string | null } | null>(null);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
   // Renomear hotel inline: guarda a chave do trecho em edição + o texto digitado.
   const [renomeando, setRenomeando] = React.useState<{ key: string; quartoIds: string[] } | null>(null);
@@ -284,7 +290,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
     for (const q of quartos) {
       const k = trechoKey(q);
       if (!map.has(k)) {
-        map.set(k, { key: k, hotel_cidade: q.hotel_cidade, check_in: q.check_in, check_out: q.check_out, quartos: [] });
+        map.set(k, { key: k, hotel_cidade: q.hotel_cidade, check_in: q.check_in, check_out: q.check_out, extensao_id: q.extensao_id ?? null, quartos: [] });
       }
       map.get(k)!.quartos.push(q);
     }
@@ -308,9 +314,30 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
     return localAloc.find((a) => a.passageiro_id === paxId && ids.has(a.quarto_id))?.quarto_id ?? null;
   }
 
-  /** Pax sem quarto num trecho (não-cancelados, sem alocação naquele hotel). */
+  // Extensões: quem contratou cada uma + nome por id (migration 0052/0054).
+  const contratantesPorExtensao = React.useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const c of contratacoesExtensao ?? []) {
+      if (!m.has(c.extensao_id)) m.set(c.extensao_id, new Set());
+      m.get(c.extensao_id)!.add(c.passageiro_id);
+    }
+    return m;
+  }, [contratacoesExtensao]);
+  const nomeExtensaoById = React.useMemo(
+    () => new Map((extensoes ?? []).map((e) => [e.id, e.nome])),
+    [extensoes],
+  );
+
+  /** Pax relevantes a um trecho: se for hotel de extensão, só quem contratou; senão todos. */
+  function paxRelevantesDoTrecho(trecho: Trecho): PassageiroRow[] {
+    if (!trecho.extensao_id) return paxAtivos;
+    const contratantes = contratantesPorExtensao.get(trecho.extensao_id) ?? new Set<string>();
+    return paxAtivos.filter((p) => contratantes.has(p.id));
+  }
+
+  /** Pax sem quarto num trecho (relevantes ao trecho, sem alocação naquele hotel). */
   function semQuartoNoTrecho(trecho: Trecho): PassageiroRow[] {
-    return paxAtivos.filter((p) => !quartoDoPaxNoTrecho(p.id, trecho));
+    return paxRelevantesDoTrecho(trecho).filter((p) => !quartoDoPaxNoTrecho(p.id, trecho));
   }
 
   /** ⚠️ local/temporário: grupo "dominante" de um hotel/trecho, pelos hóspedes alocados.
@@ -525,7 +552,8 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
 
       ws.mergeCells("A1:I1");
       const titulo = ws.getCell("A1");
-      titulo.value = `Rooming — ${t.hotel_cidade ?? "Hotel"}`;
+      const rotuloExt = t.extensao_id ? ` (Extensão: ${nomeExtensaoById.get(t.extensao_id) ?? "extensão"})` : "";
+      titulo.value = `Rooming — ${t.hotel_cidade ?? "Hotel"}${rotuloExt}`;
       titulo.font = { bold: true, size: 14 };
 
       ws.mergeCells("A2:I2");
@@ -955,6 +983,14 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                         {grupoTrecho === "misto" ? "G1+G2" : grupoTrecho}
                       </span>
                     )}
+                    {t.extensao_id && (
+                      <span
+                        title="Hotel de extensão — só quem contratou entra na alocação"
+                        className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-lista-100 px-1.5 py-0.5 text-[10px] font-bold text-lista-600"
+                      >
+                        <Route className="h-2.5 w-2.5" />{nomeExtensaoById.get(t.extensao_id) ?? "Extensão"}
+                      </span>
+                    )}
                   </button>
                     {!somenteLeitura && (
                       <button
@@ -971,7 +1007,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                   )}
                   <div className="flex items-center gap-2">
                     <Badge variant={sem.length === 0 ? "vinculado" : "atencao"}>
-                      {paxAtivos.length - sem.length}/{paxAtivos.length} alocados
+                      {paxRelevantesDoTrecho(t).length - sem.length}/{paxRelevantesDoTrecho(t).length} alocados
                     </Badge>
                     {!somenteLeitura && (
                       <button
@@ -981,6 +1017,7 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                             hotel_cidade: t.hotel_cidade ?? "",
                             check_in: t.check_in ?? "",
                             check_out: t.check_out ?? "",
+                            extensao_id: t.extensao_id,
                           });
                           setAutoOpen(true);
                         }}
@@ -1160,12 +1197,13 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
           })
         )}
 
-        <NovoQuartoDrawer expedicaoId={expedicaoId} open={drawerOpen} onOpenChange={setDrawerOpen} />
+        <NovoQuartoDrawer expedicaoId={expedicaoId} open={drawerOpen} onOpenChange={setDrawerOpen} extensoes={extensoes} />
         <QuartosAutomaticosDrawer
           expedicaoId={expedicaoId}
           prefill={autoPrefill}
           open={autoOpen}
           onOpenChange={(v) => { setAutoOpen(v); if (!v) setAutoPrefill(null); }}
+          extensoes={extensoes}
         />
         <EditarQuartoDrawer
           expedicaoId={expedicaoId}

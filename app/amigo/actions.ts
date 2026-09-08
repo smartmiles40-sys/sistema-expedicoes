@@ -93,7 +93,7 @@ export type AmigoInfoPdf = { url: string; label: string };
 export type AmigoInfo = { titulo: string; conteudo: string; pdfs: AmigoInfoPdf[] };
 export type AmigoIngresso = { nome: string; url: string };
 /** Extensão que ESTE passageiro contratou (dias/voos extras). Migration 0052. */
-export type AmigoExtensao = { nome: string; descricao: string | null };
+export type AmigoExtensao = { nome: string; descricao: string | null; hospedagem_voucher_url: string | null };
 
 export type AmigoExpedicao = {
   id: string;
@@ -382,6 +382,7 @@ export async function entrarExpedAmigo(
       if (i.arquivo_id_2 && expIdsFuturas.has(i.expedicao_id)) idsRelevantes.add(i.arquivo_id_2);
     }
     for (const e of exps) if (e.hospedagem_voucher_arquivo_id && expIdsFuturas.has(e.id)) idsRelevantes.add(e.hospedagem_voucher_arquivo_id);
+    for (const x of extensoesAll) if (x.hospedagem_voucher_arquivo_id && expIdsFuturas.has(x.expedicao_id)) idsRelevantes.add(x.hospedagem_voucher_arquivo_id);
     for (const p of passeiosOpc) if (p.foto_arquivo_id && expIdsFuturas.has(p.expedicao_id)) idsRelevantes.add(p.foto_arquivo_id);
     for (const a of ingressoArqs) idsRelevantes.add(a.id);
     for (const a of seguroArqs) idsRelevantes.add(a.id);
@@ -539,7 +540,11 @@ export async function entrarExpedAmigo(
       extensoes_contratadas: extensoesAll
         .filter((x) => x.expedicao_id === e.id && minhasExtensoes.has(x.id))
         .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
-        .map((x) => ({ nome: x.nome, descricao: x.descricao })),
+        .map((x) => ({
+          nome: x.nome,
+          descricao: x.descricao,
+          hospedagem_voucher_url: x.hospedagem_voucher_arquivo_id ? fotoUrl.get(x.hospedagem_voucher_arquivo_id) ?? null : null,
+        })),
     });
   }
 

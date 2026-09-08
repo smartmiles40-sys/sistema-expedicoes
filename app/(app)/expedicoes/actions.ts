@@ -930,11 +930,12 @@ const novoQuartoSchema = z.object({
   check_in: z.string().optional().nullable(),
   check_out: z.string().optional().nullable(),
   observacoes: z.string().optional().nullable(),
+  extensao_id: z.string().optional().nullable(),
 });
 
 /** Chave do trecho (hotel) de um quarto — mesma regra do board/export. */
-function trechoKeyQuarto(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }): string {
-  return `${(q.hotel_cidade ?? "").trim()}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
+function trechoKeyQuarto(q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id?: string | null }): string {
+  return `${(q.hotel_cidade ?? "").trim()}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}|${q.extensao_id ?? ""}`;
 }
 
 /**
@@ -948,9 +949,9 @@ async function renumerarQuartosSupabase(
 ): Promise<void> {
   const { data } = await supabase
     .from("quartos")
-    .select("id, numero, hotel_cidade, check_in, check_out, created_at")
+    .select("id, numero, hotel_cidade, check_in, check_out, extensao_id, created_at")
     .eq("expedicao_id", expedicaoId);
-  const qs = (data ?? []) as { id: string; numero: string; hotel_cidade: string | null; check_in: string | null; check_out: string | null; created_at: string | null }[];
+  const qs = (data ?? []) as { id: string; numero: string; hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id: string | null; created_at: string | null }[];
   const grupos = new Map<string, typeof qs>();
   for (const q of qs) {
     const k = trechoKeyQuarto(q);
@@ -993,6 +994,7 @@ export async function criarQuarto(
     hotel_cidade: d.hotel_cidade || null,
     check_in: d.check_in || null,
     check_out: d.check_out || null,
+    extensao_id: d.extensao_id || null,
   };
   const k = trechoKeyQuarto(trecho);
 
@@ -1043,6 +1045,7 @@ const quartosAutoSchema = z.object({
   check_out: z.string().min(1, "Informe o check-out"),
   tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
   quantidade: z.number().int().min(1, "Mínimo 1 quarto").max(100, "Máximo 100 por vez"),
+  extensao_id: z.string().optional().nullable(),
 });
 
 /**
@@ -1057,8 +1060,9 @@ export async function criarQuartosAutomaticos(
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(", ") };
   const d = parsed.data;
   const now = new Date().toISOString();
-  const mesmoTrecho = (q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null }) =>
-    q.hotel_cidade === d.hotel_cidade && q.check_in === d.check_in && q.check_out === d.check_out;
+  const ext = d.extensao_id || null;
+  const mesmoTrecho = (q: { hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id?: string | null }) =>
+    q.hotel_cidade === d.hotel_cidade && q.check_in === d.check_in && q.check_out === d.check_out && (q.extensao_id ?? null) === ext;
 
   if (DEV_USE_MOCK_DATA) {
     const base = mockQuartos.filter((q) => q.expedicao_id === d.expedicao_id && mesmoTrecho(q)).length;
@@ -1073,6 +1077,7 @@ export async function criarQuartosAutomaticos(
         check_out: d.check_out,
         status: "ativo",
         observacoes: null,
+        extensao_id: ext,
         created_at: now,
         updated_at: now,
       });
@@ -1098,6 +1103,7 @@ export async function criarQuartosAutomaticos(
     check_in: d.check_in,
     check_out: d.check_out,
     status: "ativo",
+    extensao_id: ext,
   }));
   const { error } = await supabase.from("quartos").insert(rows);
   if (error) return { ok: false, error: error.message };
@@ -1903,12 +1909,13 @@ export async function renomearHotelRooming(
 }
 
 // --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
-type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null };
+type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id?: string | null };
 /** Chave do "trecho/hotel": normaliza hotel (trim + colapsa espaços) e datas (AAAA-MM-DD)
- *  pra diferenças bobas de espaço não separarem o mesmo hotel (igual ao RoomingBoard). */
+ *  pra diferenças bobas de espaço não separarem o mesmo hotel (igual ao RoomingBoard).
+ *  Inclui a extensão: hotel de extensão é um trecho próprio (migration 0054). */
 function trechoKey(q: QuartoTrecho): string {
   const hotel = (q.hotel_cidade ?? "").trim().replace(/\s+/g, " ");
-  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}`;
+  return `${hotel}|${(q.check_in ?? "").slice(0, 10)}|${(q.check_out ?? "").slice(0, 10)}|${q.extensao_id ?? ""}`;
 }
 
 /**
@@ -1940,10 +1947,10 @@ export async function alocarPassageiro(
 
   const supabase = await getServerClient();
   const { data: alvo } = await supabase
-    .from("quartos").select("hotel_cidade, check_in, check_out").eq("id", quartoId).maybeSingle();
+    .from("quartos").select("hotel_cidade, check_in, check_out, extensao_id").eq("id", quartoId).maybeSingle();
   if (!alvo) return { ok: false, error: "Quarto não encontrado" };
   const { data: qs } = await supabase
-    .from("quartos").select("id, hotel_cidade, check_in, check_out").eq("expedicao_id", expedicaoId);
+    .from("quartos").select("id, hotel_cidade, check_in, check_out, extensao_id").eq("expedicao_id", expedicaoId);
   const tk = trechoKey(alvo as QuartoTrecho);
   const idsTrecho = ((qs ?? []) as (QuartoTrecho & { id: string })[])
     .filter((q) => trechoKey(q) === tk).map((q) => q.id);

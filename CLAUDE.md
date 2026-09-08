@@ -480,6 +480,18 @@ role**, **só leitura**.
     `extensoes_contratadas` (`AmigoExtensao[]`) vira **selo no topo** da viagem
     (`app/amigo/page.tsx`) e uma seção "Sua extensão" na capa do PDF (`ViagemPDF.tsx`).
     Admin (row null) não contrata nada → só vê o grupo principal.
+  - **Voucher de hospedagem por extensão + rooming por extensão (migration 0054):**
+    coluna `extensoes.hospedagem_voucher_arquivo_id` (voucher PRÓPRIO da extensão — o da
+    expedição é 1 só, do hotel base) — anexado na seção "Extensões" do editor (`extra` da
+    `Secao` reusa `VoucherAnexo` com `campo="hospedagem_voucher_arquivo_id"`), e no portal
+    quem contratou vê "Hospedagem — {extensão}" **além** do voucher base (campo
+    `hospedagem_voucher_url` em `AmigoExtensao`). E coluna **`quartos.extensao_id`**: um
+    hotel/trecho do rooming pode ser "de uma extensão" — aí **só quem contratou entra na
+    alocação** (`paxRelevantesDoTrecho`/`semQuartoNoTrecho` no `RoomingBoard` filtram o
+    pool e o contador; `trechoKey` inclui `extensao_id` no board E em `actions.ts`
+    alocação/numeração). Seletor "Faz parte de" nos drawers Novo quarto / Quartos
+    automáticos (prefill carrega a extensão do hotel); badge roxo (`Route`) no header e no
+    título do export. `listContratacoesExtensao` alimenta o board via `rooming/page.tsx`.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.

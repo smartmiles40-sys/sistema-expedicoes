@@ -21,18 +21,20 @@ const schema = z.object({
   check_out: z.string().min(1, "Informe o check-out"),
   tipo: z.enum(["Single", "Duplo", "Twin", "Triplo", "Compartilhado", "Líder"]),
   quantidade: z.coerce.number().int().min(1, "Mínimo 1").max(100, "Máximo 100"),
+  extensao_id: z.string().optional(),
 });
 type FormData = z.input<typeof schema>;
 
 interface Props {
   expedicaoId: string;
   /** Preenche hotel/datas (ao adicionar quartos a uma seção/hotel já existente). */
-  prefill?: { hotel_cidade: string; check_in: string; check_out: string } | null;
+  prefill?: { hotel_cidade: string; check_in: string; check_out: string; extensao_id?: string | null } | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  extensoes?: { id: string; nome: string }[];
 }
 
-export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenChange }: Props) {
+export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenChange, extensoes }: Props) {
   const router = useRouter();
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } =
     useForm<FormData>({
@@ -48,6 +50,7 @@ export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenCha
       hotel_cidade: prefill?.hotel_cidade ?? "",
       check_in: prefill?.check_in ?? "",
       check_out: prefill?.check_out ?? "",
+      extensao_id: prefill?.extensao_id ?? "",
     });
   }, [open, reset, prefill]);
 
@@ -59,6 +62,7 @@ export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenCha
       check_out: data.check_out,
       tipo: data.tipo,
       quantidade: Number(data.quantidade),
+      extensao_id: data.extensao_id || null,
     });
     if (r.ok) {
       toast.success(`${r.criados} quarto(s) criado(s)`);
@@ -117,6 +121,20 @@ export function QuartosAutomaticosDrawer({ expedicaoId, prefill, open, onOpenCha
                 {errors.quantidade && <p className="text-[11px] text-critico-600">{errors.quantidade.message}</p>}
               </div>
             </div>
+
+            {extensoes && extensoes.length > 0 && (
+              <div className="space-y-1">
+                <Label>Faz parte de</Label>
+                <Select value={watch("extensao_id") ?? ""} onValueChange={(v) => setValue("extensao_id", v === "__base__" ? "" : v, { shouldDirty: true })}>
+                  <SelectTrigger><SelectValue placeholder="Grupo principal (todos)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__base__">Grupo principal (todos)</SelectItem>
+                    {extensoes.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">Hotel de extensão: só quem contratou entra na alocação.</p>
+              </div>
+            )}
           </DrawerBody>
           <DrawerFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

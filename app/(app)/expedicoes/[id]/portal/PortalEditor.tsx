@@ -138,10 +138,25 @@ export function PortalEditor({
           <>
             <div className="text-[13px] font-medium inline-flex items-center gap-1">
               <Route className="h-3 w-3 text-lista-600" /> {String(r.nome ?? "")}
+              {r.hospedagem_voucher_arquivo_id ? <span className="text-vinculado-600"> · hospedagem ✓</span> : null}
             </div>
             <div className="text-[11px] text-muted-foreground line-clamp-1">{String(r.descricao ?? "Sem descrição")}</div>
           </>
         )}
+        extra={(item) =>
+          item ? (
+            <VoucherAnexo
+              tabela="extensoes"
+              expedicaoId={expedicaoId}
+              itemId={item.id}
+              rotulo="Voucher da hospedagem"
+              campo="hospedagem_voucher_arquivo_id"
+              arquivoId={extensoes.find((e) => e.id === item.id)?.hospedagem_voucher_arquivo_id ?? null}
+            />
+          ) : (
+            <p className="text-[12px] text-muted-foreground">Salve a extensão primeiro para anexar o voucher da hospedagem.</p>
+          )
+        }
       />
 
       <RoteiroInline expedicaoId={expedicaoId} dias={roteiro} fotosPorDia={fotosPorDia} passeiosOpcPorDia={passeiosOpcPorDia} paresExtensao={paresExtensao} segmentoLabel={segmentoLabel} />

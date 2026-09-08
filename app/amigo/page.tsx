@@ -556,6 +556,13 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                   <IngressoLink ing={{ nome: "Voucher da hospedagem", url: exp.hospedagem_voucher_url }} onDownload={logVoucher} />
                 </div>
               )}
+              {exp.extensoes_contratadas
+                .filter((x) => x.hospedagem_voucher_url)
+                .map((x, i) => (
+                  <div key={`ext-hosp-${i}`} className="mb-2">
+                    <IngressoLink ing={{ nome: `Hospedagem — ${x.nome}`, url: x.hospedagem_voucher_url! }} onDownload={logVoucher} />
+                  </div>
+                ))}
               {exp.quartos.length > 0 ? (
                 <ul className="space-y-1.5">
                   {exp.quartos.map((q, i) => (

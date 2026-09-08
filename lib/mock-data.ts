@@ -447,14 +447,14 @@ export const mockPassageiros: Tables<"passageiros">[] = persist("mockPassageiros
   passageirosBase.map(normalizarPassageiro));
 
 export const mockQuartos: Tables<"quartos">[] = persist("mockQuartos", () => [
-  { id: "q001", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "101", tipo: "Duplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "q002", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "102", tipo: "Twin", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "q003", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "103", tipo: "Triplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "q004", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "201", tipo: "Líder", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q001", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "101", tipo: "Duplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q002", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "102", tipo: "Twin", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q003", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "103", tipo: "Triplo", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q004", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "201", tipo: "Líder", hotel_cidade: "Cusco", check_in: futureDate(95), check_out: futureDate(98), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
   // Segundo hotel/trecho (Lima) — pra testar rooming por hotel.
-  { id: "q005", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "501", tipo: "Duplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "q006", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "502", tipo: "Triplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
-  { id: "q007", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "503", tipo: "Twin", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q005", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "501", tipo: "Duplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q006", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "502", tipo: "Triplo", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
+  { id: "q007", expedicao_id: "e0000000-0000-0000-0000-000000000001", numero: "503", tipo: "Twin", hotel_cidade: "Lima", check_in: futureDate(98), check_out: futureDate(100), status: "Reservado", observacoes: null, extensao_id: null, created_at: pastDate(30), updated_at: pastDate(2) },
 ]);
 
 /** Alocações passageiro↔quarto (M2M): um quarto por hotel/trecho. */

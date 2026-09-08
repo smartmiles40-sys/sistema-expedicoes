@@ -22,6 +22,7 @@ import {
   mockExpedicaoAvisos,
   mockPasseiosOpcionais,
   mockExtensoes,
+  mockPassageiroExtensao,
   mockPassageiroRequisitos,
   getExpedicoesComAgregados,
 } from "@/lib/mock-data";
@@ -332,6 +333,23 @@ export const listPasseiosOpcionais = (expedicaoId: string) =>
 /** Extensões da expedição (dias/voos extras por subgrupo, migration 0052). */
 export const listExtensoes = (expedicaoId: string) =>
   listPortal<ExtensaoRow>("extensoes", expedicaoId, mockExtensoes);
+
+/** Contratações de extensão (passageiro↔extensão) de uma expedição. Migration 0052. */
+export async function listContratacoesExtensao(
+  expedicaoId: string,
+): Promise<{ passageiro_id: string; extensao_id: string }[]> {
+  if (DEV_USE_MOCK_DATA) {
+    const extIds = new Set(mockExtensoes.filter((e) => e.expedicao_id === expedicaoId).map((e) => e.id));
+    return mockPassageiroExtensao.filter((c) => extIds.has(c.extensao_id))
+      .map((c) => ({ passageiro_id: c.passageiro_id, extensao_id: c.extensao_id }));
+  }
+  const supabase = await getServerClient();
+  const { data: exts } = await supabase.from("extensoes").select("id").eq("expedicao_id", expedicaoId);
+  const extIds = ((exts ?? []) as { id: string }[]).map((e) => e.id);
+  if (!extIds.length) return [];
+  const { data } = await supabase.from("passageiro_extensao").select("passageiro_id, extensao_id").in("extensao_id", extIds);
+  return (data ?? []) as { passageiro_id: string; extensao_id: string }[];
+}
 /** Roteiro operacional do líder (migration 0029). Sem mock — lê direto do banco. */
 export const listRoteiroLider = (expedicaoId: string) =>
   listPortal<RoteiroLiderDiaRow>("roteiro_lider_dias", expedicaoId, []);

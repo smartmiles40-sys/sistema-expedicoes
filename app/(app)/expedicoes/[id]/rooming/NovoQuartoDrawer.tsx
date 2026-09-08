@@ -21,6 +21,7 @@ const schema = z.object({
   check_in: z.string().optional(),
   check_out: z.string().optional(),
   observacoes: z.string().optional(),
+  extensao_id: z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -28,9 +29,10 @@ interface Props {
   expedicaoId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  extensoes?: { id: string; nome: string }[];
 }
 
-export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange }: Props) {
+export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange, extensoes }: Props) {
   const router = useRouter();
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } =
     useForm<FormData>({
@@ -43,7 +45,7 @@ export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange }: Props) {
   }, [open, reset]);
 
   async function onSubmit(data: FormData) {
-    const r = await criarQuarto({ expedicao_id: expedicaoId, ...data });
+    const r = await criarQuarto({ expedicao_id: expedicaoId, ...data, extensao_id: data.extensao_id || null });
     if (r.ok) {
       toast.success("Quarto criado");
       onOpenChange(false);
@@ -78,6 +80,20 @@ export function NovoQuartoDrawer({ expedicaoId, open, onOpenChange }: Props) {
               <Label htmlFor="nq-hotel">Hotel / Cidade</Label>
               <Input id="nq-hotel" {...register("hotel_cidade")} placeholder="Hotel Casa Andina — Cusco" />
             </div>
+
+            {extensoes && extensoes.length > 0 && (
+              <div className="space-y-1">
+                <Label>Faz parte de</Label>
+                <Select value={watch("extensao_id") ?? ""} onValueChange={(v) => setValue("extensao_id", v === "__base__" ? "" : v, { shouldDirty: true })}>
+                  <SelectTrigger><SelectValue placeholder="Grupo principal (todos)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__base__">Grupo principal (todos)</SelectItem>
+                    {extensoes.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">Hotel de extensão: só quem contratou entra na alocação.</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">

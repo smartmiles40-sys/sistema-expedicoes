@@ -343,6 +343,8 @@ export type QuartoRow = {
   check_out: string | null;
   status: string;
   observacoes: string | null;
+  /** Hotel deste quarto pertence a uma extensão (só quem contratou entra). Migration 0054. */
+  extensao_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -552,6 +554,8 @@ export type ExtensaoRow = {
   expedicao_id: string;
   nome: string;
   descricao: string | null;
+  /** Voucher de hospedagem próprio da extensão (arquivos.id). Migration 0054. */
+  hospedagem_voucher_arquivo_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;
