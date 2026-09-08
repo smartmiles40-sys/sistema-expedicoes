@@ -1870,6 +1870,38 @@ export async function excluirTrechoRooming(
   return { ok: true, removidos: ids.length };
 }
 
+/**
+ * Renomeia um hotel/trecho do rooming: atualiza `hotel_cidade` de TODOS os quartos
+ * daquele trecho de uma vez (o board passa os ids dos quartos do hotel). Mantém as
+ * datas e alocações — só troca o nome. Usado pra corrigir grafia direto no board.
+ */
+export async function renomearHotelRooming(
+  expedicaoId: string,
+  quartoIds: string[],
+  novoNome: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const nome = (novoNome ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, error: "Informe o nome do hotel." };
+  const ids = [...new Set(quartoIds)];
+  if (!ids.length) return { ok: false, error: "Nenhum quarto neste hotel." };
+
+  if (DEV_USE_MOCK_DATA) {
+    for (const q of mockQuartos) if (ids.includes(q.id)) q.hotel_cidade = nome;
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { error } = await supabase
+    .from("quartos")
+    .update({ hotel_cidade: nome })
+    .eq("expedicao_id", expedicaoId)
+    .in("id", ids);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
 // --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
 type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null };
 /** Chave do "trecho/hotel": normaliza hotel (trim + colapsa espaços) e datas (AAAA-MM-DD)

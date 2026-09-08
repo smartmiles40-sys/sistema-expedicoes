@@ -20,6 +20,7 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import {
   excluirQuarto,
   excluirTrechoRooming,
+  renomearHotelRooming,
   alocarPassageiro,
   desalocarPassageiro,
   desfazerConexao,
@@ -114,6 +115,10 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
   // (botão "Adicionar quarto" numa seção/hotel existente). null = criar do zero.
   const [autoPrefill, setAutoPrefill] = React.useState<{ hotel_cidade: string; check_in: string; check_out: string } | null>(null);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
+  // Renomear hotel inline: guarda a chave do trecho em edição + o texto digitado.
+  const [renomeando, setRenomeando] = React.useState<{ key: string; quartoIds: string[] } | null>(null);
+  const [nomeHotelEdit, setNomeHotelEdit] = React.useState("");
+  const [salvandoNome, setSalvandoNome] = React.useState(false);
   // Duplicar um hotel inteiro (quartos + pax) para um novo hotel/datas.
   const [duplicarOrigem, setDuplicarOrigem] = React.useState<{ quartoIds: string[]; hotelOrigem: string | null } | null>(null);
   // null = fechado; { membros } = aberto (vazio cria, preenchido edita).
@@ -126,6 +131,26 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+
+  function abrirRenomear(key: string, quartoIds: string[], nomeAtual: string | null) {
+    setRenomeando({ key, quartoIds });
+    setNomeHotelEdit(nomeAtual ?? "");
+  }
+  async function salvarNomeHotel() {
+    if (!renomeando) return;
+    const nome = nomeHotelEdit.trim();
+    if (!nome) { toast.error("Informe o nome do hotel."); return; }
+    setSalvandoNome(true);
+    const r = await renomearHotelRooming(expedicaoId, renomeando.quartoIds, nome);
+    setSalvandoNome(false);
+    if (r.ok) {
+      setRenomeando(null);
+      toast.success("Hotel renomeado");
+      router.refresh();
+    } else {
+      toast.error("Erro ao renomear", { description: r.error });
+    }
+  }
   // Divisão por grupos é OPT-IN: só vale quando a expedição tem G1 E G2 (mesma regra
   // da aba Passageiros). Sem isso, nada de grupo no board/export (nem o legado Egito).
   const grupoNomePorId = React.useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.nome])), [grupos]);
@@ -875,6 +900,30 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
             return (
               <section key={t.key} className="rounded-md border border-border">
                 <header className={`flex items-center justify-between gap-2 bg-muted/30 px-3 py-2 flex-wrap${recolhido ? "" : " border-b border-border"}`}>
+                  {renomeando?.key === t.key ? (
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <Building className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <input
+                        autoFocus
+                        value={nomeHotelEdit}
+                        onChange={(e) => setNomeHotelEdit(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); salvarNomeHotel(); }
+                          if (e.key === "Escape") setRenomeando(null);
+                        }}
+                        disabled={salvandoNome}
+                        placeholder="Nome do hotel"
+                        className="min-w-0 max-w-sm flex-1 rounded-md border border-editavel-600 bg-background px-2 py-1 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
+                      />
+                      <button type="button" onClick={salvarNomeHotel} disabled={salvandoNome} className="shrink-0 rounded-md bg-editavel-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-editavel-700 disabled:opacity-60">
+                        {salvandoNome ? "Salvando…" : "Salvar"}
+                      </button>
+                      <button type="button" onClick={() => setRenomeando(null)} disabled={salvandoNome} className="shrink-0 rounded-md border border-border px-2.5 py-1 text-[11px] font-medium hover:bg-accent">
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                  <div className="flex min-w-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => toggleTrecho(t.key)}
@@ -907,6 +956,19 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                       </span>
                     )}
                   </button>
+                    {!somenteLeitura && (
+                      <button
+                        type="button"
+                        onClick={() => abrirRenomear(t.key, t.quartos.map((q) => q.id), t.hotel_cidade)}
+                        title="Renomear hotel"
+                        aria-label="Renomear hotel"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Badge variant={sem.length === 0 ? "vinculado" : "atencao"}>
                       {paxAtivos.length - sem.length}/{paxAtivos.length} alocados
