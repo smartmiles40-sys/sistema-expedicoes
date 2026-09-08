@@ -8,6 +8,7 @@ import {
   mockPasseiosOpcionais, mockPasseioOpcionalCompras, mockExtensoes, mockPassageiroExtensao,
 } from "@/lib/mock-data";
 import { fetchAllRows } from "@/lib/data/expedicoes";
+import { ordenarVoosCronologico } from "@/lib/portal-voos";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
 import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
@@ -474,9 +475,9 @@ export async function entrarExpedAmigo(
               comprou: meusComprados.has(p.id),
             })),
         })),
-      voos_grupo: voosGrupo
-        .filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao))
-        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+      voos_grupo: ordenarVoosCronologico(
+        voosGrupo.filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao)),
+      )
         .map((v) => ({
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,
           origem: v.origem, destino: v.destino, partida: v.partida, chegada: v.chegada,

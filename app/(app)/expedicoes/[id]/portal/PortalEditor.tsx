@@ -20,6 +20,7 @@ import {
   excluirPasseioOpcional,
 } from "./actions";
 import { liberarExpedamigoTodos } from "../passageiros/expedamigo-actions";
+import { ordenarVoosCronologico } from "@/lib/portal-voos";
 import type {
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
   ExpedicaoAvisoRow, RoteiroDiaFotoRow, PasseioOpcionalRow, ExtensaoRow,
@@ -151,7 +152,7 @@ export function PortalEditor({
         descricao="Voos da expedição (ida, volta, internos)."
         icone={<Plane className="h-4 w-4" />}
         expedicaoId={expedicaoId}
-        itens={voos as unknown as Item[]}
+        itens={ordenarVoosCronologico(voos) as unknown as Item[]}
         campos={[
           { key: "trecho", label: "Trecho", type: "text", required: true, placeholder: "Ida / Volta / Interno" },
           { key: "companhia", label: "Companhia", type: "text" },
