@@ -421,6 +421,9 @@ export async function entrarExpedAmigo(
     const semExtensao = minhasExtensoes.size === 0;
     const veSegmento = (extId: string | null, apenasSemExt: boolean | null | undefined): boolean =>
       extId != null ? minhasExtensoes.has(extId) : apenasSemExt ? semExtensao : true;
+    // Voo por subgrupo (G1/G2): null = todos veem; senão só quem é do grupo (admin/row null vê tudo). Migration 0055.
+    const veGrupo = (grupoId: string | null | undefined): boolean =>
+      grupoId == null || !row || row.grupo_id === grupoId;
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)
@@ -477,7 +480,7 @@ export async function entrarExpedAmigo(
             })),
         })),
       voos_grupo: ordenarVoosCronologico(
-        voosGrupo.filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao)),
+        voosGrupo.filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao) && veGrupo(v.grupo_id)),
       )
         .map((v) => ({
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,

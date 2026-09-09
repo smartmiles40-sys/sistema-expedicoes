@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2, KeyRound, Route } from "lucide-react";
+import { Plus, Pencil, CalendarDays, Plane, Ticket, Info, MapPin, MegaphoneIcon, ImageIcon, X, Upload, BedDouble, ChevronRight, Copy, Check, Loader2, Sparkles, MessageCircle, Trash2, KeyRound, Route, Users } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -41,7 +41,7 @@ type Campo = {
 };
 
 export function PortalEditor({
-  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, extensoes, hospedagemVoucherArquivoId, isAdmin = false,
+  expedicaoId, roteiro, voos, passeios, info, avisos, fotos, passeiosOpcionais, extensoes, grupos = [], hospedagemVoucherArquivoId, isAdmin = false,
 }: {
   expedicaoId: string;
   roteiro: RoteiroDiaRow[];
@@ -52,6 +52,7 @@ export function PortalEditor({
   fotos: RoteiroDiaFotoRow[];
   passeiosOpcionais: PasseioOpcionalRow[];
   extensoes: ExtensaoRow[];
+  grupos?: { id: string; nome: string }[];
   hospedagemVoucherArquivoId: string | null;
   isAdmin?: boolean;
 }) {
@@ -87,6 +88,14 @@ export function PortalEditor({
     [extensoes],
   );
   const temExtensoes = extensoes.length > 0;
+
+  // Subgrupos (G1/G2…): voo pode ser específico de um grupo (só quem é dele vê). Migration 0055.
+  const temGrupos = grupos.length >= 2;
+  const paresGrupo = React.useMemo(
+    () => [{ value: "", label: "Todos os grupos" }, ...grupos.map((g) => ({ value: g.id, label: `Só ${g.nome}` }))],
+    [grupos],
+  );
+  const nomeGrupoById = React.useMemo(() => new Map(grupos.map((g) => [g.id, g.nome])), [grupos]);
 
   // A aba do ExpedAmigo é 100% autoria de conteúdo — para perfis somente-leitura
   // não faz sentido mostrar o editor. Mostramos um aviso e escondemos os controles.
@@ -178,6 +187,9 @@ export function PortalEditor({
           { key: "chegada", label: "Chegada", type: "text", placeholder: "13/08 03:10" },
           { key: "localizador", label: "Localizador", type: "text" },
           { key: "observacoes", label: "Observações", type: "textarea", full: true },
+          ...(temGrupos
+            ? [{ key: "grupo_id", label: "Voo de qual grupo?", type: "select" as const, full: true, opcoesPares: paresGrupo }]
+            : []),
           ...(temExtensoes
             ? [{ key: "extensao_id", label: "Faz parte de", type: "select" as const, full: true, opcoesPares: paresExtensao }]
             : []),
@@ -187,6 +199,9 @@ export function PortalEditor({
             <div className="text-[13px] font-medium">
               {String(r.trecho ?? "")}: {String(r.origem ?? "—")} → {String(r.destino ?? "—")}
               {r.arquivo_id ? <span className="text-vinculado-600"> · voucher ✓</span> : null}
+              {r.grupo_id && nomeGrupoById.get(r.grupo_id as string) ? (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-editavel-100 px-1.5 py-0.5 text-[10px] font-bold text-editavel-700"><Users className="h-2.5 w-2.5" />{nomeGrupoById.get(r.grupo_id as string)}</span>
+              ) : null}
               {segmentoLabel(r.extensao_id as string | null, r.apenas_sem_extensao as boolean | null) ? (
                 <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-lista-100 px-1.5 py-0.5 text-[10px] font-medium text-lista-700"><Route className="h-2.5 w-2.5" />{segmentoLabel(r.extensao_id as string | null, r.apenas_sem_extensao as boolean | null)}</span>
               ) : null}

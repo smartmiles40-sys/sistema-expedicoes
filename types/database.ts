@@ -462,6 +462,8 @@ export type ExpedicaoVooRow = {
   extensao_id: string | null;
   /** true = só aparece para quem NÃO contratou extensão (ex.: voo de volta do grupo base). Migration 0053. */
   apenas_sem_extensao: boolean;
+  /** Subgrupo (G1/G2) a que este voo pertence (null = todos veem). Migration 0055. */
+  grupo_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;

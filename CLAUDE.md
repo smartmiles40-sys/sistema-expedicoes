@@ -492,6 +492,14 @@ role**, **só leitura**.
     alocação/numeração). Seletor "Faz parte de" nos drawers Novo quarto / Quartos
     automáticos (prefill carrega a extensão do hotel); badge roxo (`Route`) no header e no
     título do export. `listContratacoesExtensao` alimenta o board via `rooming/page.tsx`.
+- **Voo por subgrupo G1/G2 (migration 0055):** coluna `expedicao_voos.grupo_id`
+  (FK `grupos_expedicao`, on delete set null) — `null` = voo compartilhado (todos veem);
+  preenchido = só quem é daquele grupo vê no portal. Caso Tailândia 2026: uma expedição
+  junta 2 grupos que voam em voos diferentes. No editor (aba ExpedAmigo → Voos de grupo)
+  um seletor **"Voo de qual grupo?"** (Todos / G1 / G2), só aparece se a expedição tem
+  ≥2 `grupos_expedicao`; badge azul (`Users`) no voo. No portal `veGrupo(grupo_id)` filtra
+  (`entrarExpedAmigo`): `null` ou `row.grupo_id === grupo_id` (admin/row null vê todos).
+  `PortalEditor` recebe `grupos` da `portal/page.tsx` (`listGruposExpedicao`).
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.
