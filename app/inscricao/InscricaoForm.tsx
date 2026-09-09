@@ -10,7 +10,8 @@ import { cn, formatDate, mascaraTelefone } from "@/lib/utils";
 import { mascaraCpf } from "@/lib/cpf";
 import { SaudeCampos, PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
 import type { SaudePassageiro } from "@/types/database";
-import { enviarInscricao, identificarInscricao, type ExpedicaoOpcao } from "./actions";
+import { enviarInscricao, identificarInscricao, identificarPorToken, type ExpedicaoOpcao } from "./actions";
+import type { ValoresInscricao } from "@/lib/inscricao/core";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 
 /** Folga sob o bodySizeLimit da server action (32 MB) — deixa margem pro JSON + multipart. */
@@ -78,7 +79,7 @@ const CAMISETAS = ["PP", "P", "M", "G", "GG", "XG", "XXG"];
 const DESCRICOES_GRUPO = ["Extrovertido(a), puxo conversa", "Equilibrado(a)", "Mais reservado(a), observo primeiro", "Depende do momento"];
 const ANIMA_OPCOES = ["Paisagens e lugares", "Pessoas e conexões", "Gastronomia", "Cultura e história", "Aventura", "Sair da rotina / relaxar"];
 
-export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) {
+export function InscricaoForm({ expedicoes, token = null }: { expedicoes: ExpedicaoOpcao[]; token?: string | null }) {
   const [fase, setFase] = React.useState<"identificacao" | "completar" | "conflito">("identificacao");
   const [expedicaoId, setExpedicaoId] = React.useState("");
   const [cpf, setCpf] = React.useState("");
@@ -175,6 +176,64 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
     return faltas;
   }
 
+  // Aplica os dados reconhecidos (pré-preenche). Reusado pelo identificar normal e pelo token.
+  function aplicarReconhecido(v: ValoresInscricao, temAnexo: boolean) {
+    setTemos(new Set());
+    setF({
+      nome_completo: v.nome_completo, email: v.email, telefone: v.telefone,
+      passaporte: v.passaporte, validade_passaporte: v.validade_passaporte,
+      endereco_cep: v.endereco_cep, endereco_rua: v.endereco_rua, endereco_numero: v.endereco_numero,
+      endereco_complemento: v.endereco_complemento, endereco_bairro: v.endereco_bairro,
+      endereco_cidade: v.endereco_cidade, endereco_estado: v.endereco_estado,
+      contato_emergencia_nome: v.contato_emergencia_nome, contato_emergencia_fone: v.contato_emergencia_fone,
+      contato_emergencia_vinculo: v.contato_emergencia_vinculo,
+      paises_visitados: v.paises_visitados, acompanhante_nome: v.acompanhante_nome,
+      acompanhante_vinculo: v.acompanhante_vinculo, acompanhante_dividir_com: v.acompanhante_dividir_com,
+      profissao: v.profissao, instagram: v.instagram, musica: v.musica, significado: v.significado,
+    });
+    setPrefAssento(v.pref_marcar_assento);
+    setPrefUpgrade(v.pref_upgrade_classe);
+    setJaViajou(v.ja_viajou_internacional);
+    setAcompanhado(v.acompanhante_nome ? true : null);
+    setDivideQuarto(v.acompanhante_divide_quarto);
+    setSaude(v.saude ?? {});
+    setCamiseta(v.camiseta || null);
+    setDescricaoGrupo(v.descricao_grupo || null);
+    setAnimaExpedicao(v.anima_expedicao || null);
+    setPossuiPassaporte(v.passaporte || v.validade_passaporte ? true : null);
+    setTemPassaporteAnexo(temAnexo);
+    setReconhecido(true);
+  }
+  function aplicarNovo() {
+    setTemos(new Set());
+    setF({ ...CAMPOS_TEXTO_VAZIO });
+    setCamiseta(null); setDescricaoGrupo(null); setAnimaExpedicao(null);
+    setTemPassaporteAnexo(false);
+    setReconhecido(false);
+  }
+
+  // Link vindo do PORTAL (?t=token): a pessoa já se autenticou lá (CPF + senha), então
+  // carrega os dados dela DIRETO, sem pedir data de nascimento.
+  React.useEffect(() => {
+    if (!token) return;
+    let ativo = true;
+    setBusy(true);
+    identificarPorToken(token)
+      .then((r) => {
+        if (!ativo) return;
+        if (!r.ok) { toast.error(r.error); return; }
+        setCpf(mascaraCpf(r.cpf));
+        setExpedicaoId(r.expedicaoId);
+        if (r.existe && r.valores) aplicarReconhecido(r.valores, r.temPassaporteAnexo);
+        else aplicarNovo();
+        setPasso(0);
+        setFase("completar");
+      })
+      .finally(() => { if (ativo) setBusy(false); });
+    return () => { ativo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   async function identificar() {
     if (!expedicaoId) return toast.error("Selecione a expedição.");
     if (mascaraCpf(cpf).replace(/\D/g, "").length !== 11) return toast.error("Informe um CPF válido.");
@@ -184,40 +243,8 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
       const r = await identificarInscricao(expedicaoId, cpf, nascimento);
       if (!r.ok) return toast.error(r.error);
       if (r.existe && r.conflito) return setFase("conflito");
-      // Mostra TODOS os campos (temos vazio); se achamos o cadastro, pré-preenche.
-      setTemos(new Set());
-      if (r.existe) {
-        const v = r.valores;
-        setF({
-          nome_completo: v.nome_completo, email: v.email, telefone: v.telefone,
-          passaporte: v.passaporte, validade_passaporte: v.validade_passaporte,
-          endereco_cep: v.endereco_cep, endereco_rua: v.endereco_rua, endereco_numero: v.endereco_numero,
-          endereco_complemento: v.endereco_complemento, endereco_bairro: v.endereco_bairro,
-          endereco_cidade: v.endereco_cidade, endereco_estado: v.endereco_estado,
-          contato_emergencia_nome: v.contato_emergencia_nome, contato_emergencia_fone: v.contato_emergencia_fone,
-          contato_emergencia_vinculo: v.contato_emergencia_vinculo,
-          paises_visitados: v.paises_visitados, acompanhante_nome: v.acompanhante_nome,
-          acompanhante_vinculo: v.acompanhante_vinculo, acompanhante_dividir_com: v.acompanhante_dividir_com,
-          profissao: v.profissao, instagram: v.instagram, musica: v.musica, significado: v.significado,
-        });
-        setPrefAssento(v.pref_marcar_assento);
-        setPrefUpgrade(v.pref_upgrade_classe);
-        setJaViajou(v.ja_viajou_internacional);
-        setAcompanhado(v.acompanhante_nome ? true : null);
-        setDivideQuarto(v.acompanhante_divide_quarto);
-        setSaude(v.saude ?? {});
-        setCamiseta(v.camiseta || null);
-        setDescricaoGrupo(v.descricao_grupo || null);
-        setAnimaExpedicao(v.anima_expedicao || null);
-        setPossuiPassaporte(v.passaporte || v.validade_passaporte ? true : null);
-        setTemPassaporteAnexo(r.temPassaporteAnexo);
-        setReconhecido(true);
-      } else {
-        setF({ ...CAMPOS_TEXTO_VAZIO });
-        setCamiseta(null); setDescricaoGrupo(null); setAnimaExpedicao(null);
-        setTemPassaporteAnexo(false);
-        setReconhecido(false);
-      }
+      if (r.existe) aplicarReconhecido(r.valores, r.temPassaporteAnexo);
+      else aplicarNovo();
       setPasso(0);
       setFase("completar");
     } finally {
@@ -324,6 +351,18 @@ export function InscricaoForm({ expedicoes }: { expedicoes: ExpedicaoOpcao[] }) 
             <Button variant="outline" className="mt-4" onClick={() => setFase("identificacao")}>Voltar</Button>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  // Link do portal: enquanto o token carrega os dados, evita piscar o form de CPF.
+  if (token && busy && fase === "identificacao") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <ShieldCheck className="h-7 w-7 animate-pulse text-foreground" />
+          <span className="text-[13px]">Carregando seus dados…</span>
+        </div>
       </div>
     );
   }

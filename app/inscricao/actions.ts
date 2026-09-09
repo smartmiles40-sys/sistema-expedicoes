@@ -11,6 +11,7 @@ import {
   essenciaisFaltando, validarArquivo, safeName, salvarPerfilGlobalInscricao,
   type Pax, type ValoresInscricao,
 } from "@/lib/inscricao/core";
+import { verificarTokenInscricao } from "@/lib/inscricao/token";
 import type { ExpedicaoRow, InscricaoPendenteRow, Json } from "@/types/database";
 import type { CategoriaArquivo } from "@/lib/constants";
 
@@ -65,6 +66,31 @@ export async function identificarInscricao(
   const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
   return {
     ok: true, existe: true, conflito: false, temos,
+    temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
+    valores: montarValores(base, existente),
+  };
+}
+
+export type IdentificacaoToken =
+  | { ok: false; error: string }
+  | { ok: true; cpf: string; expedicaoId: string; existe: boolean; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao | null };
+
+/**
+ * Identificação vinda do PORTAL (link com token). Pula o portão de nascimento —
+ * a pessoa já se autenticou no portal (CPF + senha). Retorna os dados pré-preenchidos.
+ */
+export async function identificarPorToken(token: string): Promise<IdentificacaoToken> {
+  const v = verificarTokenInscricao(token);
+  if (!v) return { ok: false, error: "Link expirado ou inválido. Use o formulário normalmente." };
+  const linhas = await acharLinhasPorCpf(v.cpf);
+  const existente = linhas.find((l) => l.expedicao_id === v.expedicaoId) ?? null;
+  const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
+  if (!base) {
+    return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null };
+  }
+  const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
+  return {
+    ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: true, temos,
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
     valores: montarValores(base, existente),
   };

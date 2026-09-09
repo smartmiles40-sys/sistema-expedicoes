@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { formatDate, daysUntil, cn } from "@/lib/utils";
 import {
-  entrarExpedAmigo, definirSenhaExpedAmigo, registrarAcessoExpedamigo,
+  entrarExpedAmigo, definirSenhaExpedAmigo, registrarAcessoExpedamigo, gerarTokenInscricao,
   type AmigoDados, type AmigoExpedicao, type AmigoRoteiroDia,
 } from "./actions";
 import { Logo } from "@/components/ui/Logo";
@@ -282,7 +282,7 @@ export default function AmigoPage() {
 
       {selecionada ? (
         <main>
-          <ViagemExperiencia exp={selecionada} nome={dados.nome} cpf={cpf} />
+          <ViagemExperiencia exp={selecionada} nome={dados.nome} cpf={cpf} senha={senha} />
           <footer className="bg-brand-gradient px-4 py-12 text-center text-white">
             <p className="font-display text-2xl font-semibold">Nós cuidamos de tudo. Você só embarca.</p>
             <p className="mx-auto mt-2 max-w-md text-[13px] text-white/70">
@@ -300,8 +300,21 @@ export default function AmigoPage() {
   );
 }
 
-function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: string; cpf: string }) {
+function ViagemExperiencia({ exp, nome, cpf, senha }: { exp: AmigoExpedicao; nome: string; cpf: string; senha: string }) {
   const [gerandoPdf, setGerandoPdf] = React.useState(false);
+  const [gerandoLink, setGerandoLink] = React.useState(false);
+
+  // Leva ao formulário de inscrição JÁ com os dados: gera um token seguro (a senha do
+  // portal autentica) e abre /inscricao?t=... — sem a pessoa redigitar nada.
+  async function irParaInscricao() {
+    setGerandoLink(true);
+    try {
+      const r = await gerarTokenInscricao(cpf, senha, exp.id);
+      window.location.href = r.ok ? `/inscricao?t=${encodeURIComponent(r.token)}` : "/inscricao";
+    } catch {
+      window.location.href = "/inscricao";
+    }
+  }
   const dias = daysUntil(exp.data_embarque);
   // Foto de capa do header: a imagem icônica do destino (Machu Picchu, no Peru);
   // se o destino não tiver imagem mapeada, cai na 1ª foto do roteiro.
@@ -428,12 +441,14 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
                 <p className="mt-1 text-[13px] leading-relaxed text-white/80">
                   Notamos que você ainda não preencheu (ou não atualizou) seus dados de viagem. Leva 5 minutos e é essencial pra sua expedição.
                 </p>
-                <a
-                  href="/inscricao"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#f6c667] px-5 py-2.5 text-[13px] font-semibold text-[var(--brand-dark)] transition-transform hover:scale-[1.02]"
+                <button
+                  type="button"
+                  onClick={irParaInscricao}
+                  disabled={gerandoLink}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#f6c667] px-5 py-2.5 text-[13px] font-semibold text-[var(--brand-dark)] transition-transform hover:scale-[1.02] disabled:opacity-70"
                 >
-                  Preencher minha inscrição <ChevronRight className="h-4 w-4" />
-                </a>
+                  {gerandoLink ? "Abrindo…" : "Preencher minha inscrição"} <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>

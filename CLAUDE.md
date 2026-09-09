@@ -601,6 +601,13 @@ não-nulo dos `CAMPOS_PESSOAIS_CARRY`). O **núcleo compartilhado** vive em
 função `materializarInscricao`. `app/inscricao/actions.ts` tem só `identificar`/`enviar`/
 `listExpedicoes`.
 
+- **Aviso + link direto do PORTAL:** no `/amigo`, quem está **sem `perfil_viajante`**
+  (não fez o formulário) vê um banner "Complete sua inscrição". O botão gera um **token
+  assinado** (`lib/inscricao/token.ts`, HMAC + validade 30 min) via `gerarTokenInscricao`
+  (reverifica a senha do portal) e abre **`/inscricao?t=...`**. A `InscricaoPage` lê o `t`,
+  e `identificarPorToken` carrega os dados **JÁ pré-preenchidos pulando o portão de
+  nascimento** (a senha do portal já autenticou — auth mais forte). Sinal de "não fez a
+  inscrição" no portal = `inscricao_incompleta` (`AmigoExpedicao`, perfil_viajante vazio).
 - **Reconhecimento + edição (P):** `identificarInscricao` devolve os **valores**
   guardados (`montarValores`), não só rótulos — o form **pré-preenche** e a pessoa
   **edita**. Portão de privacidade = CPF + nascimento (nascimento divergente → `conflito`,

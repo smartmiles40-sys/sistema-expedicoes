@@ -12,6 +12,7 @@ import { ordenarVoosCronologico } from "@/lib/portal-voos";
 import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
 import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
+import { assinarTokenInscricao } from "@/lib/inscricao/token";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
@@ -618,6 +619,33 @@ export async function registrarAcessoExpedamigo(
   } catch {
     /* best-effort */
   }
+}
+
+/**
+ * Gera um token curto pra levar o passageiro do portal ao formulário de inscrição
+ * JÁ com os dados dele (link `/inscricao?t=...`). Reverifica a senha do portal —
+ * só quem está autenticado gera token. A senha aqui é a MESMA já usada no login.
+ */
+export async function gerarTokenInscricao(
+  cpfRaw: string,
+  senhaRaw: string,
+  expedicaoId: string,
+): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  const cpf = soDigitosCpf(cpfRaw ?? "");
+  const senha = senhaRaw ?? "";
+  if (cpf.length !== 11) return { ok: false, error: "CPF inválido." };
+  if (!expedicaoId) return { ok: false, error: "Expedição inválida." };
+  if (DEV_USE_MOCK_DATA) return { ok: true, token: assinarTokenInscricao(cpf, expedicaoId) };
+
+  const sb = createServiceRoleClient();
+  const { data } = await sb.from("acesso_senhas").select("senha_hash,senha_provisoria").eq("cpf", cpf).maybeSingle();
+  const hashSalvo = (data as { senha_hash: string | null } | null)?.senha_hash ?? null;
+  const provisoria = (data as { senha_provisoria: string | null } | null)?.senha_provisoria ?? null;
+  let okSenha = false;
+  if (hashSalvo) okSenha = (await hashSenhaAcesso(cpf, senha)) === hashSalvo;
+  else if (provisoria) okSenha = senha === provisoria;
+  if (!okSenha) return { ok: false, error: "Sessão expirada. Entre no portal de novo." };
+  return { ok: true, token: assinarTokenInscricao(cpf, expedicaoId) };
 }
 
 /** Define/troca a senha da pessoa (por CPF). Confere a senha atual antes. */
