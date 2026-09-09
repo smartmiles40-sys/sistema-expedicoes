@@ -158,19 +158,20 @@ export async function entrarExpedAmigo(
 
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
-  let links: LinkExpedicaoRow[];
-  let quartos: QuartoRow[];
-  let alocacoes: AlocacaoQuartoRow[];
-  let roteiro: RoteiroDiaRow[];
-  let voosGrupo: ExpedicaoVooRow[];
-  let passeios: ExpedicaoPasseioRow[];
-  let infos: ExpedicaoInfoRow[];
-  let avisosAll: ExpedicaoAvisoRow[];
-  let rtFotos: RoteiroDiaFotoRow[];
-  let passeiosOpc: PasseioOpcionalRow[];
-  let comprasOpc: PasseioOpcionalCompraRow[];
-  let extensoesAll: ExtensaoRow[];
-  let contratacoes: PassageiroExtensaoRow[];
+  // Conteúdo (roteiro/voos/…) — em PROD carrega só das expedições da pessoa (Fase 2, abaixo).
+  let links: LinkExpedicaoRow[] = [];
+  let quartos: QuartoRow[] = [];
+  let alocacoes: AlocacaoQuartoRow[] = [];
+  let roteiro: RoteiroDiaRow[] = [];
+  let voosGrupo: ExpedicaoVooRow[] = [];
+  let passeios: ExpedicaoPasseioRow[] = [];
+  let infos: ExpedicaoInfoRow[] = [];
+  let avisosAll: ExpedicaoAvisoRow[] = [];
+  let rtFotos: RoteiroDiaFotoRow[] = [];
+  let passeiosOpc: PasseioOpcionalRow[] = [];
+  let comprasOpc: PasseioOpcionalCompraRow[] = [];
+  let extensoesAll: ExtensaoRow[] = [];
+  let contratacoes: PassageiroExtensaoRow[] = [];
 
   const sb = DEV_USE_MOCK_DATA ? null : createServiceRoleClient();
 
@@ -192,38 +193,14 @@ export async function entrarExpedAmigo(
     contratacoes = mockPassageiroExtensao;
   } else {
     const cli = sb!;
-    const [paxAll, er, linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll, poAll, pocAll, extAll, ctAll] = await Promise.all([
+    // Fase 1: só o essencial pra identificar a pessoa e descobrir as expedições dela.
+    // O conteúdo (roteiro/voos/fotos/…) é carregado depois, SÓ dessas expedições (Fase 2).
+    const [paxAll, er] = await Promise.all([
       fetchAllRows<PassageiroRow>((from, to) => cli.from("passageiros").select("*").order("id").range(from, to)),
       cli.from("expedicoes").select("*"),
-      fetchAllRows<LinkExpedicaoRow>((from, to) => cli.from("links_expedicao").select("*").order("id").range(from, to)),
-      fetchAllRows<QuartoRow>((from, to) => cli.from("quartos").select("*").order("id").range(from, to)),
-      fetchAllRows<AlocacaoQuartoRow>((from, to) => cli.from("passageiro_quarto").select("*").order("id").range(from, to)),
-      fetchAllRows<RoteiroDiaRow>((from, to) => cli.from("roteiro_dias").select("*").order("id").range(from, to)),
-      fetchAllRows<ExpedicaoVooRow>((from, to) => cli.from("expedicao_voos").select("*").order("id").range(from, to)),
-      fetchAllRows<ExpedicaoPasseioRow>((from, to) => cli.from("expedicao_passeios").select("*").order("id").range(from, to)),
-      fetchAllRows<ExpedicaoInfoRow>((from, to) => cli.from("expedicao_info").select("*").order("id").range(from, to)),
-      fetchAllRows<ExpedicaoAvisoRow>((from, to) => cli.from("expedicao_avisos").select("*").order("id").range(from, to)),
-      fetchAllRows<RoteiroDiaFotoRow>((from, to) => cli.from("roteiro_dia_fotos").select("*").order("id").range(from, to)),
-      fetchAllRows<PasseioOpcionalRow>((from, to) => cli.from("passeios_opcionais").select("*").order("id").range(from, to)),
-      fetchAllRows<PasseioOpcionalCompraRow>((from, to) => cli.from("passeio_opcional_compras").select("*").order("id").range(from, to)),
-      fetchAllRows<ExtensaoRow>((from, to) => cli.from("extensoes").select("*").order("id").range(from, to)),
-      fetchAllRows<PassageiroExtensaoRow>((from, to) => cli.from("passageiro_extensao").select("*").order("id").range(from, to)),
     ]);
     pax = paxAll;
     exps = (er.data ?? []) as ExpedicaoRow[];
-    links = linkAll;
-    quartos = qAll;
-    alocacoes = alocAll;
-    roteiro = rtAll;
-    voosGrupo = voAll;
-    passeios = psAll;
-    infos = inAll;
-    avisosAll = avAll;
-    rtFotos = ftAll;
-    passeiosOpc = poAll;
-    comprasOpc = pocAll;
-    extensoesAll = extAll;
-    contratacoes = ctAll;
   }
 
   // 1) Acha as linhas da pessoa pelo CPF. Admin não precisa ser passageiro.
@@ -279,7 +256,6 @@ export async function entrarExpedAmigo(
   //    inclusive as antigas. Admin master continua vendo as futuras não-canceladas.
   const hoje = new Date().toISOString().slice(0, 10);
   const expById = new Map(exps.map((e) => [e.id, e]));
-  const quartoById = new Map(quartos.map((q) => [q.id, q]));
 
   const cancelada = (e: ExpedicaoRow | undefined): boolean => !e || e.status === "Cancelada";
 
@@ -312,6 +288,37 @@ export async function entrarExpedAmigo(
 
   // Ingressos (categoria "Bilhetes") das linhas da PRÓPRIA pessoa — só os dela.
   const meusIds = minhasRows.map((r) => r.id);
+
+  // Fase 2 (PROD): carrega o CONTEÚDO só das expedições que a pessoa vê (expIdsFuturas)
+  // e os dados pessoais só das linhas dela (meusIds) — em vez de baixar a base inteira de
+  // TODAS as expedições no login. O resto do código já filtra por expedicao_id, então o
+  // resultado é idêntico; só carrega muito menos.
+  if (!DEV_USE_MOCK_DATA && sb) {
+    const cli = sb;
+    const expIds = [...expIdsFuturas];
+    const naExp = expIds.length > 0;
+    const noPax = meusIds.length > 0;
+    const [linkAll, qAll, alocAll, rtAll, voAll, psAll, inAll, avAll, ftAll, poAll, pocAll, extAll, ctAll] = await Promise.all([
+      naExp ? fetchAllRows<LinkExpedicaoRow>((f, t) => cli.from("links_expedicao").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<LinkExpedicaoRow[]>([]),
+      naExp ? fetchAllRows<QuartoRow>((f, t) => cli.from("quartos").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<QuartoRow[]>([]),
+      noPax ? fetchAllRows<AlocacaoQuartoRow>((f, t) => cli.from("passageiro_quarto").select("*").in("passageiro_id", meusIds).order("id").range(f, t)) : Promise.resolve<AlocacaoQuartoRow[]>([]),
+      naExp ? fetchAllRows<RoteiroDiaRow>((f, t) => cli.from("roteiro_dias").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<RoteiroDiaRow[]>([]),
+      naExp ? fetchAllRows<ExpedicaoVooRow>((f, t) => cli.from("expedicao_voos").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<ExpedicaoVooRow[]>([]),
+      naExp ? fetchAllRows<ExpedicaoPasseioRow>((f, t) => cli.from("expedicao_passeios").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<ExpedicaoPasseioRow[]>([]),
+      naExp ? fetchAllRows<ExpedicaoInfoRow>((f, t) => cli.from("expedicao_info").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<ExpedicaoInfoRow[]>([]),
+      naExp ? fetchAllRows<ExpedicaoAvisoRow>((f, t) => cli.from("expedicao_avisos").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<ExpedicaoAvisoRow[]>([]),
+      naExp ? fetchAllRows<RoteiroDiaFotoRow>((f, t) => cli.from("roteiro_dia_fotos").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<RoteiroDiaFotoRow[]>([]),
+      naExp ? fetchAllRows<PasseioOpcionalRow>((f, t) => cli.from("passeios_opcionais").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<PasseioOpcionalRow[]>([]),
+      noPax ? fetchAllRows<PasseioOpcionalCompraRow>((f, t) => cli.from("passeio_opcional_compras").select("*").in("passageiro_id", meusIds).order("id").range(f, t)) : Promise.resolve<PasseioOpcionalCompraRow[]>([]),
+      naExp ? fetchAllRows<ExtensaoRow>((f, t) => cli.from("extensoes").select("*").in("expedicao_id", expIds).order("id").range(f, t)) : Promise.resolve<ExtensaoRow[]>([]),
+      noPax ? fetchAllRows<PassageiroExtensaoRow>((f, t) => cli.from("passageiro_extensao").select("*").in("passageiro_id", meusIds).order("id").range(f, t)) : Promise.resolve<PassageiroExtensaoRow[]>([]),
+    ]);
+    links = linkAll; quartos = qAll; alocacoes = alocAll; roteiro = rtAll; voosGrupo = voAll;
+    passeios = psAll; infos = inAll; avisosAll = avAll; rtFotos = ftAll; passeiosOpc = poAll;
+    comprasOpc = pocAll; extensoesAll = extAll; contratacoes = ctAll;
+  }
+  const quartoById = new Map(quartos.map((q) => [q.id, q]));
+
   let ingressoArqs: IngressoArq[] = [];
   if (DEV_USE_MOCK_DATA) {
     ingressoArqs = (await listArquivosMock())
