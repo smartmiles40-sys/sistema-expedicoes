@@ -123,6 +123,8 @@ export type AmigoExpedicao = {
   cartoes_embarque: AmigoIngresso[];
   /** Extensões contratadas por este passageiro — selo/nota no topo (migration 0052). */
   extensoes_contratadas: AmigoExtensao[];
+  /** true = passageiro ainda não preencheu o formulário de inscrição (sem perfil_viajante). */
+  inscricao_incompleta: boolean;
 };
 export type AmigoDados = {
   nome: string;
@@ -558,6 +560,11 @@ export async function entrarExpedAmigo(
           descricao: x.descricao,
           hospedagem_voucher_url: x.hospedagem_voucher_arquivo_id ? fotoUrl.get(x.hospedagem_voucher_arquivo_id) ?? null : null,
         })),
+      // "Não realizou a inscrição": sem perfil_viajante (só o formulário /inscricao o preenche).
+      // Admin (row null) não vê o aviso.
+      inscricao_incompleta: !!row && !(
+        row.perfil_viajante && (typeof row.perfil_viajante !== "object" || Object.keys(row.perfil_viajante).length > 0)
+      ),
     });
   }
 
