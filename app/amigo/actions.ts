@@ -394,14 +394,24 @@ export async function entrarExpedAmigo(
     } else if (sb && idsRelevantes.size > 0) {
       const ids = [...idsRelevantes];
       const { data: arqs } = await sb.from("arquivos").select("id,storage_path").in("id", ids);
-      const pathById = new Map(
-        ((arqs ?? []) as { id: string; storage_path: string }[]).map((a) => [a.id, a.storage_path]),
+      const arqRows = (arqs ?? []) as { id: string; storage_path: string }[];
+      const idByPath = new Map(arqRows.map((a) => [a.storage_path, a.id]));
+      const paths = arqRows.map((a) => a.storage_path);
+      // URLs assinadas em LOTE e em PARALELO (antes: 1 await por arquivo, sequencial —
+      // deixava o login do master lento, pois ele vê as fotos de TODAS as futuras). 7 dias.
+      const LOTE = 100;
+      const lotes: string[][] = [];
+      for (let i = 0; i < paths.length; i += LOTE) lotes.push(paths.slice(i, i + LOTE));
+      const resultados = await Promise.all(
+        lotes.map((lote) => sb.storage.from(BUCKET).createSignedUrls(lote, 604800)),
       );
-      for (const id of ids) {
-        const sp = pathById.get(id);
-        if (!sp) continue;
-        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 604800); // 7 dias — o link do PDF sobrevive além da sessão
-        if (data?.signedUrl) fotoUrl.set(id, data.signedUrl);
+      for (const res of resultados) {
+        for (const it of res.data ?? []) {
+          if (it.signedUrl && it.path) {
+            const id = idByPath.get(it.path);
+            if (id) fotoUrl.set(id, it.signedUrl);
+          }
+        }
       }
     }
   }
