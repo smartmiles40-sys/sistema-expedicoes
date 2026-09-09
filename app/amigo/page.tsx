@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   CompassIcon, MapPin, Calendar, Plane, LinkIcon, BedDouble, ExternalLink,
   CalendarDays, Ticket, Info, ChevronRight, Megaphone, Download, ArrowLeft,
-  Sparkles, Check, MessageCircle, ShieldCheck, AlertTriangle,
+  Sparkles, Check, MessageCircle, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -418,27 +418,6 @@ function ViagemExperiencia({ exp, nome, cpf }: { exp: AmigoExpedicao; nome: stri
       <div className="relative bg-[var(--portal-bg)]">
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <div className="relative mx-auto max-w-3xl space-y-10 px-4 py-12">
-        {/* Aviso: inscrição ainda não realizada (sem perfil_viajante) */}
-        {exp.inscricao_incompleta && (
-          <div className="rounded-2xl border border-[#f6c667]/45 bg-[#f6c667]/12 p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#f6c667]" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-bold text-[#fbe4b0]">Complete sua inscrição</div>
-                <p className="mt-1 text-[13px] leading-relaxed text-white/80">
-                  Notamos que você ainda não preencheu (ou não atualizou) seus dados de viagem. Leva 5 minutos e é essencial pra sua expedição.
-                </p>
-                <a
-                  href="/inscricao"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#f6c667] px-5 py-2.5 text-[13px] font-semibold text-[var(--brand-dark)] transition-transform hover:scale-[1.02]"
-                >
-                  Preencher minha inscrição <ChevronRight className="h-4 w-4" />
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Extensão contratada — selo no topo (migration 0052) */}
         {exp.extensoes_contratadas.length > 0 && (
           <div className="rounded-2xl border border-[var(--brand-lime)]/40 bg-[var(--brand-lime)]/10 p-5 text-white">
