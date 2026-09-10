@@ -184,12 +184,21 @@ export async function buscarDadosLider(
     const fotoIds = [...new Set(pax.map((p) => p.foto_arquivo_id).filter((id): id is string => !!id))];
     if (fotoIds.length > 0) {
       const { data: arqFotos } = await sb.from("arquivos").select("id,storage_path").in("id", fotoIds);
-      const pathById = new Map(((arqFotos ?? []) as { id: string; storage_path: string }[]).map((a) => [a.id, a.storage_path]));
-      for (const id of fotoIds) {
-        const sp = pathById.get(id);
-        if (!sp) continue;
-        const { data } = await sb.storage.from(BUCKET).createSignedUrl(sp, 604800); // 7 dias
-        if (data?.signedUrl) fotoUrl.set(id, data.signedUrl);
+      const rows = (arqFotos ?? []) as { id: string; storage_path: string }[];
+      const idByPath = new Map(rows.map((a) => [a.storage_path, a.id]));
+      const paths = rows.map((a) => a.storage_path);
+      // URLs assinadas em LOTE (antes: 1 await por foto, sequencial — deixava o login lento). 7 dias.
+      const LOTE = 100;
+      const lotes: string[][] = [];
+      for (let i = 0; i < paths.length; i += LOTE) lotes.push(paths.slice(i, i + LOTE));
+      const resultados = await Promise.all(lotes.map((l) => sb.storage.from(BUCKET).createSignedUrls(l, 604800)));
+      for (const res of resultados) {
+        for (const it of res.data ?? []) {
+          if (it.signedUrl && it.path) {
+            const id = idByPath.get(it.path);
+            if (id) fotoUrl.set(id, it.signedUrl);
+          }
+        }
       }
     }
   }
@@ -410,25 +419,25 @@ export async function linkAssinadoLider(
   const cpf = soDigitosCpf(cpfRaw ?? "");
   if (cpf.length !== 11) return { ok: false, error: "CPF inválido" };
 
-  // Sem isso, o CPF sozinho — que é dado semi-público — liberava qualquer
-  // documento da expedição (inclusive scans de passaporte) por esta action.
-  const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "");
-  if (!conf.ok) return { ok: false, error: conf.error };
-
+  // A senha é reconferida a cada clique (o CPF sozinho é semi-público e liberaria
+  // qualquer documento, inclusive scans de passaporte).
   if (DEV_USE_MOCK_DATA) {
+    const conf = await conferirSenhaAcesso(cpf, senhaRaw ?? "");
+    if (!conf.ok) return { ok: false, error: conf.error };
     const arq = (await listArquivosMock()).find((a) => a.id === arquivoId);
     if (!arq) return { ok: false, error: "Arquivo não encontrado" };
     return { ok: true, url: download ? `/api/arquivos/${arquivoId}/download` : `/api/arquivos/${arquivoId}/download?inline=1` };
   }
 
   const sb = createServiceRoleClient();
-  const { data: arq } = await sb
-    .from("arquivos")
-    .select("storage_path,nome,expedicao_id")
-    .eq("id", arquivoId)
-    .maybeSingle();
-  if (!arq) return { ok: false, error: "Arquivo não encontrado" };
-  const a = arq as { storage_path: string; nome: string; expedicao_id: string };
+  // Confere a senha e busca o arquivo EM PARALELO (antes eram 2 idas ao banco em fila).
+  const [conf, arqRes] = await Promise.all([
+    conferirSenhaAcesso(cpf, senhaRaw ?? ""),
+    sb.from("arquivos").select("storage_path,nome,expedicao_id").eq("id", arquivoId).maybeSingle(),
+  ]);
+  if (!conf.ok) return { ok: false, error: conf.error };
+  const a = arqRes.data as { storage_path: string; nome: string; expedicao_id: string } | null;
+  if (!a) return { ok: false, error: "Arquivo não encontrado" };
 
   // Autoriza: Master vê tudo; senão o CPF tem que ser líder da expedição dona do arquivo.
   let autorizado = MASTERS[cpf] !== undefined;

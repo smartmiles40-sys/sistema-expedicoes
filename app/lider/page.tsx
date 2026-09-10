@@ -103,11 +103,13 @@ export default function LiderPage() {
   }
 
   async function verDoc(arq: LiderArquivo, download = false) {
+    const tid = toast.loading(download ? "Preparando download…" : "Abrindo documento…");
     const r = await linkAssinadoLider(cpf, senha, arq.id, download);
     if (!r.ok) {
-      toast.error("Não foi possível abrir", { description: r.error });
+      toast.error("Não foi possível abrir", { description: r.error, id: tid });
       return;
     }
+    toast.dismiss(tid);
     if (download) {
       window.open(r.url, "_blank", "noopener");
       return;
