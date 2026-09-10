@@ -73,7 +73,7 @@ export async function identificarInscricao(
 
 export type IdentificacaoToken =
   | { ok: false; error: string }
-  | { ok: true; cpf: string; expedicaoId: string; existe: boolean; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao | null };
+  | { ok: true; cpf: string; expedicaoId: string; existe: boolean; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao | null; dataNascimento: string | null };
 
 /**
  * Identificação vinda do PORTAL (link com token). Pula o portão de nascimento —
@@ -86,13 +86,17 @@ export async function identificarPorToken(token: string): Promise<IdentificacaoT
   const existente = linhas.find((l) => l.expedicao_id === v.expedicaoId) ?? null;
   const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
   if (!base) {
-    return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null };
+    return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null, dataNascimento: null };
   }
   const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
+  // A data de nascimento vem junto: o portão de nascimento foi pulado (a pessoa já
+  // se autenticou no portal), então o form precisa dela pra o envio não falhar.
+  const dataNascimento = base.data_nascimento ? String(base.data_nascimento).slice(0, 10) : null;
   return {
     ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: true, temos,
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
     valores: montarValores(base, existente),
+    dataNascimento,
   };
 }
 

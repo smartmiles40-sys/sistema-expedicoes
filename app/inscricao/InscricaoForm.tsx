@@ -224,10 +224,19 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
         if (!r.ok) { toast.error(r.error); return; }
         setCpf(mascaraCpf(r.cpf));
         setExpedicaoId(r.expedicaoId);
-        if (r.existe && r.valores) aplicarReconhecido(r.valores, r.temPassaporteAnexo);
-        else aplicarNovo();
-        setPasso(0);
-        setFase("completar");
+        if (r.dataNascimento) {
+          // O portão de nascimento é pulado no token — traga a data do sistema pra
+          // o envio não falhar na validação do servidor.
+          setNascimento(r.dataNascimento);
+          if (r.existe && r.valores) aplicarReconhecido(r.valores, r.temPassaporteAnexo);
+          else aplicarNovo();
+          setPasso(0);
+          setFase("completar");
+        } else {
+          // Sem data de nascimento no cadastro: cai no fluxo normal com o CPF já
+          // preenchido, pedindo só a data (o portão aceita e segue).
+          setFase("identificacao");
+        }
       })
       .finally(() => { if (ativo) setBusy(false); });
     return () => { ativo = false; };
