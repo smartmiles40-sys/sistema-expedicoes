@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays, Moon, Sun,
+  DownloadCloud, WifiOff, Trash2,
 } from "lucide-react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -21,6 +22,10 @@ import {
 import { Logo, LogoMark } from "@/components/ui/Logo";
 import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 import { resumoSaude } from "@/lib/saude";
+import {
+  offlineSuportado, salvarSnapshot, carregarSnapshot, limparOffline,
+  salvarDoc, carregarDoc, coletarArquivos,
+} from "@/lib/lider/offline";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
 type VerDoc = (a: LiderArquivo, download?: boolean) => void;
@@ -53,6 +58,37 @@ export default function LiderPage() {
       if (n.has(k)) n.delete(k); else n.add(k);
       return n;
     });
+  // Offline (opção B): snapshot CONGELADO no aparelho. Uma vez salvo, a tela abre
+  // nele e NÃO atualiza sozinha (nem online) — só no botão "Atualizar agora".
+  const [congelado, setCongelado] = React.useState(false);
+  const [salvoEm, setSalvoEm] = React.useState<string | null>(null);
+  const [prep, setPrep] = React.useState<{ feito: number; total: number; falhas: number } | null>(null);
+  const [restaurando, setRestaurando] = React.useState(true);
+
+  // Registra o service worker (faz /lider abrir sem internet). Só em produção —
+  // em dev o cache atrapalharia o desenvolvimento das outras páginas.
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/lider-sw.js").catch(() => {});
+    }
+  }, []);
+
+  // Ao abrir: se há um snapshot salvo, restaura congelado (sem login, sem auto-refresh).
+  React.useEffect(() => {
+    let ativo = true;
+    (async () => {
+      const snap = offlineSuportado() ? await carregarSnapshot() : null;
+      if (ativo && snap) {
+        setCpf(snap.cpf);
+        setSenha(snap.senha);
+        setDados(snap.dados);
+        setCongelado(true);
+        setSalvoEm(snap.savedAt);
+      }
+      if (ativo) setRestaurando(false);
+    })();
+    return () => { ativo = false; };
+  }, []);
 
   // Recarrega os dados em silêncio (reflete o que a operação atualizou).
   const recarregar = React.useCallback(async () => {
@@ -64,9 +100,10 @@ export default function LiderPage() {
   }, [cpf, senha]);
 
   // Enquanto a área está aberta: atualiza a cada 25s e ao voltar pra aba.
+  // NÃO quando está congelado (offline): aí só atualiza no botão manual.
   const logado = dados !== null;
   React.useEffect(() => {
-    if (!logado) return;
+    if (!logado || congelado) return;
     const id = setInterval(recarregar, 25000);
     const onVis = () => {
       if (document.visibilityState === "visible") recarregar();
@@ -76,7 +113,7 @@ export default function LiderPage() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [logado, recarregar]);
+  }, [logado, congelado, recarregar]);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +141,20 @@ export default function LiderPage() {
   }
 
   async function verDoc(arq: LiderArquivo, download = false) {
+    // Offline / snapshot congelado: tenta o blob salvo no aparelho primeiro.
+    const local = offlineSuportado() ? await carregarDoc(arq.id) : null;
+    if (local) {
+      const url = URL.createObjectURL(local.blob);
+      if (download || !local.mime?.startsWith("image/")) window.open(url, "_blank", "noopener");
+      else setLightbox(url);
+      // Libera o object URL depois (o lightbox/aba já carregaram).
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("Documento não disponível offline", { description: "Conecte-se e use “Salvar tudo para offline”." });
+      return;
+    }
     const tid = toast.loading(download ? "Preparando download…" : "Abrindo documento…");
     const r = await linkAssinadoLider(cpf, senha, arq.id, download);
     if (!r.ok) {
@@ -117,6 +168,66 @@ export default function LiderPage() {
     }
     if (arq.mime?.startsWith("image/")) setLightbox(r.url);
     else window.open(r.url, "_blank", "noopener");
+  }
+
+  // Baixa dados + TODOS os documentos e CONGELA o snapshot no aparelho.
+  async function salvarOffline() {
+    if (!offlineSuportado()) {
+      toast.error("Este navegador não suporta salvar offline.");
+      return;
+    }
+    const r = await buscarDadosLider(cpf, senha);
+    if (!r.ok) { toast.error("Não foi possível carregar os dados", { description: r.error }); return; }
+    const dadosFrescos = r.dados;
+    const arquivos = coletarArquivos(dadosFrescos);
+    setPrep({ feito: 0, total: arquivos.length, falhas: 0 });
+    let feito = 0, falhas = 0;
+    // Baixa em pequenos lotes pra não travar a rede do celular.
+    const LOTE = 4;
+    for (let i = 0; i < arquivos.length; i += LOTE) {
+      await Promise.all(
+        arquivos.slice(i, i + LOTE).map(async (a) => {
+          try {
+            const link = await linkAssinadoLider(cpf, senha, a.id, false);
+            if (!link.ok) { falhas++; return; }
+            const resp = await fetch(link.url);
+            if (!resp.ok) { falhas++; return; }
+            const blob = await resp.blob();
+            await salvarDoc(a.id, { blob, mime: a.mime, nome: a.nome });
+          } catch {
+            falhas++;
+          } finally {
+            feito++;
+            setPrep({ feito, total: arquivos.length, falhas });
+          }
+        }),
+      );
+    }
+    const savedAt = new Date().toISOString();
+    await salvarSnapshot({ cpf, senha, dados: dadosFrescos, savedAt });
+    setDados(dadosFrescos);
+    setSalvoEm(savedAt);
+    setCongelado(true);
+    setPrep(null);
+    toast.success(
+      falhas === 0 ? "Tudo salvo para uso offline! 📴" : `Salvo com ${falhas} documento(s) que falharam.`,
+      { description: `${arquivos.length - falhas} de ${arquivos.length} documentos no aparelho.` },
+    );
+  }
+
+  async function sairLimpar() {
+    if (congelado) await limparOffline();
+    setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null);
+    setCongelado(false); setSalvoEm(null); setPrep(null);
+  }
+
+  // Enquanto verifica se há um snapshot salvo no aparelho, não pisca a tela de login.
+  if (restaurando && !dados) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   // ---------- Primeiro acesso: criar nova senha ----------
@@ -225,25 +336,59 @@ export default function LiderPage() {
           >
             {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
+          {!congelado && offlineSuportado() && (
+            <button
+              type="button"
+              onClick={salvarOffline}
+              disabled={prep !== null || atualizando}
+              title="Baixar dados e documentos para acessar sem internet"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-lime)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--brand-dark)] hover:opacity-90 disabled:opacity-60"
+            >
+              <DownloadCloud className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{prep ? `Salvando ${prep.feito}/${prep.total}…` : "Salvar offline"}</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={recarregar}
-            disabled={atualizando}
-            title="Atualizar"
+            onClick={congelado ? salvarOffline : recarregar}
+            disabled={atualizando || prep !== null}
+            title={congelado ? "Atualizar os dados salvos (precisa de internet)" : "Atualizar"}
             className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20 disabled:opacity-60"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5", atualizando && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5", (atualizando || prep !== null) && "animate-spin")} />
             <span className="hidden sm:inline">Atualizar</span>
           </button>
           <button
             type="button"
-            onClick={() => { setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null); }}
+            onClick={sairLimpar}
+            title={congelado ? "Sair e apagar os dados salvos no aparelho" : "Sair"}
             className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
           >
-            Sair
+            {congelado ? "Sair e limpar" : "Sair"}
           </button>
         </div>
       </header>
+
+      {(congelado || prep) && (
+        <div className="relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-atencao-600/30 bg-atencao-50 px-5 py-2 text-[12px] text-atencao-700">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          {prep ? (
+            <span>Baixando documentos para offline… {prep.feito}/{prep.total}{prep.falhas ? ` (${prep.falhas} falha[s])` : ""}</span>
+          ) : (
+            <>
+              <span className="font-medium">Modo offline.</span>
+              <span>Dados salvos no aparelho{salvoEm ? ` em ${new Date(salvoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : ""}. Não atualiza sozinho — use “Atualizar” quando tiver internet.</span>
+              <button
+                type="button"
+                onClick={sairLimpar}
+                className="ml-auto inline-flex items-center gap-1 rounded-md border border-atencao-600/40 px-1.5 py-0.5 font-medium hover:bg-atencao-100"
+              >
+                <Trash2 className="h-3 w-3" /> Remover dados offline
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <main className="relative z-10 mx-auto max-w-3xl space-y-4 p-4">
         {dados.expedicoes.length === 0 ? (
