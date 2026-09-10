@@ -1908,6 +1908,41 @@ export async function renomearHotelRooming(
   return { ok: true };
 }
 
+/**
+ * Corrige as datas de um hotel/trecho do rooming: atualiza `check_in`/`check_out`
+ * de TODOS os quartos daquele trecho de uma vez (o board passa os ids dos quartos
+ * do hotel). Mantém nome e alocações — só troca as datas. Como o "trecho" é agrupado
+ * por hotel+datas, mudar as datas de todos os quartos juntos mantém o bloco unido.
+ */
+export async function redatarHotelRooming(
+  expedicaoId: string,
+  quartoIds: string[],
+  checkIn: string | null,
+  checkOut: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const ci = (checkIn ?? "").slice(0, 10) || null;
+  const co = (checkOut ?? "").slice(0, 10) || null;
+  if (ci && co && co < ci) return { ok: false, error: "O check-out não pode ser antes do check-in." };
+  const ids = [...new Set(quartoIds)];
+  if (!ids.length) return { ok: false, error: "Nenhum quarto neste hotel." };
+
+  if (DEV_USE_MOCK_DATA) {
+    for (const q of mockQuartos) if (ids.includes(q.id)) { q.check_in = ci; q.check_out = co; }
+    revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+    return { ok: true };
+  }
+
+  const supabase = await getServerClient();
+  const { error } = await supabase
+    .from("quartos")
+    .update({ check_in: ci, check_out: co })
+    .eq("expedicao_id", expedicaoId)
+    .in("id", ids);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/expedicoes/${expedicaoId}/rooming`);
+  return { ok: true };
+}
+
 // --- Rooming: alocação por hotel/trecho (M2M) --------------------------------
 type QuartoTrecho = { hotel_cidade: string | null; check_in: string | null; check_out: string | null; extensao_id?: string | null };
 /** Chave do "trecho/hotel": normaliza hotel (trim + colapsa espaços) e datas (AAAA-MM-DD)

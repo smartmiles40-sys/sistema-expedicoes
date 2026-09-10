@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy, ChevronDown, ChevronRight, Route } from "lucide-react";
+import { Building, Download, Pencil, User, Plus, GripVertical, AlertTriangle, CheckCircle2, Wand2, Users, Link2, BedDouble, Copy, ChevronDown, ChevronRight, Route, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -21,6 +21,7 @@ import {
   excluirQuarto,
   excluirTrechoRooming,
   renomearHotelRooming,
+  redatarHotelRooming,
   alocarPassageiro,
   desalocarPassageiro,
   desfazerConexao,
@@ -125,6 +126,11 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
   const [renomeando, setRenomeando] = React.useState<{ key: string; quartoIds: string[] } | null>(null);
   const [nomeHotelEdit, setNomeHotelEdit] = React.useState("");
   const [salvandoNome, setSalvandoNome] = React.useState(false);
+  // Editar datas (check-in/out) de um hotel/trecho inteiro de uma vez.
+  const [redatando, setRedatando] = React.useState<{ key: string; quartoIds: string[] } | null>(null);
+  const [checkInEdit, setCheckInEdit] = React.useState("");
+  const [checkOutEdit, setCheckOutEdit] = React.useState("");
+  const [salvandoDatas, setSalvandoDatas] = React.useState(false);
   // Duplicar um hotel inteiro (quartos + pax) para um novo hotel/datas.
   const [duplicarOrigem, setDuplicarOrigem] = React.useState<{ quartoIds: string[]; hotelOrigem: string | null } | null>(null);
   // null = fechado; { membros } = aberto (vazio cria, preenchido edita).
@@ -155,6 +161,28 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
       router.refresh();
     } else {
       toast.error("Erro ao renomear", { description: r.error });
+    }
+  }
+  function abrirRedatar(key: string, quartoIds: string[], checkIn: string | null, checkOut: string | null) {
+    setRedatando({ key, quartoIds });
+    setCheckInEdit((checkIn ?? "").slice(0, 10));
+    setCheckOutEdit((checkOut ?? "").slice(0, 10));
+  }
+  async function salvarDatasHotel() {
+    if (!redatando) return;
+    if (checkInEdit && checkOutEdit && checkOutEdit < checkInEdit) {
+      toast.error("O check-out não pode ser antes do check-in.");
+      return;
+    }
+    setSalvandoDatas(true);
+    const r = await redatarHotelRooming(expedicaoId, redatando.quartoIds, checkInEdit || null, checkOutEdit || null);
+    setSalvandoDatas(false);
+    if (r.ok) {
+      setRedatando(null);
+      toast.success("Datas do hotel atualizadas");
+      router.refresh();
+    } else {
+      toast.error("Erro ao atualizar datas", { description: r.error });
     }
   }
   // Divisão por grupos é OPT-IN: só vale quando a expedição tem G1 E G2 (mesma regra
@@ -950,6 +978,38 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                         Cancelar
                       </button>
                     </div>
+                  ) : redatando?.key === t.key ? (
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        Check-in
+                        <input
+                          type="date"
+                          autoFocus
+                          value={checkInEdit}
+                          onChange={(e) => setCheckInEdit(e.target.value)}
+                          disabled={salvandoDatas}
+                          className="rounded-md border border-editavel-600 bg-background px-2 py-1 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-editavel-600"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        Check-out
+                        <input
+                          type="date"
+                          value={checkOutEdit}
+                          min={checkInEdit || undefined}
+                          onChange={(e) => setCheckOutEdit(e.target.value)}
+                          disabled={salvandoDatas}
+                          className="rounded-md border border-editavel-600 bg-background px-2 py-1 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-editavel-600"
+                        />
+                      </label>
+                      <button type="button" onClick={salvarDatasHotel} disabled={salvandoDatas} className="shrink-0 rounded-md bg-editavel-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-editavel-700 disabled:opacity-60">
+                        {salvandoDatas ? "Salvando…" : "Salvar"}
+                      </button>
+                      <button type="button" onClick={() => setRedatando(null)} disabled={salvandoDatas} className="shrink-0 rounded-md border border-border px-2.5 py-1 text-[11px] font-medium hover:bg-accent">
+                        Cancelar
+                      </button>
+                    </div>
                   ) : (
                   <div className="flex min-w-0 items-center gap-1">
                   <button
@@ -1001,6 +1061,17 @@ export function RoomingBoard({ expedicaoId, passageiros, quartos, alocacoes, des
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                       >
                         <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {!somenteLeitura && (
+                      <button
+                        type="button"
+                        onClick={() => abrirRedatar(t.key, t.quartos.map((q) => q.id), t.check_in, t.check_out)}
+                        title="Editar datas (check-in / check-out)"
+                        aria-label="Editar datas do hotel"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <CalendarDays className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
