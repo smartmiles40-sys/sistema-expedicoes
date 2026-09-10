@@ -18,6 +18,7 @@ import {
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { requisitosDoDestino } from "@/lib/prontidao/requisitos-destino";
+import { espalharCertificadoVacina } from "@/lib/prontidao/vacina-sync";
 import { ETAPA_CHECKLIST, STATUS_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
@@ -2521,6 +2522,18 @@ export async function gerarRequisitosPadrao(
 
   const { error } = await supabase.from("passageiro_requisitos").insert(novos);
   if (error) return { ok: false, error: error.message };
+
+  // Vacina universal: expedição nova de alguém que JÁ tem o Certificado de Febre
+  // Amarela herda o anexo no slot "Vacina" (puxa do histórico da pessoa por CPF).
+  const cpfsNovos = [
+    ...new Set(
+      passageiros
+        .filter((p) => !jaTem.has(p.id) && (p as { cpf?: string | null }).cpf)
+        .map((p) => (p as { cpf: string | null }).cpf as string),
+    ),
+  ];
+  for (const cpf of cpfsNovos) await espalharCertificadoVacina(supabase, cpf);
+
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
   revalidatePath("/avisos");
@@ -2576,6 +2589,24 @@ export async function atualizarRequisitoCampo(
     .update({ [campo]: valor, ...extra })
     .eq("id", requisitoId);
   if (error) return { ok: false, error: error.message };
+
+  // Vacina é universal da pessoa: ao anexar o certificado numa expedição, reflete
+  // o arquivo no slot "Vacina" de todas as outras expedições dela (slot vazio,
+  // sem mexer em Dispensado/Reprovado). Só na ADIÇÃO de anexo (não na remoção).
+  if (campo === "arquivo_id" && typeof valor === "string" && valor) {
+    const { data: req } = await supabase
+      .from("passageiro_requisitos")
+      .select("tipo, passageiro_id")
+      .eq("id", requisitoId)
+      .maybeSingle();
+    const r = req as { tipo: string; passageiro_id: string } | null;
+    if (r?.tipo === "Vacina") {
+      const { data: pax } = await supabase.from("passageiros").select("cpf").eq("id", r.passageiro_id).maybeSingle();
+      const cpf = (pax as { cpf: string | null } | null)?.cpf ?? null;
+      await espalharCertificadoVacina(supabase, cpf, valor);
+    }
+  }
+
   revalidatePath(`/expedicoes/${expedicaoId}/passageiros`);
   revalidatePath(`/expedicoes/${expedicaoId}`);
   revalidatePath("/avisos");

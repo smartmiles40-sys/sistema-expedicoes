@@ -5,6 +5,7 @@ import { z } from "zod";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { gerarRequisitosPadrao } from "@/app/(app)/expedicoes/actions";
+import { espalharCertificadoVacina } from "@/lib/prontidao/vacina-sync";
 import { soDigitosCpf } from "@/lib/cpf";
 import { MAX_UPLOAD_BYTES, MIME_ARQUIVO_PERMITIDOS } from "@/lib/constants";
 import { mockPassageiros, PASSAGEIRO_INSCRICAO_DEFAULTS } from "@/lib/mock-data";
@@ -460,6 +461,11 @@ export async function materializarInscricao(pend: PendenteMaterializar): Promise
   await propagarProd(paxId);
   await linkarAnexo(paxId);
   await gerarRequisitosPadrao(expedicao_id);
+  // O certificado de febre amarela alimenta o requisito "Vacina" — e como a vacina
+  // é UNIVERSAL da pessoa, reflete em TODAS as expedições dela (não só nesta). Roda
+  // DEPOIS de gerarRequisitosPadrao (as instâncias precisam já existir). O helper é
+  // conservador: só preenche slot vazio, não mexe em Dispensado/Reprovado.
+  await espalharCertificadoVacina(sb, cpf, certId ?? null);
   const { data: pax } = await sb.from("passageiros").select("*").eq("id", paxId).maybeSingle();
   return (pax as Pax | null) ?? null;
 }
