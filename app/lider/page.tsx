@@ -28,7 +28,7 @@ import {
 } from "@/lib/lider/offline";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
-type VerDoc = (a: LiderArquivo, download?: boolean) => void;
+type VerDoc = (a: LiderArquivo) => void;
 
 const SEM_DOT: Record<string, string> = {
   ok: "bg-vinculado-600",
@@ -44,7 +44,12 @@ export default function LiderPage() {
   const [dados, setDados] = React.useState<LiderDados | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
-  const [lightbox, setLightbox] = React.useState<string | null>(null);
+  // Visualizador de documento IN-APP (evita window.open, que o mobile bloqueia
+  // quando chamado depois de um await). `objectUrl` = URL de blob a revogar ao fechar.
+  const [docView, setDocView] = React.useState<{ url: string; mime: string | null; nome: string; objectUrl: boolean } | null>(null);
+  const fecharDoc = React.useCallback(() => {
+    setDocView((d) => { if (d?.objectUrl) URL.revokeObjectURL(d.url); return null; });
+  }, []);
   const [atualizando, setAtualizando] = React.useState(false);
   const [precisaTrocar, setPrecisaTrocar] = React.useState(false);
   const [novaSenha, setNovaSenha] = React.useState("");
@@ -145,34 +150,26 @@ export default function LiderPage() {
     toast.success("Senha criada! 🎉");
   }
 
-  async function verDoc(arq: LiderArquivo, download = false) {
-    // Offline / snapshot congelado: tenta o blob salvo no aparelho primeiro.
+  async function verDoc(arq: LiderArquivo) {
+    // Abre SEMPRE no visualizador in-app (nada de window.open — bloqueado no celular).
+    // 1) tenta o blob salvo no aparelho (offline); 2) senão, URL assinada (online).
     const local = offlineSuportado() ? await carregarDoc(arq.id) : null;
     if (local) {
-      const url = URL.createObjectURL(local.blob);
-      if (download || !local.mime?.startsWith("image/")) window.open(url, "_blank", "noopener");
-      else setLightbox(url);
-      // Libera o object URL depois (o lightbox/aba já carregaram).
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setDocView({ url: URL.createObjectURL(local.blob), mime: local.mime, nome: local.nome, objectUrl: true });
       return;
     }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      toast.error("Documento não disponível offline", { description: "Conecte-se e use “Salvar tudo para offline”." });
+      toast.error("Documento não disponível offline", { description: "Conecte-se e use “Salvar para offline” nesta expedição." });
       return;
     }
-    const tid = toast.loading(download ? "Preparando download…" : "Abrindo documento…");
-    const r = await linkAssinadoLider(cpf, senha, arq.id, download);
+    const tid = toast.loading("Abrindo documento…");
+    const r = await linkAssinadoLider(cpf, senha, arq.id, false);
     if (!r.ok) {
       toast.error("Não foi possível abrir", { description: r.error, id: tid });
       return;
     }
     toast.dismiss(tid);
-    if (download) {
-      window.open(r.url, "_blank", "noopener");
-      return;
-    }
-    if (arq.mime?.startsWith("image/")) setLightbox(r.url);
-    else window.open(r.url, "_blank", "noopener");
+    setDocView({ url: r.url, mime: arq.mime, nome: arq.nome, objectUrl: false });
   }
 
   // Baixa dados + documentos de UMA expedição e salva (congelada) no aparelho.
@@ -436,26 +433,47 @@ export default function LiderPage() {
         </p>
       </main>
 
-      {lightbox && typeof document !== "undefined" &&
+      {docView && typeof document !== "undefined" &&
         createPortal(
-          <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setLightbox(null)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightbox}
-              alt="Documento"
+          <div className="fixed inset-0 z-[300] flex flex-col bg-black/85" onClick={fecharDoc}>
+            <div
+              className="flex items-center justify-between gap-2 px-3 py-2 text-white"
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-xl"
-            />
-            <button
-              type="button"
-              onClick={() => setLightbox(null)}
-              className="absolute right-4 top-4 rounded-full bg-background/90 px-3 py-1 text-[13px] font-medium hover:bg-background"
             >
-              Fechar
-            </button>
+              <span className="min-w-0 flex-1 truncate text-[13px]" title={docView.nome}>{docView.nome}</span>
+              <div className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium">
+                <a
+                  href={docView.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md bg-white/15 px-2.5 py-1 hover:bg-white/25"
+                >
+                  Abrir em nova aba
+                </a>
+                <a
+                  href={docView.url}
+                  download={docView.nome}
+                  className="rounded-md bg-white/15 px-2.5 py-1 hover:bg-white/25"
+                >
+                  Baixar
+                </a>
+                <button
+                  type="button"
+                  onClick={fecharDoc}
+                  className="rounded-md bg-white/15 px-2.5 py-1 hover:bg-white/25"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-1 items-center justify-center overflow-auto p-3" onClick={(e) => e.stopPropagation()}>
+              {docView.mime?.startsWith("image/") ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={docView.url} alt={docView.nome} className="max-h-full max-w-full rounded-md object-contain shadow-xl" />
+              ) : (
+                <iframe src={docView.url} title={docView.nome} className="h-full w-full rounded-md bg-white" />
+              )}
+            </div>
           </div>,
           document.body,
         )}
@@ -1005,9 +1023,7 @@ function DocChip({ a, onVerDoc }: { a: LiderArquivo; onVerDoc: VerDoc }) {
     <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[11px]">
       <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
       <span className="max-w-[120px] truncate" title={a.nome}>{a.nome}</span>
-      <button type="button" onClick={() => onVerDoc(a, false)} className="font-medium text-editavel-700 hover:underline">Abrir</button>
-      <span className="text-border">·</span>
-      <button type="button" onClick={() => onVerDoc(a, true)} className="font-medium text-editavel-700 hover:underline">Baixar</button>
+      <button type="button" onClick={() => onVerDoc(a)} className="font-medium text-editavel-700 hover:underline">Abrir</button>
     </span>
   );
 }
