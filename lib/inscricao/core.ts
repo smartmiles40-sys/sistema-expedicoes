@@ -285,17 +285,16 @@ export async function salvarPerfilGlobalInscricao(
 ): Promise<void> {
   try {
     const campos = novosCampos(d, cpf) as Record<string, unknown>;
+    // Dados PESSOAIS (universais) fazem backfill em TODAS as linhas da pessoa. O
+    // perfil_viajante NÃO entra aqui: a inscrição é POR expedição (perguntas mudam,
+    // ex.: "significado da viagem") → só vai na linha da expedição sendo inscrita.
     const pessoal: Record<string, unknown> = {};
     for (const k of CAMPOS_PESSOAIS_CARRY) if (k in campos) pessoal[k] = campos[k];
-    pessoal.perfil_viajante = campos.perfil_viajante;
     if (passaporteArqId) pessoal.passaporte_arquivo_id = passaporteArqId;
     if (fotoArqId) pessoal.foto_arquivo_id = fotoArqId;
 
     const vazio = (v: unknown) => v == null || v === "" || (typeof v === "object" && v !== null && Object.keys(v).length === 0);
-    const temAlgo = (k: string, v: unknown) =>
-      k === "saude" ? temSaude(v)
-        : k === "perfil_viajante" ? !!(v && typeof v === "object" && Object.values(v).some((x) => temValor(x)))
-        : temValor(v);
+    const temPerfil = !!(campos.perfil_viajante && typeof campos.perfil_viajante === "object" && Object.values(campos.perfil_viajante).some((x) => temValor(x)));
 
     const linhas = await acharLinhasPorCpf(cpf);
 
@@ -308,7 +307,11 @@ export async function salvarPerfilGlobalInscricao(
           if (temSaude(v)) patch.saude = { ...(v as Record<string, unknown>), ...atual }; // atual vence
           continue;
         }
-        if (vazio((l as Record<string, unknown>)[k]) && temAlgo(k, v)) patch[k] = v;
+        if (vazio((l as Record<string, unknown>)[k]) && temValor(v)) patch[k] = v;
+      }
+      // Perfil do viajante SÓ na linha da expedição sendo inscrita (não vaza p/ outras).
+      if (l.expedicao_id === d.expedicao_id && vazio(l.perfil_viajante) && temPerfil) {
+        patch.perfil_viajante = campos.perfil_viajante;
       }
       return patch;
     };

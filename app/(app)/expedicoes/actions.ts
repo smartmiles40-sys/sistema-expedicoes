@@ -302,10 +302,11 @@ const CAMPOS_PESSOAIS = [
   "passaporte",
   "validade_passaporte",
   "passaporte_arquivo_id",
-  // Foto e Perfil do viajante são PESSOAIS (propagam entre expedições, como o
-  // passaporte). Acompanhante/dividir quarto continua por-reserva (não entra aqui).
+  // A Foto é PESSOAL (propaga entre expedições, como o passaporte). O Perfil do
+  // viajante NÃO propaga: a inscrição é preenchida uma vez POR expedição (tem
+  // perguntas que mudam, ex.: "significado da viagem", "o que te anima"), então
+  // fica por-reserva — igual acompanhante/dividir quarto.
   "foto_arquivo_id",
-  "perfil_viajante",
   "data_nascimento",
   "email",
   "telefone",
