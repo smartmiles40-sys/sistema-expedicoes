@@ -23,8 +23,8 @@ import { Logo, LogoMark } from "@/components/ui/Logo";
 import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
 import { resumoSaude } from "@/lib/saude";
 import {
-  offlineSuportado, salvarSnapshot, carregarSnapshot, limparOffline,
-  salvarDoc, carregarDoc, coletarArquivos,
+  offlineSuportado, salvarExpedicao, carregarExpedicoesSalvas, removerExpedicao,
+  salvarDoc, carregarDoc, coletarArquivosExpedicao,
 } from "@/lib/lider/offline";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
@@ -58,11 +58,12 @@ export default function LiderPage() {
       if (n.has(k)) n.delete(k); else n.add(k);
       return n;
     });
-  // Offline (opção B): snapshot CONGELADO no aparelho. Uma vez salvo, a tela abre
-  // nele e NÃO atualiza sozinha (nem online) — só no botão "Atualizar agora".
-  const [congelado, setCongelado] = React.useState(false);
-  const [salvoEm, setSalvoEm] = React.useState<string | null>(null);
-  const [prep, setPrep] = React.useState<{ feito: number; total: number; falhas: number } | null>(null);
+  // Offline (opção B), POR EXPEDIÇÃO: o líder salva cada expedição que quiser.
+  // `salvas` = expId → savedAt (salvas neste aparelho). `offline` = renderizando dos
+  // snapshots (sem servidor). `prepExp` = progresso do download da expedição atual.
+  const [offline, setOffline] = React.useState(false);
+  const [salvas, setSalvas] = React.useState<Map<string, string>>(new Map());
+  const [prepExp, setPrepExp] = React.useState<{ expId: string; feito: number; total: number; falhas: number } | null>(null);
   const [restaurando, setRestaurando] = React.useState(true);
 
   // Registra o service worker (faz /lider abrir sem internet). Só em produção —
@@ -73,19 +74,23 @@ export default function LiderPage() {
     }
   }, []);
 
-  // Ao abrir: se há um snapshot salvo, restaura congelado (sem login, sem auto-refresh).
+  // Ao abrir: carrega quais expedições estão salvas. Se estiver SEM internet e houver
+  // salvas, remonta a tela a partir delas (sem login).
   React.useEffect(() => {
     let ativo = true;
     (async () => {
-      const snap = offlineSuportado() ? await carregarSnapshot() : null;
-      if (ativo && snap) {
-        setCpf(snap.cpf);
-        setSenha(snap.senha);
-        setDados(snap.dados);
-        setCongelado(true);
-        setSalvoEm(snap.savedAt);
+      const lista = offlineSuportado() ? await carregarExpedicoesSalvas() : [];
+      if (!ativo) return;
+      setSalvas(new Map(lista.map((s) => [s.expId, s.savedAt])));
+      const online = typeof navigator === "undefined" ? true : navigator.onLine;
+      if (!online && lista.length) {
+        const first = lista[0];
+        setCpf(first.cpf);
+        setSenha(first.senha);
+        setDados({ nome: first.nome, master: first.master, expedicoes: lista.map((s) => s.expedicao) });
+        setOffline(true);
       }
-      if (ativo) setRestaurando(false);
+      setRestaurando(false);
     })();
     return () => { ativo = false; };
   }, []);
@@ -99,11 +104,11 @@ export default function LiderPage() {
     if (r.ok) setDados(r.dados);
   }, [cpf, senha]);
 
-  // Enquanto a área está aberta: atualiza a cada 25s e ao voltar pra aba.
-  // NÃO quando está congelado (offline): aí só atualiza no botão manual.
+  // Enquanto a área está aberta ONLINE: atualiza a cada 25s e ao voltar pra aba.
+  // No modo offline (remontado dos snapshots) não faz nada.
   const logado = dados !== null;
   React.useEffect(() => {
-    if (!logado || congelado) return;
+    if (!logado || offline) return;
     const id = setInterval(recarregar, 25000);
     const onVis = () => {
       if (document.visibilityState === "visible") recarregar();
@@ -113,7 +118,7 @@ export default function LiderPage() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [logado, congelado, recarregar]);
+  }, [logado, offline, recarregar]);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -170,20 +175,17 @@ export default function LiderPage() {
     else window.open(r.url, "_blank", "noopener");
   }
 
-  // Baixa dados + TODOS os documentos e CONGELA o snapshot no aparelho.
-  async function salvarOffline() {
-    if (!offlineSuportado()) {
-      toast.error("Este navegador não suporta salvar offline.");
-      return;
-    }
+  // Baixa dados + documentos de UMA expedição e salva (congelada) no aparelho.
+  async function salvarExpedicaoOffline(exp: LiderExpedicao) {
+    if (!offlineSuportado()) { toast.error("Este navegador não suporta salvar offline."); return; }
+    setPrepExp({ expId: exp.id, feito: 0, total: 0, falhas: 0 });
     const r = await buscarDadosLider(cpf, senha);
-    if (!r.ok) { toast.error("Não foi possível carregar os dados", { description: r.error }); return; }
-    const dadosFrescos = r.dados;
-    const arquivos = coletarArquivos(dadosFrescos);
-    setPrep({ feito: 0, total: arquivos.length, falhas: 0 });
+    if (!r.ok) { toast.error("Não foi possível carregar os dados", { description: r.error }); setPrepExp(null); return; }
+    const fresh = r.dados.expedicoes.find((e) => e.id === exp.id) ?? exp;
+    const arquivos = coletarArquivosExpedicao(fresh);
+    setPrepExp({ expId: exp.id, feito: 0, total: arquivos.length, falhas: 0 });
     let feito = 0, falhas = 0;
-    // Baixa em pequenos lotes pra não travar a rede do celular.
-    const LOTE = 4;
+    const LOTE = 4; // baixa em lotes pequenos pra não travar a rede do celular
     for (let i = 0; i < arquivos.length; i += LOTE) {
       await Promise.all(
         arquivos.slice(i, i + LOTE).map(async (a) => {
@@ -198,27 +200,35 @@ export default function LiderPage() {
             falhas++;
           } finally {
             feito++;
-            setPrep({ feito, total: arquivos.length, falhas });
+            setPrepExp({ expId: exp.id, feito, total: arquivos.length, falhas });
           }
         }),
       );
     }
     const savedAt = new Date().toISOString();
-    await salvarSnapshot({ cpf, senha, dados: dadosFrescos, savedAt });
-    setDados(dadosFrescos);
-    setSalvoEm(savedAt);
-    setCongelado(true);
-    setPrep(null);
+    await salvarExpedicao({ expId: exp.id, cpf, senha, nome: r.dados.nome, master: r.dados.master, expedicao: fresh, savedAt });
+    setSalvas((prev) => new Map(prev).set(exp.id, savedAt));
+    setPrepExp(null);
     toast.success(
-      falhas === 0 ? "Tudo salvo para uso offline! 📴" : `Salvo com ${falhas} documento(s) que falharam.`,
+      falhas === 0 ? "Expedição salva para offline! 📴" : `Salva com ${falhas} documento(s) que falharam.`,
       { description: `${arquivos.length - falhas} de ${arquivos.length} documentos no aparelho.` },
     );
   }
 
-  async function sairLimpar() {
-    if (congelado) await limparOffline();
-    setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null);
-    setCongelado(false); setSalvoEm(null); setPrep(null);
+  async function removerExpedicaoOffline(expId: string) {
+    await removerExpedicao(expId);
+    setSalvas((prev) => { const n = new Map(prev); n.delete(expId); return n; });
+    toast.success("Dados offline desta expedição removidos.");
+    if (offline) {
+      // No modo offline, tira o card da tela; se era o último, volta pro portão.
+      const rest = (dados?.expedicoes ?? []).filter((e) => e.id !== expId);
+      if (rest.length === 0) { setDados(null); setOffline(false); }
+      else if (dados) setDados({ ...dados, expedicoes: rest });
+    }
+  }
+
+  function sair() {
+    setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null); setOffline(false);
   }
 
   // Enquanto verifica se há um snapshot salvo no aparelho, não pisca a tela de login.
@@ -336,57 +346,33 @@ export default function LiderPage() {
           >
             {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
-          {!congelado && offlineSuportado() && (
+          {!offline && (
             <button
               type="button"
-              onClick={salvarOffline}
-              disabled={prep !== null || atualizando}
-              title="Baixar dados e documentos para acessar sem internet"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-lime)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--brand-dark)] hover:opacity-90 disabled:opacity-60"
+              onClick={recarregar}
+              disabled={atualizando}
+              title="Atualizar"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20 disabled:opacity-60"
             >
-              <DownloadCloud className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{prep ? `Salvando ${prep.feito}/${prep.total}…` : "Salvar offline"}</span>
+              <RefreshCw className={cn("h-3.5 w-3.5", atualizando && "animate-spin")} />
+              <span className="hidden sm:inline">Atualizar</span>
             </button>
           )}
           <button
             type="button"
-            onClick={congelado ? salvarOffline : recarregar}
-            disabled={atualizando || prep !== null}
-            title={congelado ? "Atualizar os dados salvos (precisa de internet)" : "Atualizar"}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20 disabled:opacity-60"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", (atualizando || prep !== null) && "animate-spin")} />
-            <span className="hidden sm:inline">Atualizar</span>
-          </button>
-          <button
-            type="button"
-            onClick={sairLimpar}
-            title={congelado ? "Sair e apagar os dados salvos no aparelho" : "Sair"}
+            onClick={sair}
             className="rounded-lg bg-white/10 px-2.5 py-1.5 text-[12px] font-medium hover:bg-white/20"
           >
-            {congelado ? "Sair e limpar" : "Sair"}
+            Sair
           </button>
         </div>
       </header>
 
-      {(congelado || prep) && (
+      {offline && (
         <div className="relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-atencao-600/30 bg-atencao-50 px-5 py-2 text-[12px] text-atencao-700">
           <WifiOff className="h-3.5 w-3.5 shrink-0" />
-          {prep ? (
-            <span>Baixando documentos para offline… {prep.feito}/{prep.total}{prep.falhas ? ` (${prep.falhas} falha[s])` : ""}</span>
-          ) : (
-            <>
-              <span className="font-medium">Modo offline.</span>
-              <span>Dados salvos no aparelho{salvoEm ? ` em ${new Date(salvoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : ""}. Não atualiza sozinho — use “Atualizar” quando tiver internet.</span>
-              <button
-                type="button"
-                onClick={sairLimpar}
-                className="ml-auto inline-flex items-center gap-1 rounded-md border border-atencao-600/40 px-1.5 py-0.5 font-medium hover:bg-atencao-100"
-              >
-                <Trash2 className="h-3 w-3" /> Remover dados offline
-              </button>
-            </>
-          )}
+          <span className="font-medium">Modo offline.</span>
+          <span>Mostrando {dados.expedicoes.length} expedição(ões) salva(s) neste aparelho. Conecte-se para ver ao vivo e salvar outras.</span>
         </div>
       )}
 
@@ -405,7 +391,19 @@ export default function LiderPage() {
           const futuras = naoConcluidas.filter((e) => anoDe(e) > anoAtual);
           const anosFuturos = [...new Set(futuras.map(anoDe))].sort((a, b) => a - b);
           const renderCards = (lista: LiderExpedicao[]) =>
-            lista.map((exp) => <ExpedicaoLiderCard key={exp.id} exp={exp} onVerDoc={verDoc} meuNome={dados.nome} />);
+            lista.map((exp) => (
+              <ExpedicaoLiderCard
+                key={exp.id}
+                exp={exp}
+                onVerDoc={verDoc}
+                meuNome={dados.nome}
+                podeSalvar={offlineSuportado() && !offline}
+                salvoEm={salvas.get(exp.id) ?? null}
+                prep={prepExp && prepExp.expId === exp.id ? prepExp : null}
+                onSalvar={() => salvarExpedicaoOffline(exp)}
+                onRemover={() => removerExpedicaoOffline(exp.id)}
+              />
+            ));
           return (
             <>
               {renderCards(atuais)}
@@ -498,7 +496,18 @@ function GrupoBox({
   );
 }
 
-function ExpedicaoLiderCard({ exp, onVerDoc, meuNome }: { exp: LiderExpedicao; onVerDoc: VerDoc; meuNome: string }) {
+function ExpedicaoLiderCard({
+  exp, onVerDoc, meuNome, podeSalvar, salvoEm, prep, onSalvar, onRemover,
+}: {
+  exp: LiderExpedicao;
+  onVerDoc: VerDoc;
+  meuNome: string;
+  podeSalvar: boolean;
+  salvoEm: string | null;
+  prep: { feito: number; total: number; falhas: number } | null;
+  onSalvar: () => void;
+  onRemover: () => void;
+}) {
   // Sempre recolhida — o usuário abre a expedição que quiser.
   const [aberta, setAberta] = React.useState(false);
   const dias = daysUntil(exp.data_embarque);
@@ -519,6 +528,11 @@ function ExpedicaoLiderCard({ exp, onVerDoc, meuNome }: { exp: LiderExpedicao; o
               {dias === 0 ? "hoje" : `${dias}d`}
             </span>
           )}
+          {salvoEm && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold" title="Disponível offline neste aparelho">
+              <WifiOff className="h-2.5 w-2.5" /> offline
+            </span>
+          )}
           <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", aberta && "rotate-90")} />
         </div>
         <h3 className="font-display mt-2 text-[18px] font-semibold leading-snug">{exp.nome}</h3>
@@ -527,6 +541,42 @@ function ExpedicaoLiderCard({ exp, onVerDoc, meuNome }: { exp: LiderExpedicao; o
           <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3 text-[var(--brand-lime)]" /> {formatDate(exp.data_embarque)} → {formatDate(exp.data_retorno)}</span>
         </div>
       </button>
+
+      {/* Ação de offline por expedição */}
+      {(podeSalvar || salvoEm) && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[12px]">
+          {prep ? (
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <DownloadCloud className="h-3.5 w-3.5 animate-pulse" />
+              Salvando… {prep.feito}/{prep.total}{prep.falhas ? ` (${prep.falhas} falha[s])` : ""}
+            </span>
+          ) : salvoEm ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-vinculado-700">
+                <WifiOff className="h-3.5 w-3.5" />
+                Salva offline · {new Date(salvoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+              </span>
+              {podeSalvar && (
+                <button type="button" onClick={onSalvar} className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 font-medium hover:bg-accent">
+                  <RefreshCw className="h-3 w-3" /> Atualizar
+                </button>
+              )}
+              <button type="button" onClick={onRemover} className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 font-medium text-critico-600 hover:bg-accent">
+                <Trash2 className="h-3 w-3" /> Remover
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onSalvar}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-lime)] px-2.5 py-1 font-semibold text-[var(--brand-dark)] hover:opacity-90"
+              title="Baixar esta expedição (dados + documentos) para acessar sem internet"
+            >
+              <DownloadCloud className="h-3.5 w-3.5" /> Salvar para offline
+            </button>
+          )}
+        </div>
+      )}
 
       {aberta && (
         <div className="space-y-3 p-3">
