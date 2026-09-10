@@ -13,6 +13,8 @@ export type CompraBitrix = {
   cpf: string | null;
   nome_contato: string | null;
   titulo: string | null;
+  /** Nome real da expedição/pacote (Bitrix via n8n). Fallback: titulo. */
+  produto: string | null;
   data_compra: string | null;
   valor: number | null;
   moeda: string | null;
@@ -37,6 +39,11 @@ export type ClienteCompras = {
 
 const norm = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** O que a pessoa comprou: nome real (produto) quando houver, senão o título do deal. */
+export function nomeCompra(c: Pick<CompraBitrix, "produto" | "titulo">): string {
+  return c.produto?.trim() || c.titulo?.trim() || "Negócio sem título";
+}
 
 /** Chave de identidade: CPF → contato Bitrix → nome normalizado. */
 function chave(c: CompraBitrix): string {

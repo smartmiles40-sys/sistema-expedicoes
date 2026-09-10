@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { listClientesCompras } from "@/lib/data/compras";
+import { listClientesCompras, nomeCompra } from "@/lib/data/compras";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -120,6 +120,7 @@ export async function GET() {
   wsD.columns = [
     { header: "Nome", key: "nome", width: 34 },
     { header: "CPF", key: "cpf", width: 16 },
+    { header: "Produto (expedição)", key: "produto", width: 36 },
     { header: "Data", key: "data", width: 13 },
     { header: "Valor", key: "valor", width: 15 },
     { header: "Moeda", key: "moeda", width: 9 },
@@ -136,6 +137,7 @@ export async function GET() {
     wsD.addRow({
       nome: c.nome_contato ?? "",
       cpf: c.cpf ? maskCpf(c.cpf) : "",
+      produto: nomeCompra(c),
       data: brDate(c.data_compra),
       valor: c.valor != null ? Math.round(Number(c.valor) * 100) / 100 : null,
       moeda: c.moeda ?? "",
@@ -146,7 +148,7 @@ export async function GET() {
     });
   }
   wsD.getColumn("valor").numFmt = "#,##0.00";
-  wsD.autoFilter = { from: "A1", to: "I1" };
+  wsD.autoFilter = { from: "A1", to: "J1" };
 
   const buf = await wb.xlsx.writeBuffer();
   const hoje = new Date().toISOString().slice(0, 10);

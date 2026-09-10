@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { formatBRL, formatDate, cn } from "@/lib/utils";
-import type { ClienteCompras } from "@/lib/data/compras";
+import { nomeCompra, type ClienteCompras } from "@/lib/data/compras";
 
 type SortKey = "nome" | "compras" | "total" | "ticket" | "primeira" | "ultima";
 type Dir = "asc" | "desc";
@@ -68,7 +68,7 @@ export function ClientesTabela({ clientes }: { clientes: ClienteCompras[] }) {
     let arr = clientes;
     if (termo) {
       arr = arr.filter((c) =>
-        [c.nome, c.cpf, ...c.compras.map((x) => x.titulo)].filter(Boolean).join(" ").toLowerCase().includes(termo),
+        [c.nome, c.cpf, ...c.compras.map((x) => nomeCompra(x))].filter(Boolean).join(" ").toLowerCase().includes(termo),
       );
     }
     arr = arr.filter((c) => c.totalCompras >= filtroRec.min && (!("max" in filtroRec) || c.totalCompras <= (filtroRec as { max: number }).max));
@@ -238,7 +238,7 @@ function ClienteDrawer({ cliente, onClose }: { cliente: ClienteCompras; onClose:
               <li key={co.id} className="rounded-md border border-border bg-background p-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium truncate">{co.titulo ?? "Negócio sem título"}</div>
+                    <div className="text-[13px] font-medium truncate">{nomeCompra(co)}</div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                       {co.data_compra && <span>{formatDate(co.data_compra)}</span>}
                       {co.funil && <Badge variant="lista">{co.funil}</Badge>}
