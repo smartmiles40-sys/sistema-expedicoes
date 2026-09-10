@@ -37,6 +37,41 @@ const SEM_DOT: Record<string, string> = {
   na: "bg-auto-600",
 };
 
+// Cache da "casca" do /lider (mesmos nomes de cache do public/lider-sw.js). A PÁGINA
+// popula porque no iOS o SW não controla o primeiro load — sem isso, os chunks do app
+// não entram no cache e o atalho não reabre offline.
+const SHELL_CACHE = "lider-shell-v2";
+const STATIC_CACHE = "lider-static-v2";
+async function precacheLiderShell() {
+  try {
+    if (typeof window === "undefined" || !("caches" in window)) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    const shell = await caches.open(SHELL_CACHE);
+    try {
+      const r = await fetch("/lider", { cache: "reload" });
+      if (r.ok) await shell.put("/lider", r.clone());
+    } catch { /* ignora */ }
+    const urls = new Set<string>();
+    document.querySelectorAll('script[src],link[rel="stylesheet"][href]').forEach((el) => {
+      const src = el.getAttribute("src") || el.getAttribute("href");
+      if (!src) return;
+      try { const u = new URL(src, location.href); if (u.origin === location.origin) urls.add(u.pathname + u.search); } catch { /* ignora */ }
+    });
+    try {
+      performance.getEntriesByType("resource").forEach((e) => {
+        try {
+          const u = new URL(e.name);
+          if (u.origin === location.origin && (u.pathname.startsWith("/_next/static/") || u.pathname.startsWith("/icons/") || u.pathname.startsWith("/fonts/"))) {
+            urls.add(u.pathname + u.search);
+          }
+        } catch { /* ignora */ }
+      });
+    } catch { /* ignora */ }
+    const estaticos = await caches.open(STATIC_CACHE);
+    await Promise.all([...urls].map((u) => fetch(u).then((r) => (r.ok ? estaticos.put(u, r.clone()) : null)).catch(() => {})));
+  } catch { /* ignora */ }
+}
+
 export default function LiderPage() {
   const { theme, toggle: alternarTema } = useTheme();
   const [cpf, setCpf] = React.useState("");
@@ -71,12 +106,15 @@ export default function LiderPage() {
   const [prepExp, setPrepExp] = React.useState<{ expId: string; feito: number; total: number; falhas: number } | null>(null);
   const [restaurando, setRestaurando] = React.useState(true);
 
-  // Registra o service worker (faz /lider abrir sem internet). Só em produção —
-  // em dev o cache atrapalharia o desenvolvimento das outras páginas.
+  // Registra o service worker (faz /lider abrir sem internet) + pré-cacheia a casca.
+  // Só em produção — em dev o cache atrapalharia o desenvolvimento das outras páginas.
   React.useEffect(() => {
-    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/lider-sw.js").catch(() => {});
-    }
+    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/lider-sw.js").catch(() => {});
+    // Depois do load (pra pegar todos os chunks já baixados) e sem travar a UI.
+    const rodar = () => window.setTimeout(precacheLiderShell, 1500);
+    if (document.readyState === "complete") rodar();
+    else window.addEventListener("load", rodar, { once: true });
   }, []);
 
   // Ao abrir: carrega quais expedições estão salvas. Se estiver SEM internet e houver
