@@ -72,6 +72,26 @@ async function precacheLiderShell() {
   } catch { /* ignora */ }
 }
 
+// Sessão persistida do líder: mantém logado entre aberturas; só sai no "Sair".
+// (mesmo trade-off do offline: guarda cpf+senha no aparelho.)
+const AUTH_KEY = "lider-auth";
+function lerAuth(): { cpf: string; senha: string } | null {
+  try {
+    const v = localStorage.getItem(AUTH_KEY);
+    if (!v) return null;
+    const o = JSON.parse(v);
+    return o && typeof o.cpf === "string" && typeof o.senha === "string" ? o : null;
+  } catch {
+    return null;
+  }
+}
+function salvarAuth(cpf: string, senha: string) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify({ cpf, senha })); } catch { /* ignora */ }
+}
+function limparAuth() {
+  try { localStorage.removeItem(AUTH_KEY); } catch { /* ignora */ }
+}
+
 export default function LiderPage() {
   const { theme, toggle: alternarTema } = useTheme();
   const [cpf, setCpf] = React.useState("");
@@ -117,8 +137,8 @@ export default function LiderPage() {
     else window.addEventListener("load", rodar, { once: true });
   }, []);
 
-  // Ao abrir: carrega quais expedições estão salvas. Se estiver SEM internet e houver
-  // salvas, remonta a tela a partir delas (sem login).
+  // Ao abrir: mantém logado (auto-login com a sessão salva). Sem internet, remonta
+  // a tela a partir das expedições salvas offline. Só sai de verdade no "Sair".
   React.useEffect(() => {
     let ativo = true;
     (async () => {
@@ -126,6 +146,22 @@ export default function LiderPage() {
       if (!ativo) return;
       setSalvas(new Map(lista.map((s) => [s.expId, s.savedAt])));
       const online = typeof navigator === "undefined" ? true : navigator.onLine;
+      const auth = lerAuth();
+      // Online + sessão salva → entra direto (dados ao vivo).
+      if (online && auth) {
+        const r = await buscarDadosLider(auth.cpf, auth.senha);
+        if (!ativo) return;
+        if (r.ok) {
+          setCpf(auth.cpf);
+          setSenha(auth.senha);
+          setDados(r.dados);
+          setPrecisaTrocar(r.precisaTrocar);
+          setRestaurando(false);
+          return;
+        }
+        limparAuth(); // credenciais não valem mais → cai no portão
+      }
+      // Offline com expedições salvas → remonta sem login.
       if (!online && lista.length) {
         const first = lista[0];
         setCpf(first.cpf);
@@ -169,7 +205,7 @@ export default function LiderPage() {
     setErro(null);
     const r = await buscarDadosLider(cpf, senha);
     setLoading(false);
-    if (r.ok) { setDados(r.dados); setPrecisaTrocar(r.precisaTrocar); }
+    if (r.ok) { setDados(r.dados); setPrecisaTrocar(r.precisaTrocar); salvarAuth(cpf, senha); }
     else setErro(r.error);
   }
 
@@ -183,6 +219,7 @@ export default function LiderPage() {
     setSalvandoSenha(false);
     if (!r.ok) return setErro(r.error ?? "Não foi possível salvar a senha.");
     setSenha(novaSenha);
+    salvarAuth(cpf, novaSenha);
     setNovaSenha(""); setConfirmaSenha("");
     setPrecisaTrocar(false);
     toast.success("Senha criada! 🎉");
@@ -263,6 +300,7 @@ export default function LiderPage() {
   }
 
   function sair() {
+    limparAuth();
     setDados(null); setCpf(""); setSenha(""); setPrecisaTrocar(false); setErro(null); setOffline(false);
   }
 
