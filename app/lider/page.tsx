@@ -20,6 +20,7 @@ import {
 } from "./actions";
 import { Logo, LogoMark } from "@/components/ui/Logo";
 import { conferirAcompanhante } from "@/lib/rooming/acompanhante";
+import { resumoSaude } from "@/lib/saude";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
 type VerDoc = (a: LiderArquivo, download?: boolean) => void;
@@ -647,8 +648,11 @@ function Secao({ titulo, pax, onVerDoc }: { titulo: string; pax: LiderPax[]; onV
 function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
   const [aberto, setAberto] = React.useState(false);
   const [dadosAbertos, setDadosAbertos] = React.useState(false);
+  const [saudeAberta, setSaudeAberta] = React.useState(false);
   // Documentos que não estão ligados a nenhuma exigência exibida.
   const outros = p.arquivos.filter((a) => !p.checagens.some((c) => c.arquivos.some((x) => x.id === a.id)));
+  const saudeFlags = resumoSaude(p.saude);
+  const saudeAlertas = saudeFlags.filter((f) => f.alerta).length;
   return (
     <div className="rounded-xl border border-border bg-background">
       <button
@@ -697,6 +701,40 @@ function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
               {p.condicoes_medicas && <Campo label="Condições médicas" valor={p.condicoes_medicas} full />}
             </div>
           )}
+
+          {/* Saúde (questionário da inscrição) — só os pontos sinalizados */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setSaudeAberta((v) => !v)}
+              className="flex items-center gap-1.5 text-[12px] font-semibold text-editavel-700"
+            >
+              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", saudeAberta && "rotate-90")} />
+              Saúde
+              {saudeAlertas > 0 && <Badge variant="atencao">{saudeAlertas}</Badge>}
+            </button>
+            {saudeAberta && (
+              saudeFlags.length === 0 ? (
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  {p.saude ? "Sem apontamentos de saúde." : "Questionário de saúde não preenchido."}
+                </p>
+              ) : (
+                <ul className="mt-1 space-y-1.5 rounded-lg border border-border bg-muted/20 p-2.5">
+                  {saudeFlags.map((f, i) => (
+                    <li key={i} className="text-[12px]">
+                      <div className="flex items-start gap-2">
+                        <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", f.alerta ? "bg-atencao-600" : "bg-vinculado-600")} />
+                        <span>
+                          <span className="font-medium">{f.curto}</span>
+                          {f.detalhe && <span className="text-muted-foreground"> — {f.detalhe}</span>}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+          </div>
 
           {/* Quarto (alocação real do Rooming) + com quem divide */}
           <div>

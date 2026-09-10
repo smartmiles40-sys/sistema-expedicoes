@@ -10,7 +10,7 @@ import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (fallback G1/G2 Egito)
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
-  GrupoExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
+  GrupoExpedicaoRow, QuartoRow, AlocacaoQuartoRow, SaudePassageiro,
 } from "@/types/database";
 
 const BUCKET = "arquivos-expedicoes";
@@ -94,6 +94,8 @@ export type LiderPax = {
   contato_emergencia_fone: string | null;
   restricoes_alimentares: string | null;
   condicoes_medicas: string | null;
+  /** Questionário de saúde (jsonb) — resumo read-only na Área do Líder. */
+  saude: SaudePassageiro | null;
   /** Foto do passageiro (signed URL / rota mock) pra mostrar no avatar. */
   foto_url: string | null;
   /** Grupo G1/G2 do passageiro (grupo_id real, ou fallback Egito). */
@@ -337,6 +339,7 @@ export async function buscarDadosLider(
           contato_emergencia_fone: p.contato_emergencia_fone,
           restricoes_alimentares: p.restricoes_alimentares,
           condicoes_medicas: p.condicoes_medicas,
+          saude: (p.saude as SaudePassageiro | null) ?? null,
           foto_url: p.foto_arquivo_id ? fotoUrl.get(p.foto_arquivo_id) ?? null : null,
           grupo: grupoDoPax(p, e),
           ...infoQuarto(p),
