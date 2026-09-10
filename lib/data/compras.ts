@@ -45,6 +45,45 @@ function chave(c: CompraBitrix): string {
   return `nome:${norm(c.nome_contato)}`;
 }
 
+/** Número do negócio no título ("#NNN") — chave pra deduplicar reimportações. */
+function numeroNegocio(titulo: string | null): string | null {
+  const m = /#\s*(\d+)/.exec(titulo ?? "");
+  return m ? m[1] : null;
+}
+
+/**
+ * Limpa a base crua do Bitrix pra base de clientes/relatórios:
+ *  1) remove vendas ZERADAS (valor nulo ou 0);
+ *  2) DEDUPLICA por número do negócio ("#NNN" no título) — o mesmo negócio às
+ *     vezes vem importado 2x (bitrix_deal_id diferentes, mesmo valor). Mantém o
+ *     canônico (bitrix_deal_id === número); senão o de maior valor / mais recente.
+ * Linhas sem "#" no título ficam como estão (não há como casar).
+ */
+export function limparComprasBitrix(compras: CompraBitrix[]): CompraBitrix[] {
+  const comValor = compras.filter((c) => c.valor != null && Number(c.valor) !== 0);
+  const grupos = new Map<string, CompraBitrix[]>();
+  const soltas: CompraBitrix[] = [];
+  for (const c of comValor) {
+    const n = numeroNegocio(c.titulo);
+    if (!n) { soltas.push(c); continue; }
+    const arr = grupos.get(n) ?? [];
+    arr.push(c);
+    grupos.set(n, arr);
+  }
+  const resultado = [...soltas];
+  for (const [num, arr] of grupos) {
+    if (arr.length === 1) { resultado.push(arr[0]); continue; }
+    const canon = arr.find((c) => String(c.bitrix_deal_id) === num);
+    resultado.push(
+      canon ??
+        [...arr].sort(
+          (a, b) => Number(b.valor) - Number(a.valor) || (b.data_compra ?? "").localeCompare(a.data_compra ?? ""),
+        )[0],
+    );
+  }
+  return resultado;
+}
+
 async function fetchTodasCompras(): Promise<CompraBitrix[]> {
   const sb = createServiceRoleClient();
   const todas: CompraBitrix[] = [];
@@ -65,7 +104,7 @@ async function fetchTodasCompras(): Promise<CompraBitrix[]> {
 
 export async function listClientesCompras(): Promise<ClienteCompras[]> {
   if (DEV_USE_MOCK_DATA) return [];
-  const compras = await fetchTodasCompras();
+  const compras = limparComprasBitrix(await fetchTodasCompras());
 
   const porChave = new Map<string, ClienteCompras>();
   for (const c of compras) {
@@ -112,5 +151,5 @@ export async function comprasDaPessoa(cpf: string | null, bitrixContactId: strin
   else if (cpfDig) q = q.eq("cpf", cpfDig);
   else if (bitrixContactId) q = q.eq("bitrix_contact_id", bitrixContactId);
   const { data } = await q;
-  return (data ?? []) as CompraBitrix[];
+  return limparComprasBitrix((data ?? []) as CompraBitrix[]);
 }

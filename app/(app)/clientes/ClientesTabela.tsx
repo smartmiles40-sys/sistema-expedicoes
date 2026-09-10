@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { Search, ShoppingBag, Plane, User, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
+import { Search, ShoppingBag, Plane, User, ArrowUp, ArrowDown, ChevronsUpDown, Download } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
@@ -95,9 +95,20 @@ export function ClientesTabela({ clientes }: { clientes: ClienteCompras[] }) {
             Quem já comprou (Bitrix). Clique nas colunas pra ordenar — quem gastou mais, quem tem maior ticket, etc.
           </p>
         </div>
-        <div className="relative w-72 max-w-full">
-          <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, CPF ou viagem…" className="pl-7" />
+        <div className="flex items-center gap-2">
+          <div className="relative w-72 max-w-full">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, CPF ou viagem…" className="pl-7" />
+          </div>
+          {clientes.length > 0 && (
+            <a
+              href="/api/clientes/export"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-[13px] font-medium hover:bg-accent"
+              title="Baixar a base completa em Excel (Clientes + Compras)"
+            >
+              <Download className="h-3.5 w-3.5" /> Exportar Excel
+            </a>
+          )}
         </div>
       </div>
 
