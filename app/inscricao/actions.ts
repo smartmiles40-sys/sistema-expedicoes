@@ -40,7 +40,21 @@ export type Identificacao =
   | { ok: false; error: string }
   | { ok: true; existe: false }
   | { ok: true; existe: true; conflito: true }
-  | { ok: true; existe: true; conflito: false; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao };
+  | { ok: true; existe: true; conflito: false; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao; fotoUrl: string | null };
+
+/** URL assinada da foto que a pessoa já enviou em qualquer expedição (pra mostrar
+ *  no form e não parecer que precisa reenviar). null se não tiver. */
+async function assinarFotoPessoa(linhas: Pax[]): Promise<string | null> {
+  const fotoId = linhas.find((l) => l.foto_arquivo_id)?.foto_arquivo_id;
+  if (!fotoId) return null;
+  if (DEV_USE_MOCK_DATA) return `/api/arquivos/${fotoId}/download?inline=1`;
+  const sb = createServiceRoleClient();
+  const { data } = await sb.from("arquivos").select("storage_path").eq("id", fotoId).maybeSingle();
+  const sp = (data as { storage_path: string } | null)?.storage_path;
+  if (!sp) return null;
+  const { data: signed } = await sb.storage.from(BUCKET).createSignedUrl(sp, 3600);
+  return signed?.signedUrl ?? null;
+}
 
 /** Passo 1: identifica o passageiro pelo CPF + nascimento (na expedição OU no histórico). */
 export async function identificarInscricao(
@@ -68,12 +82,13 @@ export async function identificarInscricao(
     ok: true, existe: true, conflito: false, temos,
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
     valores: montarValores(base, existente),
+    fotoUrl: await assinarFotoPessoa(linhas),
   };
 }
 
 export type IdentificacaoToken =
   | { ok: false; error: string }
-  | { ok: true; cpf: string; expedicaoId: string; existe: boolean; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao | null; dataNascimento: string | null };
+  | { ok: true; cpf: string; expedicaoId: string; existe: boolean; temos: string[]; temPassaporteAnexo: boolean; valores: ValoresInscricao | null; dataNascimento: string | null; fotoUrl: string | null };
 
 /**
  * Identificação vinda do PORTAL (link com token). Pula o portão de nascimento —
@@ -86,7 +101,7 @@ export async function identificarPorToken(token: string): Promise<IdentificacaoT
   const existente = linhas.find((l) => l.expedicao_id === v.expedicaoId) ?? null;
   const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
   if (!base) {
-    return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null, dataNascimento: null };
+    return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null, dataNascimento: null, fotoUrl: null };
   }
   const temos = CAMPOS_CHECAR.filter((c) => temValor((base as Record<string, unknown>)[c]));
   // A data de nascimento vem junto: o portão de nascimento foi pulado (a pessoa já
@@ -97,6 +112,7 @@ export async function identificarPorToken(token: string): Promise<IdentificacaoT
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
     valores: montarValores(base, existente),
     dataNascimento,
+    fotoUrl: await assinarFotoPessoa(linhas),
   };
 }
 

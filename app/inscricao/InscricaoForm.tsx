@@ -99,6 +99,8 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
   const [descricaoGrupo, setDescricaoGrupo] = React.useState<string | null>(null);
   const [animaExpedicao, setAnimaExpedicao] = React.useState<string | null>(null);
   const [fotoFile, setFotoFile] = React.useState<File | null>(null);
+  // Foto que a pessoa já enviou em outra expedição (reaproveitada) — só pra mostrar.
+  const [fotoExistenteUrl, setFotoExistenteUrl] = React.useState<string | null>(null);
   const [certificadoFile, setCertificadoFile] = React.useState<File | null>(null);
   const [confirmou, setConfirmou] = React.useState(false);
   const [passaporteFile, setPassaporteFile] = React.useState<File | null>(null);
@@ -224,6 +226,7 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
         if (!r.ok) { toast.error(r.error); return; }
         setCpf(mascaraCpf(r.cpf));
         setExpedicaoId(r.expedicaoId);
+        setFotoExistenteUrl(r.fotoUrl);
         if (r.dataNascimento) {
           // O portão de nascimento é pulado no token — traga a data do sistema pra
           // o envio não falhar na validação do servidor.
@@ -252,7 +255,7 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
       const r = await identificarInscricao(expedicaoId, cpf, nascimento);
       if (!r.ok) return toast.error(r.error);
       if (r.existe && r.conflito) return setFase("conflito");
-      if (r.existe) aplicarReconhecido(r.valores, r.temPassaporteAnexo);
+      if (r.existe) { aplicarReconhecido(r.valores, r.temPassaporteAnexo); setFotoExistenteUrl(r.fotoUrl); }
       else aplicarNovo();
       setPasso(0);
       setFase("completar");
@@ -568,10 +571,17 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
           <Campo label="Qual a sua música preferida? (opcional)"><Input value={f.musica} onChange={set("musica")} /></Campo>
           <div className="space-y-1">
             <Label className="text-[12px]">Envie sua melhor foto pra gente ✨ (opcional)</Label>
+            {fotoExistenteUrl && !fotoFile && (
+              <div className="flex items-center gap-2 rounded-md border border-vinculado-600/40 bg-vinculado-50 px-2.5 py-2 text-[12px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={fotoExistenteUrl} alt="Sua foto" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                <span className="text-vinculado-700">Você já enviou uma foto ✨ (mantida das suas outras viagens). Envie outra só se quiser trocar.</span>
+              </div>
+            )}
             <label className={cn("flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-[13px] hover:bg-accent/40",
               fotoFile && "border-solid border-vinculado-600/40 bg-vinculado-50")}>
               <Upload className="h-4 w-4 shrink-0" />
-              <span className="truncate">{fotoFile ? fotoFile.name : "Escolher foto"}</span>
+              <span className="truncate">{fotoFile ? fotoFile.name : fotoExistenteUrl ? "Trocar foto" : "Escolher foto"}</span>
               <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)} />
             </label>
           </div>
