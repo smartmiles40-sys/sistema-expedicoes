@@ -159,11 +159,16 @@ export type ValoresInscricao = {
   descricao_grupo: string; anima_expedicao: string; significado: string;
 };
 
-export function montarValores(base: Partial<Pax>, existente: Pax | null): ValoresInscricao {
+export function montarValores(base: Partial<Pax>, existente: Pax | null, perfilCarry?: PerfilViajante | null): ValoresInscricao {
   const s = (v: unknown) => (v == null ? "" : String(v));
   const b = base as Record<string, unknown>;
   const ex = (existente ?? {}) as Record<string, unknown>;
   const pv = (base.perfil_viajante ?? {}) as PerfilViajante;
+  // Campos "carry" (profissão, "como se descreve", @, camiseta, música) vêm do
+  // HISTÓRICO agregado (`perfilCarry`), NÃO da linha da expedição atual — que pode
+  // estar sem perfil (inscrição é por expedição). Fallback: o perfil da própria linha.
+  const cv = (perfilCarry ?? pv) as PerfilViajante;
+  const carry = (k: keyof PerfilViajante) => s((cv[k] ?? pv[k]) as unknown);
   return {
     nome_completo: s(b.nome_completo), email: s(b.email), telefone: s(b.telefone),
     passaporte: s(b.passaporte), validade_passaporte: s(b.validade_passaporte).slice(0, 10),
@@ -181,10 +186,10 @@ export function montarValores(base: Partial<Pax>, existente: Pax | null): Valore
     acompanhante_divide_quarto: null,
     acompanhante_vinculo: "", acompanhante_dividir_com: "",
     saude: (b.saude && typeof b.saude === "object" ? b.saude : {}) as SaudePassageiro,
-    profissao: s(pv.profissao), instagram: s(pv.instagram), camiseta: s(pv.camiseta), musica: s(pv.musica),
+    profissao: carry("profissao"), instagram: carry("instagram"), camiseta: carry("camiseta"), musica: carry("musica"),
     // "Profissão" e "como se descreve em grupo" seguem a pessoa; "o que te anima" e
     // "significado especial" são sempre respondidos de novo (voltam em branco).
-    descricao_grupo: s(pv.descricao_grupo), anima_expedicao: "", significado: "",
+    descricao_grupo: carry("descricao_grupo"), anima_expedicao: "", significado: "",
   };
 }
 

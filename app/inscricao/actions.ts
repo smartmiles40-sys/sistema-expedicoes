@@ -69,7 +69,8 @@ export async function identificarInscricao(
 
   const linhas = await acharLinhasPorCpf(cpf);
   const existente = linhas.find((l) => l.expedicao_id === expedicaoId) ?? null;
-  const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
+  const agregado = agregarPerfil(linhas);
+  const base = (existente ?? agregado) as Partial<Pax> | null;
   if (!base) return { ok: true, existe: false };
 
   // Trava: se já temos o nascimento e não bate, não revela nada.
@@ -81,7 +82,7 @@ export async function identificarInscricao(
   return {
     ok: true, existe: true, conflito: false, temos,
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
-    valores: montarValores(base, existente),
+    valores: montarValores(base, existente, agregado?.perfil_viajante ?? null),
     fotoUrl: await assinarFotoPessoa(linhas),
   };
 }
@@ -99,7 +100,8 @@ export async function identificarPorToken(token: string): Promise<IdentificacaoT
   if (!v) return { ok: false, error: "Link expirado ou inválido. Use o formulário normalmente." };
   const linhas = await acharLinhasPorCpf(v.cpf);
   const existente = linhas.find((l) => l.expedicao_id === v.expedicaoId) ?? null;
-  const base = (existente ?? agregarPerfil(linhas)) as Partial<Pax> | null;
+  const agregado = agregarPerfil(linhas);
+  const base = (existente ?? agregado) as Partial<Pax> | null;
   if (!base) {
     return { ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: false, temos: [], temPassaporteAnexo: false, valores: null, dataNascimento: null, fotoUrl: null };
   }
@@ -110,7 +112,7 @@ export async function identificarPorToken(token: string): Promise<IdentificacaoT
   return {
     ok: true, cpf: v.cpf, expedicaoId: v.expedicaoId, existe: true, temos,
     temPassaporteAnexo: temValor(base.passaporte_arquivo_id),
-    valores: montarValores(base, existente),
+    valores: montarValores(base, existente, agregado?.perfil_viajante ?? null),
     dataNascimento,
     fotoUrl: await assinarFotoPessoa(linhas),
   };
