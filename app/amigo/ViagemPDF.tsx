@@ -377,7 +377,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
               <View style={styles.fact}>
                 <Text style={styles.factLabel}>SUA HOSPEDAGEM</Text>
                 <Text style={styles.factVal}>{meuHotel.hotel_cidade ?? "Hospedagem"}</Text>
-                <Text style={styles.factSub}>Quarto {meuHotel.numero} · {meuHotel.tipo}</Text>
+                <Text style={styles.factSub}>{meuHotel.tipo}</Text>
               </View>
             )}
           </View>
@@ -535,7 +535,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
             <SecaoTitulo>Sua hospedagem</SecaoTitulo>
             {exp.quartos.map((q, i) => (
               <View key={i} style={styles.item} wrap={false}>
-                <Text style={styles.itemTitulo}>{q.hotel_cidade ?? "Hospedagem"} · Quarto {q.numero}</Text>
+                <Text style={styles.itemTitulo}>{q.hotel_cidade ?? "Hospedagem"}</Text>
                 <Text style={styles.meta}>
                   {q.tipo}
                   {(q.check_in || q.check_out) ? ` · ${q.check_in ? formatDate(q.check_in) : "—"} a ${q.check_out ? formatDate(q.check_out) : "—"}` : ""}

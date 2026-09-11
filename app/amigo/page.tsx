@@ -606,7 +606,7 @@ function ViagemExperiencia({ exp, nome, cpf, senha }: { exp: AmigoExpedicao; nom
                   {exp.quartos.map((q, i) => (
                     <li key={i} className="rounded-lg border border-border bg-background px-3 py-2">
                       <div className="text-[13px] font-medium">
-                        {q.hotel_cidade ?? "Hospedagem"} · Quarto {q.numero}
+                        {q.hotel_cidade ?? "Hospedagem"}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
                         {q.tipo}
