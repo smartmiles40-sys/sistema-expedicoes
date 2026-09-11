@@ -444,6 +444,13 @@ export async function entrarExpedAmigo(
     // Voo por subgrupo (G1/G2): null = todos veem; senão só quem é do grupo (admin/row null vê tudo). Migration 0055.
     const veGrupo = (grupoId: string | null | undefined): boolean =>
       grupoId == null || !row || row.grupo_id === grupoId;
+    // Voo INDIVIDUAL (migration 0057): se o passageiro tem voo próprio nesta expedição,
+    // o portal mostra SÓ os dele (ignora os de grupo). Quem não tem, vê os de grupo normal.
+    const temVoosProprios = !!row && voosGrupo.some((v) => v.expedicao_id === e.id && v.passageiro_id === row.id);
+    const veVoo = (v: ExpedicaoVooRow): boolean =>
+      v.passageiro_id != null
+        ? !!row && v.passageiro_id === row.id
+        : !temVoosProprios && veSegmento(v.extensao_id, v.apenas_sem_extensao) && veGrupo(v.grupo_id);
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)
@@ -500,7 +507,7 @@ export async function entrarExpedAmigo(
             })),
         })),
       voos_grupo: ordenarVoosCronologico(
-        voosGrupo.filter((v) => v.expedicao_id === e.id && veSegmento(v.extensao_id, v.apenas_sem_extensao) && veGrupo(v.grupo_id)),
+        voosGrupo.filter((v) => v.expedicao_id === e.id && veVoo(v)),
       )
         .map((v) => ({
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,

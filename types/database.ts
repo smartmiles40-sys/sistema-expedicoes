@@ -464,6 +464,9 @@ export type ExpedicaoVooRow = {
   apenas_sem_extensao: boolean;
   /** Subgrupo (G1/G2) a que este voo pertence (null = todos veem). Migration 0055. */
   grupo_id: string | null;
+  /** Voo INDIVIDUAL de um passageiro (null = voo de grupo). Migration 0057. Quando um
+   *  passageiro tem voo(s) próprio(s), o portal mostra SÓ os dele (ignora os do grupo). */
+  passageiro_id: string | null;
   ordem: number;
   created_at: string;
   updated_at: string;

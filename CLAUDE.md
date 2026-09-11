@@ -500,6 +500,14 @@ role**, **só leitura**.
   ≥2 `grupos_expedicao`; badge azul (`Users`) no voo. No portal `veGrupo(grupo_id)` filtra
   (`entrarExpedAmigo`): `null` ou `row.grupo_id === grupo_id` (admin/row null vê todos).
   `PortalEditor` recebe `grupos` da `portal/page.tsx` (`listGruposExpedicao`).
+- **Voo INDIVIDUAL por passageiro (migration 0057):** coluna `expedicao_voos.passageiro_id`
+  (FK `passageiros`, on delete cascade) — pra quem **emenda com outra viagem** ou voa
+  diferente do grupo quando NÃO dá pra usar o subgrupo G1/G2 (que é divisão real, mexer
+  no `grupo_id` quebraria rooming/roteiro). Regra no portal (`entrarExpedAmigo`, `veVoo`):
+  se o passageiro tem **algum** voo próprio nesta expedição, o portal mostra **SÓ os dele**
+  e esconde os de grupo; quem não tem voo próprio vê os de grupo normal. Preenchido via
+  script hoje (sem seletor no editor ainda). Ex.: Consuelo (Japão G1 emenda Tailândia via
+  Bangkok) e as saídas individuais de Japão G1/G2 poderiam migrar pra cá no futuro.
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.
