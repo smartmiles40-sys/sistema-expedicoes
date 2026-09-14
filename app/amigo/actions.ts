@@ -463,6 +463,8 @@ export async function entrarExpedAmigo(
             check_in: q.check_in,
             check_out: q.check_out,
           }))
+          // Ordem cronológica pela data de check-in (sem data vai pro fim).
+          .sort((a, b) => (a.check_in ?? "9999").localeCompare(b.check_in ?? "9999"))
       : [];
 
     expedicoes.push({
