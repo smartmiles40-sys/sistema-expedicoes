@@ -118,3 +118,23 @@ export function coletarArquivosExpedicao(exp: LiderExpedicao): LiderArquivo[] {
   }
   return [...porId.values()];
 }
+
+/** Bytes totais que o download offline vai baixar (soma dos documentos únicos). */
+export function tamanhoOfflineExpedicao(exp: LiderExpedicao): { bytes: number; comTamanho: number; total: number } {
+  const arqs = coletarArquivosExpedicao(exp);
+  let bytes = 0;
+  let comTamanho = 0;
+  for (const a of arqs) {
+    if (typeof a.tamanho === "number" && a.tamanho > 0) { bytes += a.tamanho; comTamanho++; }
+  }
+  return { bytes, comTamanho, total: arqs.length };
+}
+
+/** Formata bytes em KB/MB legível (pt-BR). */
+export function formatarTamanho(bytes: number): string {
+  if (bytes <= 0) return "0 KB";
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) return `${mb.toFixed(mb >= 10 ? 0 : 1).replace(".", ",")} MB`;
+  const kb = Math.max(1, Math.round(bytes / 1024));
+  return `${kb} KB`;
+}

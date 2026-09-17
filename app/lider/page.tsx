@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays, Moon, Sun,
-  DownloadCloud, WifiOff, Trash2,
+  DownloadCloud, WifiOff, Trash2, HardDriveDownload,
 } from "lucide-react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -25,6 +25,7 @@ import { resumoSaude } from "@/lib/saude";
 import {
   offlineSuportado, salvarExpedicao, carregarExpedicoesSalvas, removerExpedicao,
   salvarDoc, carregarDoc, coletarArquivosExpedicao,
+  tamanhoOfflineExpedicao, formatarTamanho,
 } from "@/lib/lider/offline";
 import type { RoteiroLiderDiaRow } from "@/types/database";
 
@@ -607,6 +608,9 @@ function ExpedicaoLiderCard({
   const dias = daysUntil(exp.data_embarque);
   const lideres = exp.passageiros.filter((p) => p.tipo === "Líder");
   const amigos = exp.passageiros.filter((p) => p.tipo !== "Líder");
+  const off = React.useMemo(() => tamanhoOfflineExpedicao(exp), [exp]);
+  // "+" quando algum documento não tem tamanho conhecido (estimativa é piso).
+  const tamanhoLabel = off.bytes > 0 ? `~${formatarTamanho(off.bytes)}${off.comTamanho < off.total ? "+" : ""}` : null;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -664,10 +668,15 @@ function ExpedicaoLiderCard({
               type="button"
               onClick={onSalvar}
               className="inline-flex items-center gap-1.5 rounded-md bg-[var(--brand-lime)] px-2.5 py-1 font-semibold text-[var(--brand-dark)] hover:opacity-90"
-              title="Baixar esta expedição (dados + documentos) para acessar sem internet"
+              title={`Baixar esta expedição (dados + documentos) para acessar sem internet${tamanhoLabel ? ` — ${off.total} documento(s), ${tamanhoLabel}` : ""}`}
             >
               <DownloadCloud className="h-3.5 w-3.5" /> Salvar para offline
             </button>
+          )}
+          {!prep && tamanhoLabel && (
+            <span className="inline-flex items-center gap-1 text-muted-foreground" title={`${off.total} documento(s) para baixar`}>
+              <HardDriveDownload className="h-3.5 w-3.5" /> {tamanhoLabel}
+            </span>
           )}
         </div>
       )}

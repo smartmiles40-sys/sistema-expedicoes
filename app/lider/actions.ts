@@ -78,7 +78,7 @@ async function conferirSenhaAcesso(
   return { ok: false, error: "Seu acesso ainda não foi liberado. Fale com a agência." };
 }
 
-export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string };
+export type LiderArquivo = { id: string; nome: string; mime: string | null; categoria: string; tamanho: number | null };
 export type LiderChecagem = ChecagemProntidao & { arquivos: LiderArquivo[] };
 export type LiderPax = {
   id: string;
@@ -143,7 +143,7 @@ export async function buscarDadosLider(
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
   let reqs: PassageiroRequisitoRow[];
-  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; expedicao_id: string | null; categoria: string; descricao: string | null }[];
+  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; expedicao_id: string | null; categoria: string; descricao: string | null; tamanho_bytes: number | null }[];
   let rl: RoteiroLiderDiaRow[] = [];
   let gruposExp: GrupoExpedicaoRow[] = [];
   let quartos: QuartoRow[] = [];
@@ -157,7 +157,7 @@ export async function buscarDadosLider(
     reqs = mockPassageiroRequisitos;
     quartos = mockQuartos;
     alocacoes = mockAlocacoes;
-    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, expedicao_id: a.expedicao_id, categoria: a.categoria, descricao: a.descricao }));
+    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, expedicao_id: a.expedicao_id, categoria: a.categoria, descricao: a.descricao, tamanho_bytes: a.tamanho_bytes }));
     for (const p of pax) if (p.foto_arquivo_id) fotoUrl.set(p.foto_arquivo_id, `/api/arquivos/${p.foto_arquivo_id}/download?inline=1`);
   } else {
     const sb = createServiceRoleClient();
@@ -167,7 +167,7 @@ export async function buscarDadosLider(
       sb.from("expedicoes").select("*"),
       fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
       fetchAllRows<PassageiroRequisitoRow>((from, to) => sb.from("passageiro_requisitos").select("*").order("id").range(from, to)),
-      fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,expedicao_id,categoria,descricao").order("id").range(from, to)),
+      fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,expedicao_id,categoria,descricao,tamanho_bytes").order("id").range(from, to)),
       fetchAllRows<GrupoExpedicaoRow>((from, to) => sb.from("grupos_expedicao").select("*").order("id").range(from, to)),
       fetchAllRows<QuartoRow>((from, to) => sb.from("quartos").select("*").order("id").range(from, to)),
       fetchAllRows<AlocacaoQuartoRow>((from, to) => sb.from("passageiro_quarto").select("*").order("id").range(from, to)),
@@ -289,12 +289,12 @@ export async function buscarDadosLider(
   for (const a of arqs) {
     if (a.passageiro_id) {
       const arr = arqsPorPax.get(a.passageiro_id) ?? [];
-      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, descricao: a.descricao });
+      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes, descricao: a.descricao });
       arqsPorPax.set(a.passageiro_id, arr);
     } else if (a.expedicao_id && (a.descricao ?? "") === MARCADOR_DOC_LIDER) {
       // Só documentos marcados p/ o líder — não fotos/vouchers de nível-expedição.
       const arr = arqsPorExp.get(a.expedicao_id) ?? [];
-      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
+      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes });
       arqsPorExp.set(a.expedicao_id, arr);
     }
   }
@@ -324,7 +324,7 @@ export async function buscarDadosLider(
       .map((p) => {
         const res = avaliarProntidao({ passageiro: p, expedicao: e, destino: e.destino, requisitos: reqsPorPax.get(p.id) ?? [] });
         const arquivosPax = arqsPorPax.get(p.id) ?? [];
-        const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
+        const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho });
         const checagens: LiderChecagem[] = res.checagens.map((c) => {
           const cat = CATEGORIA_REQUISITO[c.tipo];
           // Vários tipos dividem a mesma categoria (Doc Pessoal/Vacina → "Documentos
