@@ -236,6 +236,14 @@ export const CATEGORIA_ARQUIVO = [
 ] as const;
 export type CategoriaArquivo = (typeof CATEGORIA_ARQUIVO)[number];
 
+/**
+ * Marcador (em `arquivos.descricao`) que identifica um DOCUMENTO DA EXPEDIÇÃO
+ * destinado à Área do Líder (ex.: manual do líder). Guardado como categoria
+ * "Outros" + esta descrição, pra distinguir de fotos/vouchers de nível-expedição
+ * sem precisar de novo valor no enum `categoria_arquivo`.
+ */
+export const MARCADOR_DOC_LIDER = "Documento do líder";
+
 /** Tamanho máximo permitido por upload (15 MB) — barra DoS de storage. */
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 

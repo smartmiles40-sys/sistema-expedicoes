@@ -568,12 +568,18 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
 - **Importação inicial:** a partir de `Roteiro_Japao_China_G1_G2.xlsx` (34 dias
   G1+G2 + 7 alertas críticos), por script pontual não versionado.
 - **Documentos da EXPEDIÇÃO na Área do Líder** (ex.: "Manual dos líderes"): arquivos
-  em `arquivos` com `expedicao_id` preenchido e `passageiro_id = null`. `buscarDadosLider`
-  agrupa em `arqsPorExp` e devolve em `LiderExpedicao.documentos`; a UI mostra a seção
-  **"Documentos da expedição"** (`DocsExpedicao` em `page.tsx`) no card aberto, e o
-  offline os inclui (`coletarArquivosExpedicao`). Autorização reusa `linkAssinadoLider`
-  (libera quem é Líder da expedição dona do arquivo, ou Master). Upload = mesma rota
-  `/api/arquivos/upload` (sem `passageiro_id`), categoria "Outros".
+  em `arquivos` com `expedicao_id` preenchido, `passageiro_id = null`, categoria "Outros"
+  e **`descricao === MARCADOR_DOC_LIDER`** (`"Documento do líder"`, em `lib/constants.ts`).
+  O marcador é o que distingue esses docs das fotos/vouchers de nível-expedição (que
+  também têm `passageiro_id = null`) — sem precisar de novo valor no enum
+  `categoria_arquivo`. `buscarDadosLider` filtra por esse marcador em `arqsPorExp` e
+  devolve em `LiderExpedicao.documentos`; a UI mostra a seção **"Documentos da expedição"**
+  (`DocsExpedicao` em `app/lider/page.tsx`) no card aberto, e o offline os inclui
+  (`coletarArquivosExpedicao`). Autorização reusa `linkAssinadoLider` (Líder da expedição
+  dona do arquivo, ou Master). **Autoria (operacional):** painel **"Documentos da Área do
+  Líder"** (`DocsLiderPanel`) na aba **Roteiro do Líder** (`.../roteiro-lider/`) — upload
+  via `/api/arquivos/upload` (categoria "Outros" + `descricao` = marcador, sem
+  `passageiro_id`) e remoção via `DELETE /api/arquivos/[id]`.
 
 ## 🔐 Papéis e permissões (perfil do usuário)
 

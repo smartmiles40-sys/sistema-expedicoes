@@ -7,6 +7,7 @@ import { fetchAllRows } from "@/lib/data/expedicoes";
 import { soDigitosCpf } from "@/lib/cpf";
 import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import { avaliarProntidao, type ChecagemProntidao } from "@/lib/prontidao/regras";
+import { MARCADOR_DOC_LIDER } from "@/lib/constants";
 import { grupoEgito, ehExpedicaoEgito } from "@/lib/dev-grupos-egito"; // ⚠️ local/temporário (fallback G1/G2 Egito)
 import type {
   PassageiroRow, ExpedicaoRow, PassageiroRequisitoRow, ArquivoRow, Prontidao, RoteiroLiderDiaRow,
@@ -290,7 +291,8 @@ export async function buscarDadosLider(
       const arr = arqsPorPax.get(a.passageiro_id) ?? [];
       arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, descricao: a.descricao });
       arqsPorPax.set(a.passageiro_id, arr);
-    } else if (a.expedicao_id) {
+    } else if (a.expedicao_id && (a.descricao ?? "") === MARCADOR_DOC_LIDER) {
+      // Só documentos marcados p/ o líder — não fotos/vouchers de nível-expedição.
       const arr = arqsPorExp.get(a.expedicao_id) ?? [];
       arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
       arqsPorExp.set(a.expedicao_id, arr);
