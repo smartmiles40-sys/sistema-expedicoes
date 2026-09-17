@@ -124,6 +124,8 @@ export type LiderExpedicao = {
   roteiro: RoteiroLiderDiaRow[];
   /** Todos os grupos irmãos da viagem (inclui este) — para o Mapa de Líderes e alertas. */
   grupos: LiderGrupoRoteiro[];
+  /** Documentos da EXPEDIÇÃO (não de um passageiro) — ex.: Manual do líder. */
+  documentos: LiderArquivo[];
   passageiros: LiderPax[];
 };
 export type LiderDados = { nome: string; master: boolean; expedicoes: LiderExpedicao[] };
@@ -140,7 +142,7 @@ export async function buscarDadosLider(
   let pax: PassageiroRow[];
   let exps: ExpedicaoRow[];
   let reqs: PassageiroRequisitoRow[];
-  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; categoria: string; descricao: string | null }[];
+  let arqs: { id: string; nome: string; mime: string | null; passageiro_id: string | null; expedicao_id: string | null; categoria: string; descricao: string | null }[];
   let rl: RoteiroLiderDiaRow[] = [];
   let gruposExp: GrupoExpedicaoRow[] = [];
   let quartos: QuartoRow[] = [];
@@ -154,7 +156,7 @@ export async function buscarDadosLider(
     reqs = mockPassageiroRequisitos;
     quartos = mockQuartos;
     alocacoes = mockAlocacoes;
-    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, categoria: a.categoria, descricao: a.descricao }));
+    arqs = (await listArquivosMock()).map((a) => ({ id: a.id, nome: a.nome, mime: a.mime, passageiro_id: a.passageiro_id, expedicao_id: a.expedicao_id, categoria: a.categoria, descricao: a.descricao }));
     for (const p of pax) if (p.foto_arquivo_id) fotoUrl.set(p.foto_arquivo_id, `/api/arquivos/${p.foto_arquivo_id}/download?inline=1`);
   } else {
     const sb = createServiceRoleClient();
@@ -164,7 +166,7 @@ export async function buscarDadosLider(
       sb.from("expedicoes").select("*"),
       fetchAllRows<PassageiroRow>((from, to) => sb.from("passageiros").select("*").order("id").range(from, to)),
       fetchAllRows<PassageiroRequisitoRow>((from, to) => sb.from("passageiro_requisitos").select("*").order("id").range(from, to)),
-      fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,categoria,descricao").order("id").range(from, to)),
+      fetchAllRows<typeof arqs[number]>((from, to) => sb.from("arquivos").select("id,nome,mime,passageiro_id,expedicao_id,categoria,descricao").order("id").range(from, to)),
       fetchAllRows<GrupoExpedicaoRow>((from, to) => sb.from("grupos_expedicao").select("*").order("id").range(from, to)),
       fetchAllRows<QuartoRow>((from, to) => sb.from("quartos").select("*").order("id").range(from, to)),
       fetchAllRows<AlocacaoQuartoRow>((from, to) => sb.from("passageiro_quarto").select("*").order("id").range(from, to)),
@@ -281,11 +283,18 @@ export async function buscarDadosLider(
   }
   type ArqTrab = LiderArquivo & { descricao: string | null };
   const arqsPorPax = new Map<string, ArqTrab[]>();
+  // Documentos de EXPEDIÇÃO (sem passageiro): manual do líder etc.
+  const arqsPorExp = new Map<string, LiderArquivo[]>();
   for (const a of arqs) {
-    if (!a.passageiro_id) continue;
-    const arr = arqsPorPax.get(a.passageiro_id) ?? [];
-    arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, descricao: a.descricao });
-    arqsPorPax.set(a.passageiro_id, arr);
+    if (a.passageiro_id) {
+      const arr = arqsPorPax.get(a.passageiro_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, descricao: a.descricao });
+      arqsPorPax.set(a.passageiro_id, arr);
+    } else if (a.expedicao_id) {
+      const arr = arqsPorExp.get(a.expedicao_id) ?? [];
+      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria });
+      arqsPorExp.set(a.expedicao_id, arr);
+    }
   }
 
   const expById = new Map(exps.map((e) => [e.id, e]));
@@ -362,6 +371,7 @@ export async function buscarDadosLider(
       viagem_grupo: e.viagem_grupo ?? null,
       roteiro,
       grupos,
+      documentos: arqsPorExp.get(eid) ?? [],
       passageiros,
     });
   }

@@ -567,6 +567,13 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
   com quem, e onde estão os outros — destacando o dia de HOJE / A SEGUIR.
 - **Importação inicial:** a partir de `Roteiro_Japao_China_G1_G2.xlsx` (34 dias
   G1+G2 + 7 alertas críticos), por script pontual não versionado.
+- **Documentos da EXPEDIÇÃO na Área do Líder** (ex.: "Manual dos líderes"): arquivos
+  em `arquivos` com `expedicao_id` preenchido e `passageiro_id = null`. `buscarDadosLider`
+  agrupa em `arqsPorExp` e devolve em `LiderExpedicao.documentos`; a UI mostra a seção
+  **"Documentos da expedição"** (`DocsExpedicao` em `page.tsx`) no card aberto, e o
+  offline os inclui (`coletarArquivosExpedicao`). Autorização reusa `linkAssinadoLider`
+  (libera quem é Líder da expedição dona do arquivo, ou Master). Upload = mesma rota
+  `/api/arquivos/upload` (sem `passageiro_id`), categoria "Outros".
 
 ## 🔐 Papéis e permissões (perfil do usuário)
 

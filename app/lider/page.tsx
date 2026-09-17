@@ -674,6 +674,7 @@ function ExpedicaoLiderCard({
 
       {aberta && (
         <div className="space-y-3 p-3">
+          <DocsExpedicao exp={exp} onVerDoc={onVerDoc} />
           <RoteiroLider exp={exp} meuNome={meuNome} />
           <Aniversariantes exp={exp} />
           {lideres.length > 0 && (
@@ -1090,6 +1091,20 @@ function PaxLiderRow({ p, onVerDoc }: { p: LiderPax; onVerDoc: VerDoc }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function DocsExpedicao({ exp, onVerDoc }: { exp: LiderExpedicao; onVerDoc: VerDoc }) {
+  if (exp.documentos.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-border bg-accent/30 p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <FileText className="h-3.5 w-3.5" /> Documentos da expedição
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {exp.documentos.map((a) => <DocChip key={a.id} a={a} onVerDoc={onVerDoc} />)}
+      </div>
     </div>
   );
 }

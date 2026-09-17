@@ -111,6 +111,7 @@ export async function limparOffline(): Promise<void> {
 /** Documentos (dedup por id) de UMA expedição — pra baixar/remover em lote. */
 export function coletarArquivosExpedicao(exp: LiderExpedicao): LiderArquivo[] {
   const porId = new Map<string, LiderArquivo>();
+  for (const a of exp.documentos) if (!porId.has(a.id)) porId.set(a.id, a);
   for (const p of exp.passageiros) {
     for (const a of p.arquivos) if (!porId.has(a.id)) porId.set(a.id, a);
     for (const c of p.checagens) for (const a of c.arquivos) if (!porId.has(a.id)) porId.set(a.id, a);
