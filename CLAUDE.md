@@ -508,6 +508,11 @@ role**, **só leitura**.
   e esconde os de grupo; quem não tem voo próprio vê os de grupo normal. Preenchido via
   script hoje (sem seletor no editor ainda). Ex.: Consuelo (Japão G1 emenda Tailândia via
   Bangkok) e as saídas individuais de Japão G1/G2 poderiam migrar pra cá no futuro.
+- **Expedições PRIVADAS no ExpedAmigo:** o conjunto `EXPEDICOES_PRIVADAS_AMIGO`
+  (por `codigo`, em `app/amigo/actions.ts`) lista expedições que **NÃO entram no broadcast
+  de admin** (masters/admins não as veem em "todas as futuras"). Continuam visíveis só
+  para quem é **passageiro liberado** (`liberado_expedamigo`). Uso: ações de marketing/
+  fechadas. Ex.: `JAPCOR-2026-09` (influencers Japão & Coreia).
 - **Acesso Master da Área do Líder está ATIVO** para Luis Antonio de Negreiros
   Caetano e Beatriz Rodrigues Galvão (CPFs no mapa `MASTERS` em
   `app/lider/actions.ts`) — eles enxergam TODAS as expedições e todos os documentos.

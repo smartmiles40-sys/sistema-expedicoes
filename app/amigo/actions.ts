@@ -139,6 +139,14 @@ export type AmigoDados = {
  * como qualquer pessoa (o admin não precisa ser passageiro/ter nascimento).
  * Chave = 11 dígitos do CPF.
  */
+/**
+ * Expedições PRIVADAS no ExpedAmigo (por `codigo`): NÃO entram no broadcast de admin
+ * (masters/admins não as veem na lista de "todas as futuras"). Continuam visíveis
+ * apenas para quem é passageiro liberado (`liberado_expedamigo`). Uso: ações de
+ * marketing/fechadas. Ex.: JAPCOR-2026-09 (influencers Japão & Coreia).
+ */
+const EXPEDICOES_PRIVADAS_AMIGO = new Set<string>(["JAPCOR-2026-09"]);
+
 const ADMINS_AMIGO: Record<string, string> = {
   "20262027999": "Administrador",
   "79746748220": "Carolina Lage Taketomi",
@@ -279,9 +287,12 @@ export async function entrarExpedAmigo(
     if (e && !cancelada(e)) unidadesMap.set(expId, { exp: e, row });
   }
   // Admin master: também enxerga TODAS as futuras não-canceladas (com a linha dele, se for passageiro).
+  // EXCETO expedições PRIVADAS (ex.: ação de marketing) — essas só aparecem pra quem é
+  // passageiro liberado (via o laço acima), nunca no broadcast de admin.
   if (ehAdmin) {
     for (const e of exps) {
       if (cancelada(e) || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
+      if (EXPEDICOES_PRIVADAS_AMIGO.has(e.codigo)) continue;
       if (!unidadesMap.has(e.id)) unidadesMap.set(e.id, { exp: e, row: minhaRowPorExp.get(e.id) ?? null });
     }
   }
