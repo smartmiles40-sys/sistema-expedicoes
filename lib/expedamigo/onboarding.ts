@@ -15,7 +15,13 @@ Já liberamos o seu acesso ao *Portal do Viajante* 🎉 É nele que você acompa
 
 👉 {link}
 
-É só clicar no link pra criar sua senha e entrar. Qualquer dúvida, estamos aqui por você! 🙌`;
+É só clicar no link pra criar sua senha e entrar.
+
+📝 Importante: ao abrir o *roteiro dia a dia* no portal, vai aparecer um *formulário de inscrição* pra você preencher — é onde a gente te conhece melhor e já organiza sua documentação com antecedência, pra tudo fluir tranquilo lá na frente.
+
+E o próximo passo é um *encontro rápido de boas-vindas*: online, leve, uns 20 minutinhos. Ali o nosso time se apresenta, te conta como funciona o acompanhamento daqui pra frente e alinha os próximos passos da sua expedição.
+
+Conta pra gente: qual o melhor dia e horário pra você nos próximos 7 dias, de segunda a sexta? 💚`;
 
 /** Primeiro nome (a mensagem fica mais pessoal com o primeiro nome). */
 function primeiroNome(nome: string): string {
