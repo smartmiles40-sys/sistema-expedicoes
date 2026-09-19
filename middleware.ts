@@ -7,6 +7,7 @@ const LIBERADAS = [
   "/acesso",
   "/inscricao", // formulário público de inscrição (clientes não têm a senha do site)
   "/amigo", // portal público do viajante (login próprio por CPF+senha; inclui /amigo/acesso)
+  "/a/", // link curto de 1º acesso (/a/<codigo> → redireciona pro /amigo/acesso)
   "/api/health",
   "/api/logout",
   "/api/bitrix",

@@ -526,6 +526,11 @@ role**, **só leitura**.
   comprou sem CPF. Actions: `carregarAcessoPorToken` / `definirSenhaPorTokenAcesso` em
   `app/amigo/actions.ts`. Template da msg em `lib/expedamigo/onboarding.ts`
   (`{nome}`/`{expedição}`/`{link}`). `middleware.ts` libera `/amigo` e `/api/expedamigo`.
+  **Link CURTO (migration 0058):** o onboarding gera um código e grava em `acesso_links`
+  (`codigo` único, `passageiro_id`, `expira_em` 30d) e manda `/a/<codigo>` (bem menor que a
+  URL com token). A rota **`app/a/[codigo]/route.ts`** resolve o código → gera o token →
+  redireciona pro `/amigo/acesso?t=…` (`middleware` libera `/a/`). No `dryRun` NÃO grava
+  (cai no link longo por token); `criarLinkCurto` faz fallback pro link longo se o insert falhar.
   ⚠️ 1ª execução pega TODO o backlog de Confirmados-não-liberados — baseline antes de ligar.
 - **Expedições PRIVADAS no ExpedAmigo:** o conjunto `EXPEDICOES_PRIVADAS_AMIGO`
   (por `codigo`, em `app/amigo/actions.ts`) lista expedições que **NÃO entram no broadcast
