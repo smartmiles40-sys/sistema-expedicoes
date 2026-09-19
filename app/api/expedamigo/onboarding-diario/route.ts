@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { isValidWebhookSecret } from "@/lib/security/secrets";
 import { assinarTokenAcesso } from "@/lib/expedamigo/first-access-token";
 import { montarMensagemOnboarding } from "@/lib/expedamigo/onboarding";
 
@@ -41,8 +42,7 @@ async function criarLinkCurto(sb: ReturnType<typeof createServiceRoleClient>, pa
  * Body (opcional): { dryRun?: boolean, expedicao_codigo?: string }.
  */
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-webhook-secret") ?? "";
-  if (!DEV_USE_MOCK_DATA && secret !== (process.env.WEBHOOK_SECRET ?? "")) {
+  if (!DEV_USE_MOCK_DATA && !isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
