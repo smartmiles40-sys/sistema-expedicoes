@@ -16,13 +16,25 @@ export type UpsertPassageiroResult =
   | { ok: false; status: number; error: string };
 
 const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
+const soDig = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+/** Normaliza nome pra casamento (sem acento, minúsculo, espaços colapsados). */
+const normNome = (v: unknown) =>
+  String(v ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+const nascDia = (v: unknown) => String(v ?? "").slice(0, 10);
 
 /**
  * Cria/atualiza um passageiro a partir do payload do Bitrix.
  *
- * Casa o passageiro existente por `bitrix_deal_id` OU por `(expedicao_id, cpf)` — assim
- * não duplica quem já entrou por inscrição/manual (respeita a unique de CPF por expedição)
- * e ainda vincula o deal na linha existente.
+ * Casa o passageiro existente com CASAMENTO REFORÇADO (pra não duplicar quem já entrou
+ * por inscrição/manual): 1) por `bitrix_deal_id` (global); senão, DENTRO da expedição,
+ * por 2) CPF (dígitos), 3) `bitrix_contact_id`, 4) nome + data de nascimento. Só cria
+ * novo se nenhum casar. Vincula o deal na linha existente.
  *
  * ⚠️ Política "SÓ PREENCHE O QUE ESTÁ VAZIO": passageiro NOVO é criado com tudo; num que
  * JÁ EXISTE, só grava os campos vazios no sistema — NUNCA sobrescreve dado já preenchido
@@ -58,9 +70,19 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
     const expedicao = mockExpedicoes.find((e) => e.codigo === data.expedicao_codigo);
     if (!expedicao) return { ok: false, status: 404, error: `Expedição ${data.expedicao_codigo} não encontrada` };
 
-    let existente = mockPassageiros.find((p) => p.bitrix_deal_id === data.bitrix_deal_id);
-    if (!existente && data.cpf) {
-      existente = mockPassageiros.find((p) => p.expedicao_id === expedicao.id && p.cpf === data.cpf);
+    let existente = data.bitrix_deal_id
+      ? mockPassageiros.find((p) => p.bitrix_deal_id === data.bitrix_deal_id)
+      : undefined;
+    if (!existente) {
+      const naExp = mockPassageiros.filter((p) => p.expedicao_id === expedicao.id);
+      const cpfDig = soDig(data.cpf);
+      if (cpfDig) existente = naExp.find((p) => soDig(p.cpf) === cpfDig);
+      if (!existente && data.bitrix_contact_id)
+        existente = naExp.find((p) => String(p.bitrix_contact_id ?? "").trim() === String(data.bitrix_contact_id).trim());
+      if (!existente && data.nome_completo && data.data_nascimento)
+        existente = naExp.find(
+          (p) => normNome(p.nome_completo) === normNome(data.nome_completo) && nascDia(p.data_nascimento) === nascDia(data.data_nascimento),
+        );
     }
     if (existente) {
       const patch = patchVazios(existente as unknown as Record<string, unknown>);
@@ -124,7 +146,10 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
 
   const cols =
     "id, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, bitrix_deal_id, endereco_cep, endereco_rua";
-  const cpfDig = data.cpf ? data.cpf.replace(/\D/g, "") : null;
+  const cpfDig = soDig(data.cpf) || null;
+  const contatoId = data.bitrix_contact_id ? String(data.bitrix_contact_id).trim() : null;
+  const nomeN = data.nome_completo ? normNome(data.nome_completo) : null;
+  const nascN = data.data_nascimento ? nascDia(data.data_nascimento) : null;
 
   /** Aplica o patch "só-vazio" numa linha existente e devolve o resultado. */
   const atualizar = async (ex: Record<string, unknown>): Promise<UpsertPassageiroResult> => {
@@ -140,25 +165,40 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
     return { ok: true, passageiro_id: ex.id as string, action: "updated" };
   };
 
-  /** Acha na expedição a linha cujo CPF (só dígitos) bate com o recebido. */
-  const acharPorCpf = async (): Promise<Record<string, unknown> | null> => {
-    if (!cpfDig) return null;
+  /**
+   * Casamento REFORÇADO dentro da expedição, por prioridade:
+   * 1) CPF (dígitos) · 2) bitrix_contact_id · 3) nome + data de nascimento.
+   * Busca as linhas da expedição UMA vez e tenta cada chave.
+   */
+  const acharNaExpedicao = async (): Promise<Record<string, unknown> | null> => {
+    if (!cpfDig && !contatoId && !(nomeN && nascN)) return null;
     const { data: rows } = await supabase.from("passageiros").select(cols).eq("expedicao_id", exp.id);
-    return (
-      ((rows ?? []) as Record<string, unknown>[]).find(
-        (r) => String(r.cpf ?? "").replace(/\D/g, "") === cpfDig,
-      ) ?? null
-    );
+    const lista = (rows ?? []) as Record<string, unknown>[];
+    if (cpfDig) {
+      const m = lista.find((r) => soDig(r.cpf) === cpfDig);
+      if (m) return m;
+    }
+    if (contatoId) {
+      const m = lista.find((r) => String(r.bitrix_contact_id ?? "").trim() === contatoId);
+      if (m) return m;
+    }
+    if (nomeN && nascN) {
+      const m = lista.find((r) => normNome(r.nome_completo) === nomeN && nascDia(r.data_nascimento) === nascN);
+      if (m) return m;
+    }
+    return null;
   };
 
-  // 1) Casa por bitrix_deal_id.
-  const { data: byDeal } = await supabase
-    .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
-  if (byDeal) return atualizar(byDeal as Record<string, unknown>);
+  // 1) Casa por bitrix_deal_id (global — a mesma negociação).
+  if (data.bitrix_deal_id) {
+    const { data: byDeal } = await supabase
+      .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
+    if (byDeal) return atualizar(byDeal as Record<string, unknown>);
+  }
 
-  // 2) Não achou pelo deal → tenta pelo CPF (comparando por dígitos, tolerante a formato).
-  const porCpf = await acharPorCpf();
-  if (porCpf) return atualizar(porCpf);
+  // 2) Não achou pelo deal → casamento reforçado na expedição (CPF → contato → nome+nasc).
+  const naExp = await acharNaExpedicao();
+  if (naExp) return atualizar(naExp);
 
   // 3) Novo → insere completo.
   const registro = {
@@ -181,9 +221,9 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
   const { data: result, error } = await supabase
     .from("passageiros").insert(registro).select("id").single();
   if (error) {
-    // Corrida / conflito de CPF: alguém já existe nessa expedição com esse CPF.
-    // Re-acha e faz o update "só-vazio" em vez de quebrar.
-    const conflito = await acharPorCpf();
+    // Corrida / conflito de CPF: alguém já existe nessa expedição com essa identidade.
+    // Re-acha (reforçado) e faz o update "só-vazio" em vez de quebrar.
+    const conflito = await acharNaExpedicao();
     if (conflito) return atualizar(conflito);
     return { ok: false, status: 500, error: error.message };
   }
