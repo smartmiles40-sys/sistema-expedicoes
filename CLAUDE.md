@@ -508,6 +508,21 @@ role**, **só leitura**.
   e esconde os de grupo; quem não tem voo próprio vê os de grupo normal. Preenchido via
   script hoje (sem seletor no editor ainda). Ex.: Consuelo (Japão G1 emenda Tailândia via
   Bangkok) e as saídas individuais de Japão G1/G2 poderiam migrar pra cá no futuro.
+- **Onboarding automático (link de 1º acesso via n8n):** cron diário do n8n chama
+  **`POST /api/expedamigo/onboarding-diario`** (auth `x-webhook-secret` = `WEBHOOK_SECRET`;
+  body opcional `{ dryRun?, expedicao_codigo? }`). Seleciona quem **comprou** (`status_reserva
+  = "Confirmado"`) e ainda **não foi onboarded** (`liberado_expedamigo ≠ true`) nas
+  expedições ativas (futuras, não canceladas), gera um **link de 1º acesso** por pessoa,
+  marca `liberado_expedamigo = true` (idempotência — não reenvia; pulável com `dryRun`) e
+  devolve `{ enviar:[{nome, telefone, cpf, expedicao_codigo, expedicao_nome, link,
+  mensagem}], pendencias:[...sem telefone] }` pro n8n mandar por WhatsApp. **Link** =
+  `lib/expedamigo/first-access-token.ts` (HMAC, TTL 30 dias, encoda `passageiro_id`) →
+  página **`/amigo/acesso?t=…`** (`AcessoForm`): valida o token, cria a senha SEM pedir a
+  atual (o token já autentica) e **pede o CPF se faltar** (grava na linha) — resolve quem
+  comprou sem CPF. Actions: `carregarAcessoPorToken` / `definirSenhaPorTokenAcesso` em
+  `app/amigo/actions.ts`. Template da msg em `lib/expedamigo/onboarding.ts`
+  (`{nome}`/`{expedição}`/`{link}`). `middleware.ts` libera `/amigo` e `/api/expedamigo`.
+  ⚠️ 1ª execução pega TODO o backlog de Confirmados-não-liberados — baseline antes de ligar.
 - **Expedições PRIVADAS no ExpedAmigo:** o conjunto `EXPEDICOES_PRIVADAS_AMIGO`
   (por `codigo`, em `app/amigo/actions.ts`) lista expedições que **NÃO entram no broadcast
   de admin** (masters/admins não as veem em "todas as futuras"). Continuam visíveis só

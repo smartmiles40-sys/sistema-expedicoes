@@ -13,6 +13,7 @@ import { listArquivosMock } from "@/lib/data/arquivos-mock";
 import { soDigitosCpf } from "@/lib/cpf";
 import { hashSenhaAcesso, senhaNovaValida } from "@/lib/acesso-senha";
 import { assinarTokenInscricao } from "@/lib/inscricao/token";
+import { verificarTokenAcesso } from "@/lib/expedamigo/first-access-token";
 import type {
   PassageiroRow, ExpedicaoRow, LinkExpedicaoRow, QuartoRow, AlocacaoQuartoRow,
   RoteiroDiaRow, ExpedicaoVooRow, ExpedicaoPasseioRow, ExpedicaoInfoRow,
@@ -703,4 +704,79 @@ export async function definirSenhaExpedAmigo(
     .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha), senha_provisoria: null }, { onConflict: "cpf" });
   if (up.error) return { ok: false, error: up.error.message };
   return { ok: true };
+}
+
+// =============================================================================
+// PRIMEIRO ACESSO por LINK (onboarding automático via n8n)
+// =============================================================================
+
+/** Carrega os dados pra tela de 1º acesso a partir do token do link. */
+export async function carregarAcessoPorToken(
+  token: string,
+): Promise<
+  | { ok: true; nome: string; expedicaoNome: string | null; temCpf: boolean; jaTemSenha: boolean }
+  | { ok: false; error: string }
+> {
+  const v = verificarTokenAcesso(token ?? "");
+  if (!v) return { ok: false, error: "Link inválido ou expirado. Peça um novo à agência." };
+  if (DEV_USE_MOCK_DATA) return { ok: true, nome: "Viajante", expedicaoNome: "Sua viagem", temCpf: true, jaTemSenha: false };
+
+  const sb = createServiceRoleClient();
+  const { data: p } = await sb
+    .from("passageiros")
+    .select("nome_completo, cpf, expedicao_id")
+    .eq("id", v.passageiroId)
+    .maybeSingle();
+  if (!p) return { ok: false, error: "Cadastro não encontrado. Fale com a agência." };
+  const row = p as { nome_completo: string; cpf: string | null; expedicao_id: string | null };
+
+  let expedicaoNome: string | null = null;
+  if (row.expedicao_id) {
+    const { data: e } = await sb.from("expedicoes").select("nome").eq("id", row.expedicao_id).maybeSingle();
+    expedicaoNome = (e as { nome: string } | null)?.nome ?? null;
+  }
+  const cpf = soDigitosCpf(row.cpf ?? "");
+  let jaTemSenha = false;
+  if (cpf.length === 11) {
+    const { data: cred } = await sb.from("acesso_senhas").select("senha_hash").eq("cpf", cpf).maybeSingle();
+    jaTemSenha = !!(cred as { senha_hash: string | null } | null)?.senha_hash;
+  }
+  return { ok: true, nome: row.nome_completo, expedicaoNome, temCpf: cpf.length === 11, jaTemSenha };
+}
+
+/**
+ * Define a senha no 1º acesso via LINK. O token JÁ autentica (não pede senha atual).
+ * Se o passageiro não tiver CPF, ele informa aqui (o CPF é a chave do login).
+ */
+export async function definirSenhaPorTokenAcesso(
+  token: string,
+  novaSenha: string,
+  cpfInformado?: string,
+): Promise<{ ok: true; cpf: string } | { ok: false; error: string }> {
+  const v = verificarTokenAcesso(token ?? "");
+  if (!v) return { ok: false, error: "Link inválido ou expirado. Peça um novo à agência." };
+  const erro = senhaNovaValida(novaSenha);
+  if (erro) return { ok: false, error: erro };
+  if (DEV_USE_MOCK_DATA) return { ok: true, cpf: soDigitosCpf(cpfInformado ?? "00000000000") };
+
+  const sb = createServiceRoleClient();
+  const { data: p } = await sb.from("passageiros").select("id, cpf, expedicao_id").eq("id", v.passageiroId).maybeSingle();
+  if (!p) return { ok: false, error: "Cadastro não encontrado. Fale com a agência." };
+  const row = p as { id: string; cpf: string | null; expedicao_id: string | null };
+
+  let cpf = soDigitosCpf(row.cpf ?? "");
+  if (cpf.length !== 11) {
+    cpf = soDigitosCpf(cpfInformado ?? "");
+    if (cpf.length !== 11) return { ok: false, error: "Informe um CPF válido (11 dígitos) para criar seu acesso." };
+    // Grava o CPF na linha (estava vazio).
+    await sb.from("passageiros").update({ cpf }).eq("id", row.id);
+  }
+
+  const up = await sb
+    .from("acesso_senhas")
+    .upsert({ cpf, senha_hash: await hashSenhaAcesso(cpf, novaSenha), senha_provisoria: null }, { onConflict: "cpf" });
+  if (up.error) return { ok: false, error: up.error.message };
+  // Garante que a expedição aparece no portal.
+  await sb.from("passageiros").update({ liberado_expedamigo: true }).eq("id", row.id);
+  return { ok: true, cpf };
 }

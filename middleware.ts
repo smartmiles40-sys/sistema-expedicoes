@@ -6,10 +6,12 @@ import { SITE_AUTH_COOKIE, tokenAcesso } from "@/lib/site-auth";
 const LIBERADAS = [
   "/acesso",
   "/inscricao", // formulário público de inscrição (clientes não têm a senha do site)
+  "/amigo", // portal público do viajante (login próprio por CPF+senha; inclui /amigo/acesso)
   "/api/health",
   "/api/logout",
   "/api/bitrix",
   "/api/cambios",
+  "/api/expedamigo", // webhook do onboarding diário (auth própria por x-webhook-secret)
   "/api/expedicoes/atualizar-status",
 ];
 
