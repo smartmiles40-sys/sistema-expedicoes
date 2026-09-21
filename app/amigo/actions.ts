@@ -287,12 +287,15 @@ export async function entrarExpedAmigo(
     const e = expById.get(expId);
     if (e && !cancelada(e)) unidadesMap.set(expId, { exp: e, row });
   }
-  // Admin master: também enxerga TODAS as futuras não-canceladas (com a linha dele, se for passageiro).
+  // Admin master: também enxerga TODAS as expedições EM ANDAMENTO e futuras não-canceladas
+  // (com a linha dele, se for passageiro). O corte é pelo RETORNO (não pelo embarque): a
+  // expedição continua na lista enquanto acontece e só sai no dia seguinte ao retorno —
+  // assim uma viagem que embarcou NÃO some do portal no meio do caminho.
   // EXCETO expedições PRIVADAS (ex.: ação de marketing) — essas só aparecem pra quem é
   // passageiro liberado (via o laço acima), nunca no broadcast de admin.
   if (ehAdmin) {
     for (const e of exps) {
-      if (cancelada(e) || (e.data_embarque ?? "").slice(0, 10) < hoje) continue;
+      if (cancelada(e) || (e.data_retorno ?? e.data_embarque ?? "").slice(0, 10) < hoje) continue;
       if (EXPEDICOES_PRIVADAS_AMIGO.has(e.codigo)) continue;
       if (!unidadesMap.has(e.id)) unidadesMap.set(e.id, { exp: e, row: minhaRowPorExp.get(e.id) ?? null });
     }
@@ -602,8 +605,18 @@ export async function entrarExpedAmigo(
     return { ok: false, error: "Você ainda não tem uma viagem futura por aqui. Fale com a agência." };
   }
 
-  // Mais próxima primeiro.
-  expedicoes.sort((a, b) => (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""));
+  // Em andamento e futuras primeiro (a mais próxima no topo). As encerradas — a partir do
+  // DIA SEGUINTE ao retorno — vão para o fim da lista (mais recentes primeiro). Assim uma
+  // expedição fica em cima durante toda a viagem e só desce quando de fato termina.
+  expedicoes.sort((a, b) => {
+    const fimA = (a.data_retorno ?? a.data_embarque ?? "").slice(0, 10);
+    const fimB = (b.data_retorno ?? b.data_embarque ?? "").slice(0, 10);
+    const encA = fimA < hoje ? 1 : 0;
+    const encB = fimB < hoje ? 1 : 0;
+    if (encA !== encB) return encA - encB;              // encerradas por último
+    if (encA) return fimB.localeCompare(fimA);          // entre encerradas: retorno desc
+    return (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""); // ativas: embarque asc
+  });
 
   // Log de acesso (só em logins explícitos; auto-restore de sessão passa false).
   if (registrarLogin) await registrarAcessoExpedamigo(cpf, "login");
