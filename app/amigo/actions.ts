@@ -634,13 +634,13 @@ export async function entrarExpedAmigo(
  */
 export async function registrarAcessoExpedamigo(
   cpfRaw: string,
-  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher",
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher" | "primeiro_acesso",
   expedicaoId?: string | null,
 ): Promise<void> {
   try {
     const cpf = soDigitosCpf(cpfRaw ?? "");
     if (cpf.length !== 11) return;
-    if (!["login", "download_pdf", "viagem_aberta", "download_voucher"].includes(evento)) return;
+    if (!["login", "download_pdf", "viagem_aberta", "download_voucher", "primeiro_acesso"].includes(evento)) return;
     const expId = expedicaoId || null;
     if (DEV_USE_MOCK_DATA) {
       mockExpedamigoAcessos.push({
@@ -791,5 +791,7 @@ export async function definirSenhaPorTokenAcesso(
   if (up.error) return { ok: false, error: up.error.message };
   // Garante que a expedição aparece no portal.
   await sb.from("passageiros").update({ liberado_expedamigo: true }).eq("id", row.id);
+  // Loga o 1º acesso (criação da senha pelo link mágico) — best-effort, não quebra o fluxo.
+  await registrarAcessoExpedamigo(cpf, "primeiro_acesso", row.expedicao_id);
   return { ok: true, cpf };
 }

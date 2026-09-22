@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { ScrollText, Search, LogIn, FileDown, BookOpen, Ticket } from "lucide-react";
+import { ScrollText, Search, LogIn, FileDown, BookOpen, Ticket, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { StatPill } from "@/components/ui/StatPill";
@@ -12,12 +12,13 @@ export type AcessoLog = {
   id: string;
   cpf: string;
   nome: string | null;
-  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher";
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher" | "primeiro_acesso";
   expedicao_nome: string | null;
   created_at: string;
 };
 
 const EVENTOS: { chave: AcessoLog["evento"]; label: string; variant: "lista" | "vinculado" | "atencao"; Icon: typeof LogIn }[] = [
+  { chave: "primeiro_acesso", label: "1º acesso", variant: "vinculado", Icon: KeyRound },
   { chave: "login", label: "Login", variant: "lista", Icon: LogIn },
   { chave: "viagem_aberta", label: "Abriu viagem", variant: "atencao", Icon: BookOpen },
   { chave: "download_pdf", label: "Baixou PDF", variant: "vinculado", Icon: FileDown },
@@ -51,7 +52,7 @@ export function AcessosTabela({ rows }: { rows: AcessoLog[] }) {
           <ScrollText className="h-4 w-4 text-editavel-600" /> Acessos ao ExpedAmigo
         </h1>
         <p className="text-xs text-muted-foreground">
-          Registro de quem entrou no portal, abriu uma viagem e baixou o PDF. Só CPF, evento e data/hora (sem IP/dispositivo).
+          Registro de quem criou o acesso (1º acesso pelo link), entrou no portal, abriu uma viagem e baixou arquivos. Só CPF, evento e data/hora (sem IP/dispositivo).
         </p>
       </div>
 

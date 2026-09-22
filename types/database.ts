@@ -654,7 +654,7 @@ export type InscricaoPendenteRow = {
 export type ExpedamigoAcessoRow = {
   id: string;
   cpf: string;
-  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher";
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher" | "primeiro_acesso";
   expedicao_id: string | null;
   created_at: string;
 }
