@@ -108,6 +108,14 @@ export const REQUISITOS_POR_DESTINO: Record<string, RequisitoDestinoTemplate[]> 
     VOO_DOMESTICO,
     VOO_INTERNO,
   ],
+  // Tailândia — BR sem visto p/ turismo até 30 dias; febre amarela exigível conforme
+  // país de origem/regiões; trechos domésticos (ilhas/norte) comuns.
+  Tailândia: [
+    ...BASE_INTERNACIONAL,
+    { ...VACINA_FEBRE_AMARELA, observacoes: "Febre amarela exigível conforme país de origem/regiões — conferir." },
+    VOO_DOMESTICO,
+    VOO_INTERNO,
+  ],
   // Itália / Schengen — sem visto p/ turismo até 90 dias; ETIAS a caminho.
   Itália: [
     ...BASE_INTERNACIONAL,
