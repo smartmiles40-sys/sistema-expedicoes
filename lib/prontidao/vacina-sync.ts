@@ -13,6 +13,8 @@
  *
  * O `arquivo` já é 1 por pessoa (mesmo id apontado em várias linhas); não duplica.
  */
+import { formatarCpf } from "@/lib/cpf";
+
 // Aceita o client de service-role (admin) ou o de sessão (ssr) — ambos com schema
 // não-tipado aqui; a query é simples e validada em runtime.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,7 +29,10 @@ export async function espalharCertificadoVacina(
   if (digitos.length !== 11) return { atualizados: 0, certId: null };
 
   const client = sb as Cliente;
-  const { data: pxs } = await client.from("passageiros").select("id").eq("cpf", digitos);
+  // A coluna `cpf` é gravada ora como dígitos, ora formatada (000.000.000-00) —
+  // casar só por dígitos deixava a herança de vacina passar batido. Casa as duas formas.
+  const variantes = [...new Set([digitos, formatarCpf(digitos)])];
+  const { data: pxs } = await client.from("passageiros").select("id").in("cpf", variantes);
   const ids = ((pxs ?? []) as { id: string }[]).map((p) => p.id);
   if (!ids.length) return { atualizados: 0, certId: null };
 
