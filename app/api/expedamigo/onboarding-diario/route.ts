@@ -60,11 +60,11 @@ export async function POST(req: NextRequest) {
   const hoje = new Date().toISOString().slice(0, 10);
 
   // 1) expedições ativas (futuras, não canceladas), opcionalmente filtrando por código.
-  let q = sb.from("expedicoes").select("id, codigo, nome, status, data_embarque").neq("status", "Cancelada").gte("data_embarque", hoje);
+  let q = sb.from("expedicoes").select("id, codigo, nome, status, data_embarque, tipo").neq("status", "Cancelada").gte("data_embarque", hoje);
   if (body.expedicao_codigo) q = q.eq("codigo", body.expedicao_codigo);
   const { data: expsRaw, error: expErr } = await q;
   if (expErr) return NextResponse.json({ ok: false, error: expErr.message }, { status: 500 });
-  const exps = (expsRaw ?? []) as { id: string; codigo: string; nome: string }[];
+  const exps = (expsRaw ?? []) as { id: string; codigo: string; nome: string; tipo?: "expedicao" | "pacote" }[];
   const expById = new Map(exps.map((e) => [e.id, e]));
   if (!exps.length) return NextResponse.json({ ok: true, dryRun, total: 0, enviar: [], pendencias: [] });
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     if (!exp) continue;
     // dryRun não grava nada → usa o link longo (por token). Real → link curto /a/<codigo>.
     const link = dryRun ? `${base}/amigo/acesso?t=${assinarTokenAcesso(p.id)}` : await criarLinkCurto(sb, p.id, base);
-    const mensagem = montarMensagemOnboarding({ nome: p.nome_completo, expedicao: exp.nome, link });
+    const mensagem = montarMensagemOnboarding({ nome: p.nome_completo, expedicao: exp.nome, link, tipo: exp.tipo ?? "expedicao" });
     const item = {
       passageiro_id: p.id,
       nome: p.nome_completo,

@@ -59,9 +59,12 @@ export default async function VisaoGeralPage({
   const bloqueados = prontidao.filter((l) => l.resultado.prontidao === "Bloqueado").length;
 
   const checklistConcluido = checklist.filter((c) => c.status === "Concluído").length;
+  // Pacote personalizado não usa o checklist SOP → esconde o card de prazos e a linha de checklist.
+  const ehPacote = (expedicao?.tipo ?? "expedicao") === "pacote";
 
   return (
     <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {!ehPacote && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -97,6 +100,7 @@ export default async function VisaoGeralPage({
           )}
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -138,7 +142,9 @@ export default async function VisaoGeralPage({
             value={`${pax.length} (${pax.filter((p) => p.status_reserva === "Confirmado").length} confirmados)`}
           />
           <ResumoLinha label="Prontidão" value={`${aptos}/${prontidao.length} aptos`} />
-          <ResumoLinha label="Checklist" value={`${checklistConcluido}/${checklist.length} concluídos`} />
+          {!ehPacote && (
+            <ResumoLinha label="Checklist" value={`${checklistConcluido}/${checklist.length} concluídos`} />
+          )}
         </CardContent>
       </Card>
 

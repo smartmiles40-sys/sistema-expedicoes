@@ -650,9 +650,11 @@ export const mockPassageiroRequisitos: Tables<"passageiro_requisitos">[] = persi
     return rows;
   }));
 
-export function getExpedicoesComAgregados(): ExpedicaoComAgregados[] {
+export function getExpedicoesComAgregados(
+  tipo: "expedicao" | "pacote" = "expedicao",
+): ExpedicaoComAgregados[] {
   const usuariosById = new Map(mockUsuarios.map((u) => [u.id, u]));
-  return mockExpedicoes.map((e) => {
+  return mockExpedicoes.filter((e) => (e.tipo ?? "expedicao") === tipo).map((e) => {
     const pax = mockPassageiros.filter(
       (p) => p.expedicao_id === e.id && p.status_reserva !== "Cancelado",
     );

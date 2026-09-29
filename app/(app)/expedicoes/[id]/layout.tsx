@@ -19,7 +19,7 @@ export default async function ExpedicaoLayout({
     <div className="flex flex-col h-full">
       <ExpedicaoRealtimeSync expedicaoId={id} />
       <ExpedicaoHeader expedicao={expedicao} />
-      <ExpedicaoTabsNav expedicaoId={id} />
+      <ExpedicaoTabsNav expedicaoId={id} tipo={expedicao.tipo ?? "expedicao"} />
       <div className="flex-1 overflow-y-auto">{children}</div>
     </div>
   );

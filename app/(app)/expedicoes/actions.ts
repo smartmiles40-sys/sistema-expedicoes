@@ -42,6 +42,8 @@ const criarSchema = z.object({
   preco_venda_brl: z.number().min(0).optional(),
   responsavel_operacional_id: z.string().optional(),
   responsavel_comercial_id: z.string().optional(),
+  // 'expedicao' = viagem em grupo (padrão) · 'pacote' = pacote personalizado (sob medida).
+  tipo: z.enum(["expedicao", "pacote"]).optional().default("expedicao"),
 });
 
 export type CriarExpedicaoResult =
@@ -72,14 +74,16 @@ export async function criarExpedicao(input: z.infer<typeof criarSchema>): Promis
       pax_cortesia: 0,
       preco_venda_brl: data.preco_venda_brl ?? 0,
       bitrix_pipeline_id: null,
+      tipo: data.tipo,
       ordem: null,
       observacoes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
-    // Checklist padrão gerado automaticamente em TODA expedição criada.
-    await gerarChecklistPadrao(id);
+    // Checklist padrão (SOP de 23 processos) só nas expedições em grupo — pacote não usa.
+    if (data.tipo !== "pacote") await gerarChecklistPadrao(id);
     revalidatePath("/expedicoes");
+    revalidatePath("/pacotes");
     return { ok: true, id };
   }
 
@@ -97,14 +101,16 @@ export async function criarExpedicao(input: z.infer<typeof criarSchema>): Promis
       pax_planejados: data.pax_planejados,
       preco_venda_brl: data.preco_venda_brl ?? 0,
       status: "Planejamento",
+      tipo: data.tipo,
     })
     .select("id")
     .single();
   if (result.error) return { ok: false, error: result.error.message };
   const novoId = (result.data as { id: string }).id;
-  // Checklist padrão gerado automaticamente em TODA expedição criada.
-  await gerarChecklistPadrao(novoId);
+  // Checklist padrão (SOP de 23 processos) só nas expedições em grupo — pacote não usa.
+  if (data.tipo !== "pacote") await gerarChecklistPadrao(novoId);
   revalidatePath("/expedicoes");
+  revalidatePath("/pacotes");
   return { ok: true, id: novoId };
 }
 

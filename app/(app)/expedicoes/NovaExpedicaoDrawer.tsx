@@ -45,10 +45,20 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   usuarios: Tables<"usuarios">[];
+  /** 'expedicao' (padrão) ou 'pacote' — muda rótulos, código e efeitos de criação. */
+  tipo?: "expedicao" | "pacote";
 }
 
-export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
+/** Código único de pacote (destino/data repetem por família → sufixo aleatório). */
+function gerarCodigoPacote(destino: string, dataEmbarque: string): string {
+  const base = generateExpedicaoCodigo(destino, dataEmbarque);
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `PAC-${base}-${rand}`;
+}
+
+export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios, tipo = "expedicao" }: Props) {
   const router = useRouter();
+  const ehPacote = tipo === "pacote";
   const {
     register,
     handleSubmit,
@@ -67,17 +77,22 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
   const codigoPreview = React.useMemo(() => {
     if (!destino || !dataEmbarque) return "—";
     try {
-      return generateExpedicaoCodigo(destino, dataEmbarque);
+      const base = generateExpedicaoCodigo(destino, dataEmbarque);
+      return ehPacote ? `PAC-${base}-••••` : base;
     } catch {
       return "—";
     }
-  }, [destino, dataEmbarque]);
+  }, [destino, dataEmbarque, ehPacote]);
 
   async function onSubmit(data: FormData) {
-    const codigo = generateExpedicaoCodigo(data.destino, data.data_embarque);
-    const result = await criarExpedicao({ ...data, codigo });
+    const codigo = ehPacote
+      ? gerarCodigoPacote(data.destino, data.data_embarque)
+      : generateExpedicaoCodigo(data.destino, data.data_embarque);
+    const result = await criarExpedicao({ ...data, codigo, tipo });
     if (result.ok) {
-      toast.success("Expedição criada", { description: `${codigo} · checklist padrão gerado` });
+      toast.success(ehPacote ? "Pacote criado" : "Expedição criada", {
+        description: ehPacote ? codigo : `${codigo} · checklist padrão gerado`,
+      });
       reset();
       onOpenChange(false);
       router.push(`/expedicoes/${result.id}`);
@@ -91,7 +106,7 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
       <DrawerContent>
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <DrawerHeader>
-            <DrawerTitle>Nova expedição</DrawerTitle>
+            <DrawerTitle>{ehPacote ? "Novo pacote" : "Nova expedição"}</DrawerTitle>
             <DrawerDescription>
               O código é gerado automaticamente: <span className="font-mono">{codigoPreview}</span>
             </DrawerDescription>
@@ -99,7 +114,7 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
           <DrawerBody>
             <div className="space-y-1">
               <Label htmlFor="nome">Nome</Label>
-              <Input id="nome" placeholder="Peru — Caminho Inca Ago 2026" {...register("nome")} />
+              <Input id="nome" placeholder={ehPacote ? "Família Silva — Europa Jul 2027" : "Peru — Caminho Inca Ago 2026"} {...register("nome")} />
               {errors.nome && <p className="text-[11px] text-critico-600">{errors.nome.message}</p>}
             </div>
 
@@ -183,17 +198,24 @@ export function NovaExpedicaoDrawer({ open, onOpenChange, usuarios }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            <p className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
-              O <strong className="text-foreground">checklist padrão</strong> (23 processos operacionais das 5 fases, com prazos
-              calculados a partir do embarque) é gerado <strong className="text-foreground">automaticamente</strong>.
-            </p>
+            {ehPacote ? (
+              <p className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
+                Pacote personalizado: sem checklist de grupo. Você monta o roteiro, voos,
+                hospedagem e vouchers no editor do <strong className="text-foreground">Portal do Viajante</strong>.
+              </p>
+            ) : (
+              <p className="rounded-md border border-border bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
+                O <strong className="text-foreground">checklist padrão</strong> (23 processos operacionais das 5 fases, com prazos
+                calculados a partir do embarque) é gerado <strong className="text-foreground">automaticamente</strong>.
+              </p>
+            )}
           </DrawerBody>
           <DrawerFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Criando..." : "Criar expedição"}
+              {isSubmitting ? "Criando..." : ehPacote ? "Criar pacote" : "Criar expedição"}
             </Button>
           </DrawerFooter>
         </form>

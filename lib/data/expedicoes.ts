@@ -56,8 +56,10 @@ import type {
   Prontidao,
 } from "@/types/database";
 
-export async function listExpedicoesComAgregados(): Promise<ExpedicaoComAgregados[]> {
-  if (DEV_USE_MOCK_DATA) return getExpedicoesComAgregados();
+export async function listExpedicoesComAgregados(
+  tipo: "expedicao" | "pacote" = "expedicao",
+): Promise<ExpedicaoComAgregados[]> {
+  if (DEV_USE_MOCK_DATA) return getExpedicoesComAgregados(tipo);
 
   const supabase = await getServerClient();
   const { data, error } = await supabase
@@ -66,7 +68,8 @@ export async function listExpedicoesComAgregados(): Promise<ExpedicaoComAgregado
     .order("ordem", { ascending: true, nullsFirst: false })
     .order("data_embarque", { ascending: true });
   if (error) throw error;
-  return agregarExpedicoes(supabase, (data ?? []) as ExpedicaoRow[]);
+  const linhas = ((data ?? []) as ExpedicaoRow[]).filter((e) => (e.tipo ?? "expedicao") === tipo);
+  return agregarExpedicoes(supabase, linhas);
 }
 
 /**
@@ -479,6 +482,8 @@ export async function getResumoProntidao(): Promise<ResumoProntidaoExpedicao[]> 
 
   const resumos = await Promise.all(
     expedicoes
+      // Só expedições em grupo — pacotes personalizados não entram no card de prontidão.
+      .filter((e) => (e.tipo ?? "expedicao") === "expedicao")
       .filter((e) => e.status !== "Concluída" && e.status !== "Cancelada")
       .map(async (e) => {
         const linhas = await getProntidaoExpedicao(e.id);
@@ -559,6 +564,9 @@ async function getProntidaoTodas(): Promise<{
     passageiros = paxAll;
     requisitos = reqAll;
   }
+
+  // Avisos operacionais são só das expedições em grupo — pacotes ficam de fora.
+  expedicoes = expedicoes.filter((e) => (e.tipo ?? "expedicao") === "expedicao");
 
   const expById = new Map(expedicoes.map((e) => [e.id, e]));
   const reqPorPax = new Map<string, PassageiroRequisitoRow[]>();
@@ -690,19 +698,20 @@ function montarResumo(
 
 export async function getResumoProcessos(): Promise<ResumoProcessoExpedicao[]> {
   if (DEV_USE_MOCK_DATA) {
-    return mockExpedicoes.map((e) =>
-      montarResumo(e, mockChecklistItens.filter((c) => c.expedicao_id === e.id)),
-    );
+    return mockExpedicoes
+      .filter((e) => (e.tipo ?? "expedicao") === "expedicao")
+      .map((e) => montarResumo(e, mockChecklistItens.filter((c) => c.expedicao_id === e.id)));
   }
   const supabase = await getServerClient();
   const [{ data: exps }, { data: cks }] = await Promise.all([
-    supabase.from("expedicoes").select("id, nome, data_embarque, status"),
+    supabase.from("expedicoes").select("*"),
     supabase.from("checklist_itens").select("expedicao_id, status, prazo, parent_id"),
   ]);
   const itens = (cks ?? []) as CkLite[];
-  return ((exps ?? []) as { id: string; nome: string; data_embarque: string; status: string }[]).map(
-    (e) => montarResumo(e, itens.filter((c) => c.expedicao_id === e.id)),
-  );
+  // Pacotes não têm o SOP de 23 processos — ficam fora do card de prazos/checklist.
+  return ((exps ?? []) as { id: string; nome: string; data_embarque: string; status: string; tipo?: string }[])
+    .filter((e) => (e.tipo ?? "expedicao") === "expedicao")
+    .map((e) => montarResumo(e, itens.filter((c) => c.expedicao_id === e.id)));
 }
 
 // Re-export Tables type pra compatibilidade

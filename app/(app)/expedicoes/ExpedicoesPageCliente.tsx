@@ -34,11 +34,17 @@ const PERIODOS: { value: PeriodoFiltro; label: string }[] = [
 interface Props {
   expedicoes: ExpedicaoComAgregados[];
   usuarios: Tables<"usuarios">[];
+  /** 'expedicao' (padrão) ou 'pacote' — muda rótulos e o tipo criado no drawer. */
+  tipo?: "expedicao" | "pacote";
 }
 
-export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
+export function ExpedicoesPageCliente({ expedicoes, usuarios, tipo = "expedicao" }: Props) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
+  const ehPacote = tipo === "pacote";
+  const L = ehPacote
+    ? { titulo: "Pacotes", sing: "pacote", plur: "pacotes", novo: "Novo pacote" }
+    : { titulo: "Expedições", sing: "expedição", plur: "expedições", novo: "Nova Expedição" };
   const [busca, setBusca] = React.useState("");
   const [statusSel, setStatusSel] = React.useState<Set<string>>(new Set());
   const [destinoSel, setDestinoSel] = React.useState<Set<string>>(new Set());
@@ -174,11 +180,11 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="page-title">Expedições</h1>
+            <h1 className="page-title">{L.titulo}</h1>
             <LiveBadge status={realtimeStatus} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {filtradas.length} de {expedicoes.length} {expedicoes.length === 1 ? "expedição" : "expedições"}
+            {filtradas.length} de {expedicoes.length} {expedicoes.length === 1 ? L.sing : L.plur}
             {ativaCount > 0 && ` · ${ativaCount} filtro${ativaCount > 1 ? "s" : ""} ativo${ativaCount > 1 ? "s" : ""}`}
           </p>
         </div>
@@ -218,7 +224,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
           {!somenteLeitura && (
             <Button variant="brand" onClick={() => setDrawerOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
-              Nova Expedição
+              {L.novo}
               <kbd className="ml-1 hidden sm:inline-flex h-4 items-center rounded border border-[var(--brand-dark)]/30 bg-[var(--brand-dark)]/10 px-1 text-[10px] font-mono">
                 n
               </kbd>
@@ -390,10 +396,10 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
 
       {/* Tabela agrupada por ano */}
       {expedicoes.length === 0 ? (
-        <EmptyState onCreate={somenteLeitura ? undefined : () => setDrawerOpen(true)} />
+        <EmptyState ehPacote={ehPacote} onCreate={somenteLeitura ? undefined : () => setDrawerOpen(true)} />
       ) : filtradas.length === 0 ? (
         <div className="text-xs text-muted-foreground py-10 text-center border border-dashed border-border rounded-lg">
-          Nenhuma expedição com os filtros atuais.
+          {ehPacote ? "Nenhum pacote" : "Nenhuma expedição"} com os filtros atuais.
         </div>
       ) : (
         <div className="space-y-8">
@@ -414,7 +420,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
                         {ano === "sem-data" ? "Sem data" : ano}
                       </h2>
                       <span className="text-sm text-muted-foreground">
-                        {lista.length} {lista.length === 1 ? "expedição" : "expedições"}
+                        {lista.length} {lista.length === 1 ? L.sing : L.plur}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px]">
@@ -476,6 +482,7 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         usuarios={usuarios}
+        tipo={tipo}
       />
 
       <EditarExpedicaoDrawer
@@ -487,14 +494,18 @@ export function ExpedicoesPageCliente({ expedicoes, usuarios }: Props) {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate?: () => void }) {
+function EmptyState({ onCreate, ehPacote }: { onCreate?: () => void; ehPacote?: boolean }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-muted/20">
       <EmptyStateUI
         icon={Compass}
-        title="Nenhuma expedição ainda"
-        description="Crie sua primeira viagem em grupo para começar a organizar passageiros, prazos, rooming e prontidão — tudo num lugar só."
-        actionLabel={onCreate ? "Criar primeira expedição" : undefined}
+        title={ehPacote ? "Nenhum pacote ainda" : "Nenhuma expedição ainda"}
+        description={
+          ehPacote
+            ? "Crie seu primeiro pacote personalizado para organizar passageiros, roteiro, voos, hospedagem e vouchers — com acesso ao Portal do Viajante."
+            : "Crie sua primeira viagem em grupo para começar a organizar passageiros, prazos, rooming e prontidão — tudo num lugar só."
+        }
+        actionLabel={onCreate ? (ehPacote ? "Criar primeiro pacote" : "Criar primeira expedição") : undefined}
         onAction={onCreate}
       />
     </div>

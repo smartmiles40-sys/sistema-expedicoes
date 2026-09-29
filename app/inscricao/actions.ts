@@ -27,10 +27,12 @@ export async function listExpedicoesInscricao(): Promise<ExpedicaoOpcao[]> {
     exps = mockExpedicoes;
   } else {
     const sb = createServiceRoleClient();
-    const { data } = await sb.from("expedicoes").select("id,nome,destino,data_embarque,status");
+    const { data } = await sb.from("expedicoes").select("*");
     exps = (data ?? []) as ExpedicaoRow[];
   }
   return exps
+    // Pacotes personalizados são sob medida — não entram no dropdown público de inscrição.
+    .filter((e) => (e.tipo ?? "expedicao") === "expedicao")
     .filter((e) => e.status !== "Cancelada" && (e.data_embarque ?? "").slice(0, 10) >= hoje)
     .sort((a, b) => (a.data_embarque ?? "").localeCompare(b.data_embarque ?? ""))
     .map((e) => ({ id: e.id, nome: e.nome, destino: e.destino, data_embarque: e.data_embarque }));

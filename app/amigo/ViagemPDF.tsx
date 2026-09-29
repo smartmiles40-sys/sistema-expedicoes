@@ -674,7 +674,7 @@ function ViagemDoc({ exp, nome, fotos }: { exp: AmigoExpedicao; nome: string; fo
           <View style={styles.endSpacer} />
           <Text style={styles.endSocial}>@setuforeuvouviagens</Text>
           <Text style={styles.endNota}>
-            Este material é de uso exclusivo dos participantes desta expedição da{"\n"}
+            Este material é de uso exclusivo dos participantes desta {exp.tipo === "pacote" ? "viagem" : "expedição"} da{"\n"}
             Se Tu For, Eu Vou! — Viagens. As informações podem sofrer ajustes; acompanhe o portal e o grupo oficial.
           </Text>
         </View>

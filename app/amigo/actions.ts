@@ -103,6 +103,8 @@ export type AmigoExpedicao = {
   destino: string;
   data_embarque: string;
   data_retorno: string;
+  /** 'expedicao' | 'pacote' — no portal, pacote usa "viagem" em vez de "expedição". */
+  tipo: "expedicao" | "pacote";
   status: string;
   voo: AmigoVoo;
   links: AmigoLink[];
@@ -297,6 +299,9 @@ export async function entrarExpedAmigo(
     for (const e of exps) {
       if (cancelada(e) || (e.data_retorno ?? e.data_embarque ?? "").slice(0, 10) < hoje) continue;
       if (EXPEDICOES_PRIVADAS_AMIGO.has(e.codigo)) continue;
+      // Pacotes personalizados NÃO entram no broadcast de admin (aparecem só pro
+      // passageiro liberado, via o laço acima). Só o passageiro do pacote deve vê-lo.
+      if (((e as { tipo?: string }).tipo ?? "expedicao") !== "expedicao") continue;
       if (!unidadesMap.has(e.id)) unidadesMap.set(e.id, { exp: e, row: minhaRowPorExp.get(e.id) ?? null });
     }
   }
@@ -489,6 +494,7 @@ export async function entrarExpedAmigo(
       destino: e.destino,
       data_embarque: e.data_embarque,
       data_retorno: e.data_retorno,
+      tipo: (e.tipo ?? "expedicao") as "expedicao" | "pacote",
       status: e.status,
       voo: {
         voo_interno_necessario: row?.voo_nacional_necessario ?? false,

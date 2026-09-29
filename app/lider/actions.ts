@@ -207,6 +207,8 @@ export async function buscarDadosLider(
       }
     }
   }
+  // Área do Líder é só de expedições em grupo — pacotes personalizados não têm líder.
+  exps = exps.filter((e) => (e.tipo ?? "expedicao") === "expedicao");
   // Mapa grupo_id -> nome ("G1"/"G2") pra marcar cada passageiro.
   const grupoNomePorId = new Map(gruposExp.map((g) => [g.id, g.nome]));
   // Divisão por grupos é OPT-IN: só as expedições com G1 E G2 usam grupos.

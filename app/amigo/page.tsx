@@ -373,7 +373,7 @@ function ViagemExperiencia({ exp, nome, cpf, senha }: { exp: AmigoExpedicao; nom
 
           <h1 className="font-display mt-7 font-bold leading-[0.95] tracking-[-0.02em]">
             <span className="animate-fade-up block text-[clamp(1.6rem,5vw,3rem)] font-normal italic text-white/95" style={{ animationDelay: "0.15s" }}>
-              Sua expedição
+              {exp.tipo === "pacote" ? "Sua viagem" : "Sua expedição"}
             </span>
             <span className="animate-fade-up mt-1 block text-[clamp(2.6rem,9vw,6rem)] font-black leading-[0.95]" style={{ animationDelay: "0.28s" }}>
               {exp.nome}
@@ -439,7 +439,7 @@ function ViagemExperiencia({ exp, nome, cpf, senha }: { exp: AmigoExpedicao; nom
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-bold text-[#fbe4b0]">Complete sua inscrição</div>
                 <p className="mt-1 text-[13px] leading-relaxed text-white/80">
-                  Notamos que você ainda não preencheu (ou não atualizou) seus dados de viagem. Leva 5 minutos e é essencial pra sua expedição.
+                  Notamos que você ainda não preencheu (ou não atualizou) seus dados de viagem. Leva 5 minutos e é essencial pra sua {exp.tipo === "pacote" ? "viagem" : "expedição"}.
                 </p>
                 <button
                   type="button"
@@ -737,9 +737,14 @@ function HomeExpedicoes({ dados, onAbrir }: { dados: AmigoDados; onAbrir: (id: s
           <span className="eyebrow text-[var(--brand-lime)]">Espaço do viajante</span>
           <h1 className="font-display mt-3 text-4xl font-bold leading-tight sm:text-5xl">Olá, {dados.primeiro_nome} 👋</h1>
           <p className="mt-2 text-[14px] text-white/90">
-            {dados.expedicoes.length === 1
-              ? "Toque na sua expedição para ver todos os detalhes."
-              : "Escolha uma expedição para ver todos os detalhes."}
+            {(() => {
+              // Pacote personalizado fala em "viagem"; expedição em grupo mantém "expedição".
+              const soPacotes = dados.expedicoes.every((e) => e.tipo === "pacote");
+              const termo = soPacotes ? "viagem" : "expedição";
+              return dados.expedicoes.length === 1
+                ? `Toque na sua ${termo} para ver todos os detalhes.`
+                : `Escolha uma ${termo} para ver todos os detalhes.`;
+            })()}
           </p>
         </div>
       </div>

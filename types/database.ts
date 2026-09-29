@@ -114,6 +114,8 @@ export type ExpedicaoRow = {
   bitrix_pipeline_id: string | null;
   observacoes: string | null;
   ordem: number | null;
+  /** 'expedicao' = viagem em grupo (padrão) · 'pacote' = pacote personalizado (migration 0060). */
+  tipo?: "expedicao" | "pacote";
   /** Vínculo leve entre expedições irmãs que rodam juntas (migration 0029). */
   viagem_grupo?: string | null;
   grupo_rotulo?: string | null;

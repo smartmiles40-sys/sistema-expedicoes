@@ -42,6 +42,12 @@ export function AcessoForm() {
     const r = await definirSenhaPorTokenAcesso(token, senha, cpf.replace(/\D/g, ""));
     setEnviando(false);
     if (!r.ok) { setErro(r.error); return; }
+    // Auto-login: grava a sessão do usuário RECÉM-criado (mesma chave que o /amigo
+    // restaura). Sem isso, "Entrar no portal" restaurava uma sessão antiga que
+    // estivesse no navegador (ex.: outro CPF) em vez de entrar como esta pessoa.
+    try {
+      localStorage.setItem("expedamigo-sessao", JSON.stringify({ cpf: r.cpf, senha }));
+    } catch { /* localStorage indisponível — a pessoa entra digitando CPF + senha */ }
     setPronto(r.cpf);
   }
 

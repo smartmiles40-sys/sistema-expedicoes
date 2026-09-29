@@ -14,14 +14,24 @@ const TABS = [
   { slug: "roteiro-lider", label: "Roteiro do Líder" },
 ];
 
-export function ExpedicaoTabsNav({ expedicaoId }: { expedicaoId: string }) {
+// Abas escondidas num PACOTE personalizado (não usa rooming/SOP/roteiro de líder de grupo).
+const OCULTAS_PACOTE = new Set(["rooming", "checklist", "roteiro-lider"]);
+
+export function ExpedicaoTabsNav({
+  expedicaoId,
+  tipo = "expedicao",
+}: {
+  expedicaoId: string;
+  tipo?: "expedicao" | "pacote";
+}) {
   const pathname = usePathname();
   const base = `/expedicoes/${expedicaoId}`;
+  const tabs = tipo === "pacote" ? TABS.filter((t) => !OCULTAS_PACOTE.has(t.slug)) : TABS;
 
   return (
     <nav className="border-b border-border bg-background px-4">
       <ul className="flex items-center gap-0 overflow-x-auto">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const href = tab.slug ? `${base}/${tab.slug}` : base;
           const isActive = tab.slug ? pathname.endsWith(`/${tab.slug}`) : pathname === base;
           return (
