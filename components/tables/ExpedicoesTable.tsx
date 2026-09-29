@@ -161,6 +161,7 @@ function SortableRow({
   };
 
   const dias = daysUntil(expedicao.data_embarque);
+  const ehPacote = (expedicao.tipo ?? "expedicao") === "pacote";
   const prontTodos =
     expedicao.prontidao_total > 0 && expedicao.prontidao_aptos === expedicao.prontidao_total;
 
@@ -283,10 +284,14 @@ function SortableRow({
             </button>
           )}
           <ConfirmDeleteButton
-            ariaLabel="Excluir expedição"
+            ariaLabel={ehPacote ? "Excluir pacote" : "Excluir expedição"}
             title={`Excluir "${expedicao.nome}"?`}
-            description="A expedição e todos os passageiros, custos, pagamentos e checklist serão removidos. Esta ação não pode ser desfeita."
-            successMessage="Expedição excluída"
+            description={
+              ehPacote
+                ? "O pacote e todos os passageiros, custos e pagamentos serão removidos. Esta ação não pode ser desfeita."
+                : "A expedição e todos os passageiros, custos, pagamentos e checklist serão removidos. Esta ação não pode ser desfeita."
+            }
+            successMessage={ehPacote ? "Pacote excluído" : "Expedição excluída"}
             onConfirm={() => excluirExpedicao(expedicao.id)}
           />
         </div>
