@@ -119,6 +119,8 @@ export type AmigoExpedicao = {
   /** Ingressos do próprio passageiro (só os dele) — Peru. */
   ingressos_mp: AmigoIngresso[];
   ingressos_trem: AmigoIngresso[];
+  /** Ingressos gerais do próprio passageiro (categoria "Bilhetes" que NÃO são Machu Picchu). */
+  ingressos_gerais: AmigoIngresso[];
   /** Seguro viagem do próprio passageiro (só os dele) — todas as expedições. */
   seguros: AmigoIngresso[];
   /** Vouchers de voo do próprio passageiro (categoria "Vouchers" por pax). */
@@ -575,6 +577,13 @@ export async function entrarExpedAmigo(
         .map((a) => fotoUrl.get(a.id) ?? "")
         .filter((url) => url)
         .map((url, i, all) => ({ nome: all.length > 1 ? `Ingresso Trem Machu Picchu ${i + 1}` : "Ingresso Trem Machu Picchu", url })),
+      // Ingressos gerais (categoria "Bilhetes" que não são Machu Picchu): rótulo = descrição do arquivo.
+      ingressos_gerais: ingressoArqs
+        .filter((a) => !!row && a.passageiro_id === row.id
+          && !(a.descricao ?? "").startsWith("Ingresso Machu Picchu")
+          && !(a.descricao ?? "").startsWith("Ingresso Trem Machu Picchu"))
+        .map((a) => ({ nome: (a.descricao ?? "").trim() || a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
       seguros: seguroArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
         .map((a) => fotoUrl.get(a.id) ?? "")

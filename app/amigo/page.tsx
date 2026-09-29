@@ -574,6 +574,16 @@ function ViagemExperiencia({ exp, nome, cpf, senha }: { exp: AmigoExpedicao; nom
               </div>
             )}
 
+            {/* Ingressos gerais (só os do próprio passageiro) */}
+            {exp.ingressos_gerais.length > 0 && (
+              <div>
+                <SubTitulo icone={<Ticket className="h-3.5 w-3.5" />}>Ingressos</SubTitulo>
+                <div className="flex flex-wrap gap-2">
+                  {exp.ingressos_gerais.map((ing, i) => <IngressoLink key={i} ing={ing} onDownload={logVoucher} />)}
+                </div>
+              </div>
+            )}
+
             {/* Seguro viagem (só o do próprio passageiro) */}
             {exp.seguros.length > 0 && (
               <div>
