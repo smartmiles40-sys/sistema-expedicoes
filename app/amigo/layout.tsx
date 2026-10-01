@@ -41,5 +41,6 @@ export const metadata: Metadata = {
 };
 
 export default function AmigoLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  // `portal-fonte` troca os títulos (Fraunces) por Inter só no portal (ver globals.css).
+  return <div className="portal-fonte">{children}</div>;
 }

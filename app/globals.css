@@ -284,6 +284,15 @@ button, a, [role="button"], label, summary {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
 }
+/* Portal do viajante (ExpedAmigo): títulos em Inter também (sem a serifada Fraunces).
+   Escopado ao /amigo — o sistema operacional mantém a Fraunces. */
+.portal-fonte {
+  display: contents;
+}
+.portal-fonte .font-display,
+.portal-fonte .page-title {
+  font-family: var(--font-sans);
+}
 /* Título de página — usado nos cabeçalhos das telas */
 .page-title {
   font-family: var(--font-display);
