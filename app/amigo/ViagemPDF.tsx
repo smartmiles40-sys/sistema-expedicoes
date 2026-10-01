@@ -56,9 +56,10 @@ Font.registerEmojiSource({
   url: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/",
 });
 
-const SERIF = "Fraunces";
-const SERIF_BOLD = "FrauncesBold";
-const SERIF_ITALIC = "FrauncesItalic";
+// O portal usa Inter também nos títulos; o PDF acompanha — SERIF* apontam pra Inter.
+const SERIF = "Inter";
+const SERIF_BOLD = "InterBold";
+const SERIF_ITALIC = "InterItalic";
 const SANS = "Inter";
 const SANS_BOLD = "InterBold";
 const SANS_ITALIC = "InterItalic";

@@ -301,9 +301,8 @@ export async function entrarExpedAmigo(
     for (const e of exps) {
       if (cancelada(e) || (e.data_retorno ?? e.data_embarque ?? "").slice(0, 10) < hoje) continue;
       if (EXPEDICOES_PRIVADAS_AMIGO.has(e.codigo)) continue;
-      // Pacotes personalizados NÃO entram no broadcast de admin (aparecem só pro
-      // passageiro liberado, via o laço acima). Só o passageiro do pacote deve vê-lo.
-      if (((e as { tipo?: string }).tipo ?? "expedicao") !== "expedicao") continue;
+      // Pacotes personalizados ENTRAM no broadcast do Acesso Master (numa guia separada
+      // na home). Para o passageiro comum, continuam visíveis só via o laço acima.
       if (!unidadesMap.has(e.id)) unidadesMap.set(e.id, { exp: e, row: minhaRowPorExp.get(e.id) ?? null });
     }
   }

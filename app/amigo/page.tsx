@@ -737,6 +737,12 @@ function HeaderSlideshow({ imagens }: { imagens: string[] }) {
 
 /** Tela inicial: saudação + grade das próximas expedições da pessoa. */
 function HomeExpedicoes({ dados, onAbrir }: { dados: AmigoDados; onAbrir: (id: string) => void }) {
+  const expedicoesG = dados.expedicoes.filter((e) => e.tipo !== "pacote");
+  const pacotes = dados.expedicoes.filter((e) => e.tipo === "pacote");
+  // Guias só aparecem quando a pessoa (ex.: Acesso Master) vê os DOIS tipos.
+  const temGuias = expedicoesG.length > 0 && pacotes.length > 0;
+  const [aba, setAba] = React.useState<"expedicao" | "pacote">("expedicao");
+  const lista = !temGuias ? dados.expedicoes : aba === "pacote" ? pacotes : expedicoesG;
   return (
     <>
       {/* Header com a foto do Machu Picchu (mesma capa do site) */}
@@ -761,8 +767,24 @@ function HomeExpedicoes({ dados, onAbrir }: { dados: AmigoDados; onAbrir: (id: s
       <div className="relative bg-[var(--portal-bg)]">
         <div className="incan-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
         <main className="relative mx-auto max-w-4xl px-4 pb-16 pt-8">
+          {temGuias && (
+            <div className="mb-6 inline-flex rounded-full border border-[var(--portal-border)] bg-[var(--portal-bg-2)] p-1">
+              {([["expedicao", "Expedições", expedicoesG.length], ["pacote", "Pacotes", pacotes.length]] as const).map(([val, rotulo, n]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setAba(val)}
+                  className={`rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                    aba === val ? "bg-[var(--brand-dark)] text-white" : "text-[var(--portal-fg-soft)] hover:text-[var(--portal-fg)]"
+                  }`}
+                >
+                  {rotulo} <span className="opacity-70">({n})</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid gap-5 sm:grid-cols-2">
-            {dados.expedicoes.map((exp) => (
+            {lista.map((exp) => (
               <CardExpedicaoHome key={exp.id} exp={exp} onAbrir={onAbrir} />
             ))}
           </div>
