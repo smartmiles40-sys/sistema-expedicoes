@@ -510,7 +510,8 @@ export async function entrarExpedAmigo(
       hospedagem_voucher_url: e.hospedagem_voucher_arquivo_id ? fotoUrl.get(e.hospedagem_voucher_arquivo_id) ?? null : null,
       roteiro: roteiro
         .filter((r) => r.expedicao_id === e.id && veSegmento(r.extensao_id, r.apenas_sem_extensao))
-        .sort((a, b) => a.ordem - b.ordem || a.created_at.localeCompare(b.created_at))
+        // Sempre cronológico (data → nº do dia → ordem). Editar a data reorganiza sozinho.
+        .sort((a, b) => (a.data ?? "9999-12-31").localeCompare(b.data ?? "9999-12-31") || a.dia - b.dia || a.ordem - b.ordem)
         .map((r) => ({
           id: r.id, dia: r.dia, data: r.data, titulo: r.titulo, descricao: r.descricao,
           cidade: r.cidade, refeicoes: r.refeicoes, hospedagem: r.hospedagem,

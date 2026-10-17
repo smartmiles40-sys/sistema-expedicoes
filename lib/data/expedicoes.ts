@@ -320,8 +320,38 @@ async function listPortal<T>(
   return (data ?? []) as T[];
 }
 
-export const listRoteiro = (expedicaoId: string) =>
-  listPortal<RoteiroDiaRow>("roteiro_dias", expedicaoId, mockRoteiroDias);
+/** Comparador cronológico dos dias do roteiro: data → nº do dia → ordem manual.
+ *  Dias sem data vão para o fim. */
+export function ordenarRoteiro(a: RoteiroDiaRow, b: RoteiroDiaRow): number {
+  const da = a.data ?? "9999-12-31";
+  const db = b.data ?? "9999-12-31";
+  return da.localeCompare(db) || (a.dia ?? 0) - (b.dia ?? 0) || (a.ordem ?? 0) - (b.ordem ?? 0);
+}
+
+/** Roteiro SEMPRE em ordem cronológica (pela data). Assim, ao alterar a data de um dia,
+ *  a lista se reorganiza sozinha — no editor, no portal e no PDF. */
+export async function listRoteiro(expedicaoId: string): Promise<RoteiroDiaRow[]> {
+  if (DEV_USE_MOCK_DATA) {
+    return (mockRoteiroDias as RoteiroDiaRow[])
+      .filter((r) => r.expedicao_id === expedicaoId)
+      .slice()
+      .sort(ordenarRoteiro);
+  }
+  const supabase = await getServerClient();
+  const { data, error } = await supabase
+    .from("roteiro_dias")
+    .select("*")
+    .eq("expedicao_id", expedicaoId)
+    .order("data", { ascending: true, nullsFirst: false })
+    .order("dia", { ascending: true })
+    .order("ordem", { ascending: true });
+  if (error) {
+    if (error.code === "42P01") return [];
+    console.error("[listRoteiro] erro:", error);
+    return [];
+  }
+  return (data ?? []) as RoteiroDiaRow[];
+}
 export const listVoosExpedicao = (expedicaoId: string) =>
   listPortal<ExpedicaoVooRow>("expedicao_voos", expedicaoId, mockExpedicaoVoos);
 export const listPasseios = (expedicaoId: string) =>
