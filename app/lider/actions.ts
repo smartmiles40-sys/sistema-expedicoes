@@ -38,6 +38,7 @@ const MASTERS: Record<string, string> = {
   "79746748220": "Carolina Lage Taketomi",
   "40718963881": "Antonio Carlos Feitosa Beserra dos Santos",
   "20262027999": "Administrador",
+  "44186003882": "Tainara Ferreira Vasconcelos",
 };
 
 /**

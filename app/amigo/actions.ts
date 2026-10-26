@@ -161,6 +161,7 @@ const ADMINS_AMIGO: Record<string, string> = {
   "46323253844": "Rafaellen Borges",
   "41765424895": "John Italo Pereira da Silva",
   "37028025845": "Talita Carvalho",
+  "44186003882": "Tainara Ferreira Vasconcelos",
 };
 
 export async function entrarExpedAmigo(
