@@ -96,6 +96,8 @@ export type InscricaoPendente = {
   recusa_arquivo_id: string | null;
   /** Comentário de triagem de saúde (Carol). */
   comentario_saude: string | null;
+  /** Receita médica a emitir/enviar (~20 dias antes da viagem). */
+  receita_pendente: boolean;
   nome_completo: string;
   cpf: string | null;
   data_nascimento: string | null;
@@ -151,6 +153,7 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
     motivo_recusa: row.motivo_recusa ?? null,
     recusa_arquivo_id: row.recusa_arquivo_id ?? null,
     comentario_saude: row.comentario_saude ?? null,
+    receita_pendente: row.receita_pendente ?? false,
     nome_completo: row.nome_completo ?? gs("nome_completo") ?? "—",
     cpf: row.cpf,
     data_nascimento: row.data_nascimento ?? gs("data_nascimento"),
@@ -251,6 +254,26 @@ export async function salvarComentarioSaude(id: string, comentario: string): Pro
   return { ok: true };
 }
 
+/**
+ * Marca/desmarca "precisa emitir receita" numa inscrição pendente. Na aprovação o
+ * flag é carregado pro passageiro (sobrevive) e alimenta o menu /receitas.
+ */
+export async function marcarReceitaInscricao(id: string, pendente: boolean): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão." };
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockInscricoesPendentes.find((p) => p.id === id);
+    if (p) { p.receita_pendente = pendente; p.updated_at = new Date().toISOString(); }
+    revalidatePath("/inscricoes");
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { error } = await sb.from("inscricoes_pendentes").update({ receita_pendente: pendente }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/inscricoes");
+  return { ok: true };
+}
+
 export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {
   const eu = await getCurrentUser();
   if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão para aprovar inscrições." };
@@ -277,6 +300,17 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     })) as PassageiroRow | null;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Falha ao gravar o passageiro." };
+  }
+
+  // 2b) Carrega o flag de "receita a emitir" pro passageiro (sobrevive à aprovação → menu /receitas).
+  if (pax && pend.receita_pendente) {
+    if (DEV_USE_MOCK_DATA) {
+      const mp = mockPassageiros.find((p) => p.id === pax!.id);
+      if (mp) mp.receita_pendente = true;
+    } else {
+      const sb = createServiceRoleClient();
+      await sb.from("passageiros").update({ receita_pendente: true }).eq("id", pax.id);
+    }
   }
 
   // 3) Remove a pendência (já virou passageiro).
@@ -330,6 +364,7 @@ export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error
     revalidatePath(`/expedicoes/${pax.expedicao_id}/passageiros`);
   }
   revalidatePath("/avisos");
+  revalidatePath("/receitas");
   return { ok: true };
 }
 

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/Dialog";
 import { formatDate, cn } from "@/lib/utils";
 import { PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
-import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, salvarComentarioSaude, type InscricaoPendente } from "./actions";
+import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, salvarComentarioSaude, marcarReceitaInscricao, type InscricaoPendente } from "./actions";
 import { useSomenteLeitura, usePodeDecidirInscricao } from "@/components/layout/PermissoesContext";
 
 function Linha({ label, valor }: { label: string; valor: React.ReactNode }) {
@@ -56,34 +56,49 @@ function ComentarioSaude({ it, podeEditar }: { it: InscricaoPendente; podeEditar
     else toast.error("Erro ao salvar comentário", { description: r.error });
   }
 
+  const [receita, setReceita] = React.useState(it.receita_pendente);
+  async function toggleReceita(v: boolean) {
+    setReceita(v); // otimista
+    const r = await marcarReceitaInscricao(it.id, v);
+    if (r.ok) { toast.success(v ? "Marcada para emitir receita" : "Receita desmarcada"); router.refresh(); }
+    else { setReceita(!v); toast.error("Erro ao marcar receita", { description: r.error }); }
+  }
+
   if (!podeEditar) {
-    if (!it.comentario_saude) return null;
+    if (!it.comentario_saude && !it.receita_pendente) return null;
     return (
-      <div className="rounded-lg border border-editavel-600/30 bg-editavel-50 px-2.5 py-1.5 text-[12px]">
+      <div className="space-y-1 rounded-lg border border-editavel-600/30 bg-editavel-50 px-2.5 py-1.5 text-[12px]">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-editavel-700">Comentário da triagem</div>
-        <div className="whitespace-pre-wrap break-words text-foreground/80">{it.comentario_saude}</div>
+        {it.comentario_saude && <div className="whitespace-pre-wrap break-words text-foreground/80">{it.comentario_saude}</div>}
+        {it.receita_pendente && <div className="font-medium text-atencao-700">📋 Receita a emitir (20 dias antes)</div>}
       </div>
     );
   }
   return (
-    <div className="space-y-1 rounded-lg border border-editavel-600/30 bg-editavel-50/50 px-2.5 py-2">
-      <label className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-editavel-700">
-        <MessageSquarePlus className="h-3.5 w-3.5" /> Comentário da triagem (saúde)
+    <div className="space-y-2 rounded-lg border border-editavel-600/30 bg-editavel-50/50 px-2.5 py-2">
+      <div>
+        <label className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-editavel-700">
+          <MessageSquarePlus className="h-3.5 w-3.5" /> Comentário da triagem (saúde)
+        </label>
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          rows={2}
+          placeholder="Ex.: não precisa de receita · receita já emitida · sem conduta necessária"
+          className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+        />
+        {mudou && (
+          <div className="mt-1 flex justify-end">
+            <Button size="sm" variant="brand" onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar comentário"}
+            </Button>
+          </div>
+        )}
+      </div>
+      <label className="flex cursor-pointer items-start gap-2 rounded-md border border-atencao-600/40 bg-atencao-50 px-2 py-1.5 text-[12px] text-atencao-700">
+        <input type="checkbox" checked={receita} onChange={(e) => toggleReceita(e.target.checked)} className="mt-0.5 accent-atencao-600" />
+        <span>Preciso <strong>emitir e enviar a receita</strong> para este passageiro (lembrete ~20 dias antes da viagem → menu <strong>Receitas</strong>).</span>
       </label>
-      <textarea
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={2}
-        placeholder="Ex.: não precisa de receita · receita já emitida · sem conduta necessária"
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
-      />
-      {mudou && (
-        <div className="flex justify-end">
-          <Button size="sm" variant="brand" onClick={salvar} disabled={salvando}>
-            {salvando ? "Salvando…" : "Salvar comentário"}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
