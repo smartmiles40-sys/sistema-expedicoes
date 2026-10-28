@@ -279,6 +279,9 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
   const [aberto, setAberto] = React.useState<Set<string>>(new Set());
   const [verRecusadas, setVerRecusadas] = React.useState(false);
   const [soSaude, setSoSaude] = React.useState(false);
+  const [gruposFechados, setGruposFechados] = React.useState<Set<string>>(new Set());
+  const toggleGrupo = (id: string) =>
+    setGruposFechados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // Pop-up de recusa (motivo + anexo opcional).
   const [recusando, setRecusando] = React.useState<InscricaoPendente | null>(null);
   const [motivo, setMotivo] = React.useState("");
@@ -350,6 +353,17 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
   const nAlerta = itens.filter(temAlertaSaudeDe).length;
   const itensPend = soSaude ? itens.filter(temAlertaSaudeDe) : itens;
 
+  // Agrupa a fila por expedição (cada grupo recolhível), ordenado por embarque.
+  const gruposPend = (() => {
+    const m = new Map<string, { id: string; nome: string; embarque: string | null; itens: InscricaoPendente[] }>();
+    for (const it of itensPend) {
+      const id = it.expedicao_id ?? "sem-expedicao";
+      if (!m.has(id)) m.set(id, { id, nome: it.expedicao_nome, embarque: it.data_embarque, itens: [] });
+      m.get(id)!.itens.push(it);
+    }
+    return [...m.values()].sort((a, b) => (a.embarque ?? "9999").localeCompare(b.embarque ?? "9999"));
+  })();
+
   return (
     <div className="space-y-4">
       <div className="space-y-3">
@@ -374,35 +388,56 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
             {soSaude ? "Nenhuma inscrição com alerta de saúde." : "Nenhuma inscrição pendente no momento."}
           </div>
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {itensPend.map((it) => (
-              <CardInscricao
-                key={it.id}
-                it={it}
-                podeComentar={podeDecidir}
-                open={aberto.has(it.id)}
-                onToggle={() => toggle(it.id)}
-                acoes={
-                  <>
-                    {podeDecidir && (
-                      <>
-                        <Button size="sm" variant="brand" onClick={() => aprovar(it)} disabled={busy === it.id} className="flex-1">
-                          <Check className="h-3.5 w-3.5" /> Aprovar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => abrirRecusa(it)} disabled={busy === it.id}>
-                          <X className="h-3.5 w-3.5" /> Recusar
-                        </Button>
-                      </>
-                    )}
-                    {it.expedicao_id && (
-                      <Link href={`/expedicoes/${it.expedicao_id}/passageiros`} className="inline-flex h-8 items-center rounded-md border border-border px-2 text-[12px] hover:bg-accent" title="Ver na expedição">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </Link>
-                    )}
-                  </>
-                }
-              />
-            ))}
+          <div className="space-y-3">
+            {gruposPend.map((g) => {
+              const fechado = gruposFechados.has(g.id);
+              return (
+                <div key={g.id} className="overflow-hidden rounded-xl border border-border">
+                  <button
+                    type="button"
+                    onClick={() => toggleGrupo(g.id)}
+                    className="flex w-full items-center gap-2 bg-muted/40 px-3 py-2 text-left text-[13px] font-semibold hover:bg-muted/60"
+                  >
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", !fechado && "rotate-180")} />
+                    <span className="min-w-0 flex-1 truncate">{g.nome}</span>
+                    {g.embarque && <span className="shrink-0 text-[11px] font-normal text-muted-foreground">embarque {formatDate(g.embarque)}</span>}
+                    <Badge variant="atencao">{g.itens.length}</Badge>
+                  </button>
+                  {!fechado && (
+                    <div className="grid gap-3 p-3 lg:grid-cols-2">
+                      {g.itens.map((it) => (
+                        <CardInscricao
+                          key={it.id}
+                          it={it}
+                          podeComentar={podeDecidir}
+                          open={aberto.has(it.id)}
+                          onToggle={() => toggle(it.id)}
+                          acoes={
+                            <>
+                              {podeDecidir && (
+                                <>
+                                  <Button size="sm" variant="brand" onClick={() => aprovar(it)} disabled={busy === it.id} className="flex-1">
+                                    <Check className="h-3.5 w-3.5" /> Aprovar
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => abrirRecusa(it)} disabled={busy === it.id}>
+                                    <X className="h-3.5 w-3.5" /> Recusar
+                                  </Button>
+                                </>
+                              )}
+                              {it.expedicao_id && (
+                                <Link href={`/expedicoes/${it.expedicao_id}/passageiros`} className="inline-flex h-8 items-center rounded-md border border-border px-2 text-[12px] hover:bg-accent" title="Ver na expedição">
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Link>
+                              )}
+                            </>
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
