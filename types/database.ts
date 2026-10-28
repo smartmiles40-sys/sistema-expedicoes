@@ -648,6 +648,8 @@ export type InscricaoPendenteRow = {
   /** Motivo da recusa + anexo técnico opcional (migration 0042). */
   motivo_recusa: string | null;
   recusa_arquivo_id: string | null;
+  /** Comentário de triagem de saúde (migration 0061). */
+  comentario_saude?: string | null;
   created_at: string;
   updated_at: string;
 }

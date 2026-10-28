@@ -94,6 +94,8 @@ export type InscricaoPendente = {
   recusada_em: string | null;
   motivo_recusa: string | null;
   recusa_arquivo_id: string | null;
+  /** Comentário de triagem de saúde (Carol). */
+  comentario_saude: string | null;
   nome_completo: string;
   cpf: string | null;
   data_nascimento: string | null;
@@ -148,6 +150,7 @@ function montar(row: InscricaoPendenteRow, e: ExpedicaoRow | undefined): Inscric
     recusada_em: row.recusada_em ?? null,
     motivo_recusa: row.motivo_recusa ?? null,
     recusa_arquivo_id: row.recusa_arquivo_id ?? null,
+    comentario_saude: row.comentario_saude ?? null,
     nome_completo: row.nome_completo ?? gs("nome_completo") ?? "—",
     cpf: row.cpf,
     data_nascimento: row.data_nascimento ?? gs("data_nascimento"),
@@ -224,6 +227,28 @@ export async function contarInscricoesPendentes(): Promise<number> {
   const { count } = await sb
     .from("inscricoes_pendentes").select("id", { count: "exact", head: true }).eq("status", "pendente");
   return count ?? 0;
+}
+
+/**
+ * Salva (ou limpa) o comentário de triagem de saúde de uma inscrição pendente.
+ * Mesma permissão de decidir inscrição (relacionamento + editores). Fica na
+ * própria inscrição pendente — some junto quando a inscrição é aprovada.
+ */
+export async function salvarComentarioSaude(id: string, comentario: string): Promise<{ ok: boolean; error?: string }> {
+  const eu = await getCurrentUser();
+  if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão para comentar inscrições." };
+  const txt = (comentario ?? "").trim().slice(0, 2000) || null;
+  if (DEV_USE_MOCK_DATA) {
+    const p = mockInscricoesPendentes.find((p) => p.id === id);
+    if (p) { p.comentario_saude = txt; p.updated_at = new Date().toISOString(); }
+    revalidatePath("/inscricoes");
+    return { ok: true };
+  }
+  const sb = createServiceRoleClient();
+  const { error } = await sb.from("inscricoes_pendentes").update({ comentario_saude: txt }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/inscricoes");
+  return { ok: true };
 }
 
 export async function aprovarInscricao(id: string): Promise<{ ok: boolean; error?: string }> {

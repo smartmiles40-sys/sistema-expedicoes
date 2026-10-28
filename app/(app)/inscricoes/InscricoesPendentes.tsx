@@ -3,13 +3,13 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown, AlertTriangle, RotateCcw, Trash2, Archive, Paperclip } from "lucide-react";
+import { UserPlus, Check, X, IdCard, ExternalLink, ChevronDown, AlertTriangle, RotateCcw, Trash2, Archive, Paperclip, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/Dialog";
 import { formatDate, cn } from "@/lib/utils";
 import { PERGUNTAS_SAUDE } from "@/app/(app)/expedicoes/[id]/passageiros/SaudeCampos";
-import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, type InscricaoPendente } from "./actions";
+import { aprovarInscricao, recusarInscricao, restaurarInscricao, excluirInscricaoDefinitivo, salvarComentarioSaude, type InscricaoPendente } from "./actions";
 import { useSomenteLeitura, usePodeDecidirInscricao } from "@/components/layout/PermissoesContext";
 
 function Linha({ label, valor }: { label: string; valor: React.ReactNode }) {
@@ -34,6 +34,59 @@ function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 const simNao = (v: boolean | null) => (v === null ? null : v ? "Sim" : "Não");
+
+// Febre amarela fica de fora: "Sim" ali é bom (tem o certificado), não é alerta.
+const temAlertaSaudeDe = (it: InscricaoPendente) => {
+  const s = (it.saude ?? {}) as Record<string, string>;
+  return PERGUNTAS_SAUDE.some((q) => q.campo !== "vacina_febre_amarela" && s[q.campo] === "Sim");
+};
+
+/** Comentário de triagem de saúde (conduta da Carol) — editável por quem decide inscrição. */
+function ComentarioSaude({ it, podeEditar }: { it: InscricaoPendente; podeEditar: boolean }) {
+  const router = useRouter();
+  const [texto, setTexto] = React.useState(it.comentario_saude ?? "");
+  const [salvando, setSalvando] = React.useState(false);
+  const mudou = texto.trim() !== (it.comentario_saude ?? "").trim();
+
+  async function salvar() {
+    setSalvando(true);
+    const r = await salvarComentarioSaude(it.id, texto);
+    setSalvando(false);
+    if (r.ok) { toast.success("Comentário salvo"); router.refresh(); }
+    else toast.error("Erro ao salvar comentário", { description: r.error });
+  }
+
+  if (!podeEditar) {
+    if (!it.comentario_saude) return null;
+    return (
+      <div className="rounded-lg border border-editavel-600/30 bg-editavel-50 px-2.5 py-1.5 text-[12px]">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-editavel-700">Comentário da triagem</div>
+        <div className="whitespace-pre-wrap break-words text-foreground/80">{it.comentario_saude}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1 rounded-lg border border-editavel-600/30 bg-editavel-50/50 px-2.5 py-2">
+      <label className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-editavel-700">
+        <MessageSquarePlus className="h-3.5 w-3.5" /> Comentário da triagem (saúde)
+      </label>
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        rows={2}
+        placeholder="Ex.: não precisa de receita · receita já emitida · sem conduta necessária"
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-editavel-600"
+      />
+      {mudou && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="brand" onClick={salvar} disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar comentário"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Detalhe({ it }: { it: InscricaoPendente }) {
   const e = it.endereco;
@@ -148,12 +201,14 @@ function CardInscricao({
   onToggle,
   acoes,
   recusada,
+  podeComentar,
 }: {
   it: InscricaoPendente;
   open: boolean;
   onToggle: () => void;
   acoes: React.ReactNode;
   recusada?: boolean;
+  podeComentar?: boolean;
 }) {
   const saudeResp = (it.saude ?? {}) as Record<string, string>;
   // Febre amarela fica de fora: "Sim" ali é bom (tem o certificado), não é alerta.
@@ -191,6 +246,8 @@ function CardInscricao({
         </div>
       )}
 
+      {!recusada && temAlertaSaude && <ComentarioSaude it={it} podeEditar={!!podeComentar} />}
+
       {recusada && (it.motivo_recusa || it.recusa_arquivo_id) && (
         <div className="space-y-1 rounded-lg border border-critico-600/30 bg-critico-50 px-2.5 py-1.5 text-[12px] text-critico-700">
           <div className="text-[11px] font-semibold uppercase tracking-wide">Motivo da recusa</div>
@@ -221,6 +278,7 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
   const [busy, setBusy] = React.useState<string | null>(null);
   const [aberto, setAberto] = React.useState<Set<string>>(new Set());
   const [verRecusadas, setVerRecusadas] = React.useState(false);
+  const [soSaude, setSoSaude] = React.useState(false);
   // Pop-up de recusa (motivo + anexo opcional).
   const [recusando, setRecusando] = React.useState<InscricaoPendente | null>(null);
   const [motivo, setMotivo] = React.useState("");
@@ -289,6 +347,9 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
     else toast.error("Erro ao excluir", { description: r.error });
   }
 
+  const nAlerta = itens.filter(temAlertaSaudeDe).length;
+  const itensPend = soSaude ? itens.filter(temAlertaSaudeDe) : itens;
+
   return (
     <div className="space-y-4">
       <div className="space-y-3">
@@ -298,18 +359,27 @@ export function InscricoesPendentes({ itens, recusadas }: { itens: InscricaoPend
             {itens.length > 0 && <Badge variant="atencao">{itens.length}</Badge>}
           </h1>
           <p className="text-xs text-muted-foreground">Cadastros recebidos pelo formulário público, aguardando aprovação do operacional.</p>
+          {itens.length > 0 && nAlerta > 0 && (
+            <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-atencao-600/40 bg-atencao-50 px-2.5 py-1.5 text-[12px] text-atencao-700">
+              <input type="checkbox" checked={soSaude} onChange={(e) => setSoSaude(e.target.checked)} className="accent-atencao-600" />
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Mostrar só com alerta de saúde
+              <Badge variant="atencao">{nAlerta}</Badge>
+            </label>
+          )}
         </div>
 
-        {itens.length === 0 ? (
+        {itensPend.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center text-[13px] text-muted-foreground">
-            Nenhuma inscrição pendente no momento.
+            {soSaude ? "Nenhuma inscrição com alerta de saúde." : "Nenhuma inscrição pendente no momento."}
           </div>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
-            {itens.map((it) => (
+            {itensPend.map((it) => (
               <CardInscricao
                 key={it.id}
                 it={it}
+                podeComentar={podeDecidir}
                 open={aberto.has(it.id)}
                 onToggle={() => toggle(it.id)}
                 acoes={
