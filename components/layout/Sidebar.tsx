@@ -40,12 +40,14 @@ export function Sidebar({
   user,
   alertCount = 0,
   inscricoesCount = 0,
+  receitasCount = 0,
   mobileOpen = false,
   onClose,
 }: {
   user: CurrentUser | null;
   alertCount?: number;
   inscricoesCount?: number;
+  receitasCount?: number;
   mobileOpen?: boolean;
   onClose?: () => void;
 }) {
@@ -108,6 +110,11 @@ export function Sidebar({
                   {item.href === "/inscricoes" && inscricoesCount > 0 && (
                     <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-[var(--brand-lime)] px-1.5 text-[10px] font-semibold leading-none text-[var(--brand-dark)]">
                       {inscricoesCount > 99 ? "99+" : inscricoesCount}
+                    </span>
+                  )}
+                  {item.href === "/receitas" && receitasCount > 0 && (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-atencao-500 px-1.5 text-[10px] font-semibold leading-none text-white">
+                      {receitasCount > 99 ? "99+" : receitasCount}
                     </span>
                   )}
                 </Link>

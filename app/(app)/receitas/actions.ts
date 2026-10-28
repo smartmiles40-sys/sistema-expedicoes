@@ -59,7 +59,8 @@ export async function listReceitasPendentes(): Promise<ReceitaPendente[]> {
     const e = expById.get(p.expedicao_id);
     if (!e || e.status === "Cancelado") continue;
     const dias = e.data_embarque ? diasEntre(hoje, e.data_embarque) : null;
-    if (dias != null && dias < 0) continue; // viagem já passou
+    // Só aparece quando entra na janela: faltam de 0 a 20 dias pro embarque.
+    if (dias == null || dias < 0 || dias > DIAS_ANTECEDENCIA_RECEITA) continue;
     out.push({
       passageiro_id: p.id, nome: p.nome_completo, cpf: p.cpf, telefone: p.telefone,
       expedicao_id: p.expedicao_id, expedicao_nome: e.nome, destino: e.destino,
@@ -68,6 +69,11 @@ export async function listReceitasPendentes(): Promise<ReceitaPendente[]> {
     });
   }
   return out.sort((a, b) => (a.data_embarque ?? "9999").localeCompare(b.data_embarque ?? "9999"));
+}
+
+/** Contador pro badge da sidebar: receitas na janela (≤20 dias do embarque). */
+export async function contarReceitasNaHora(): Promise<number> {
+  return (await listReceitasPendentes()).length;
 }
 
 /** Marca a receita como enviada (sai da lista; mantém histórico em receita_enviada_em). */
