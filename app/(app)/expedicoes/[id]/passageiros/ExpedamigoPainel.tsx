@@ -1,37 +1,55 @@
 "use client";
 import * as React from "react";
 import { toast } from "sonner";
-import { KeyRound, Lock, Unlock, RefreshCw, Copy } from "lucide-react";
+import { KeyRound, Lock, Unlock, RefreshCw, Copy, Link2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { mascaraCpf } from "@/lib/cpf";
 import {
   liberarExpedamigo,
   bloquearExpedamigo,
-  gerarNovaSenhaCpf,
+  resetarAcessoExpedamigo,
+  gerarLinkAcessoExpedamigo,
   estadoExpedamigoPax,
 } from "./expedamigo-actions";
 
-/** Copia "Login: <cpf>\nSenha: <senha>" pra área de transferência. */
-export function copiarLoginSenha(cpf: string | null, senha: string) {
-  const texto = `Login: ${cpf ? mascaraCpf(cpf) : "—"}\nSenha: ${senha}`;
-  navigator.clipboard?.writeText(texto);
-  toast.success("Login e senha copiados");
+/** Copia um texto pra área de transferência com toast. */
+export function copiarTexto(texto: string, msg = "Copiado") {
+  navigator.clipboard?.writeText(texto).then(() => toast.success(msg)).catch(() => {});
+}
+
+/** Caixa com o link mágico gerado + botões de copiar (link ou mensagem de WhatsApp). */
+function LinkBox({ link, mensagem }: { link: string; mensagem: string | null }) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="break-all rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[11px]">{link}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => copiarTexto(link, "Link copiado")}>
+          <Link2 className="h-3.5 w-3.5" /> Copiar link
+        </Button>
+        {mensagem && mensagem !== link && (
+          <Button variant="ghost" size="sm" onClick={() => copiarTexto(mensagem, "Mensagem copiada")}>
+            <MessageSquare className="h-3.5 w-3.5" /> Copiar mensagem
+          </Button>
+        )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">Repasse o link ao viajante. Ao abrir, ele cria a própria senha e entra (válido por 30 dias).</p>
+    </div>
+  );
 }
 
 export function ExpedamigoPainel({ passageiroId, expedicaoId }: { passageiroId: string; expedicaoId: string }) {
   const [carregando, setCarregando] = React.useState(true);
   const [admin, setAdmin] = React.useState(false);
-  const [cpf, setCpf] = React.useState<string | null>(null);
   const [liberado, setLiberado] = React.useState(false);
   const [temHash, setTemHash] = React.useState(false);
-  const [prov, setProv] = React.useState<string | null>(null);
+  const [link, setLink] = React.useState<string | null>(null);
+  const [mensagem, setMensagem] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     let vivo = true;
     estadoExpedamigoPax(passageiroId).then((s) => {
       if (!vivo) return;
-      setAdmin(s.admin); setCpf(s.cpf); setLiberado(s.liberado); setTemHash(s.temHash); setProv(s.senhaProvisoria);
+      setAdmin(s.admin); setLiberado(s.liberado); setTemHash(s.temHash);
       setCarregando(false);
     });
     return () => { vivo = false; };
@@ -44,28 +62,32 @@ export function ExpedamigoPainel({ passageiroId, expedicaoId }: { passageiroId: 
     const r = await liberarExpedamigo(passageiroId, expedicaoId);
     setBusy(false);
     if (!r.ok) return toast.error("Erro ao liberar", { description: r.error });
-    setLiberado(true);
-    if (r.jaTemSenha) setTemHash(true);
-    if (r.senhaProvisoria) setProv(r.senhaProvisoria);
-    toast.success("ExpedAmigo liberado para o passageiro");
+    setLiberado(true); setTemHash(r.jaTemSenha); setLink(r.link); setMensagem(r.mensagem);
+    toast.success("ExpedAmigo liberado — link de acesso gerado");
   }
   async function bloquear() {
     setBusy(true);
     const r = await bloquearExpedamigo(passageiroId, expedicaoId);
     setBusy(false);
     if (!r.ok) return toast.error("Erro ao bloquear", { description: r.error });
-    setLiberado(false);
+    setLiberado(false); setLink(null); setMensagem(null);
     toast.success("ExpedAmigo bloqueado nesta expedição");
   }
-  async function novaSenha() {
-    if (!cpf) return;
+  async function gerarLink() {
     setBusy(true);
-    const r = await gerarNovaSenhaCpf(cpf);
+    const r = await gerarLinkAcessoExpedamigo(passageiroId);
     setBusy(false);
-    if (!r.ok) return toast.error("Erro ao gerar senha", { description: r.error });
-    setTemHash(false);
-    setProv(r.senhaProvisoria ?? null);
-    toast.success("Nova senha provisória gerada");
+    if (!r.ok || !r.link) return toast.error("Erro ao gerar link", { description: r.error });
+    setLink(r.link); setMensagem(r.mensagem ?? r.link);
+    toast.success("Link de acesso gerado");
+  }
+  async function resetar() {
+    setBusy(true);
+    const r = await resetarAcessoExpedamigo(passageiroId, expedicaoId);
+    setBusy(false);
+    if (!r.ok || !r.link) return toast.error("Erro ao resetar", { description: r.error });
+    setTemHash(false); setLink(r.link); setMensagem(r.mensagem ?? r.link);
+    toast.success("Acesso resetado — senha anterior invalidada; novo link gerado");
   }
 
   return (
@@ -86,29 +108,25 @@ export function ExpedamigoPainel({ passageiroId, expedicaoId }: { passageiroId: 
 
       <div className="rounded-md border border-border bg-muted/20 p-2.5">
         <div className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          <KeyRound className="h-3.5 w-3.5" /> Senha do ExpedAmigo
+          <KeyRound className="h-3.5 w-3.5" /> Acesso ao portal
         </div>
-        {temHash ? (
+        {!liberado ? (
+          <p className="text-muted-foreground">Libere o ExpedAmigo para gerar o link de acesso do viajante.</p>
+        ) : temHash ? (
           <div className="space-y-1.5">
             <p className="text-muted-foreground">O viajante já criou a própria senha.</p>
-            <Button variant="outline" size="sm" onClick={novaSenha} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Resetar senha</Button>
-            <p className="text-[11px] text-muted-foreground">Gera uma nova senha provisória e faz a pessoa voltar ao 1º acesso.</p>
+            <Button variant="outline" size="sm" onClick={resetar} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Resetar acesso</Button>
+            <p className="text-[11px] text-muted-foreground">Invalida a senha atual na hora e gera um novo link mágico pra ele criar outra.</p>
           </div>
-        ) : prov ? (
-          <>
-            <div className="space-y-0.5 font-mono text-[13px]">
-              <div>Login: <span className="tracking-wider">{cpf ? mascaraCpf(cpf) : "—"}</span></div>
-              <div>Senha: <span className="tracking-wider">{prov}</span></div>
-            </div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => copiarLoginSenha(cpf, prov)}><Copy className="h-3.5 w-3.5" /> Copiar login e senha</Button>
-              <Button variant="ghost" size="sm" onClick={novaSenha} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Nova</Button>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Repasse ao viajante. No 1º acesso ele troca por uma senha própria e esta some.</p>
-          </>
         ) : (
-          <p className="text-muted-foreground">A senha é gerada automaticamente ao liberar.</p>
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground">Gere o link mágico de 1º acesso e repasse ao viajante.</p>
+            <Button variant="outline" size="sm" onClick={gerarLink} disabled={busy}>
+              <Link2 className="h-3.5 w-3.5" /> {link ? "Gerar novo link" : "Gerar link de acesso"}
+            </Button>
+          </div>
         )}
+        {link && <LinkBox link={link} mensagem={mensagem} />}
       </div>
     </div>
   );

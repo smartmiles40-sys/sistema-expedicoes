@@ -1030,13 +1030,13 @@ function DiaInline({
 }
 
 /** Voucher ÚNICO da hospedagem (nível da expedição) — mesmo hotel p/ todos. */
-/** Card admin: libera o ExpedAmigo pra TODOS de uma vez e mostra as senhas provisórias. */
+/** Card admin: libera o ExpedAmigo pra TODOS de uma vez e gera um link mágico por pessoa. */
 function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
   const router = useRouter();
   const [carregando, setCarregando] = React.useState(false);
   const [confirmar, setConfirmar] = React.useState(false);
   const [resultado, setResultado] = React.useState<
-    { total: number; jaTinhamSenha: number; senhas: { nome: string; cpf: string; senha: string }[] } | null
+    { total: number; jaTinhamSenha: number; links: { nome: string; cpf: string; link: string }[] } | null
   >(null);
 
   async function liberar() {
@@ -1045,7 +1045,7 @@ function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
     setCarregando(false);
     setConfirmar(false);
     if (r.ok) {
-      setResultado({ total: r.total, jaTinhamSenha: r.jaTinhamSenha, senhas: r.senhas });
+      setResultado({ total: r.total, jaTinhamSenha: r.jaTinhamSenha, links: r.links });
       toast.success(`ExpedAmigo liberado para ${r.total} passageiro(s)`);
       router.refresh();
     } else {
@@ -1055,7 +1055,7 @@ function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
 
   function copiarLista() {
     if (!resultado) return;
-    const txt = resultado.senhas.map((s) => `${s.nome} — CPF ${formatarCpf(s.cpf)} — senha ${s.senha}`).join("\n");
+    const txt = resultado.links.map((s) => `${s.nome} — CPF ${formatarCpf(s.cpf)} — ${s.link}`).join("\n");
     navigator.clipboard.writeText(txt).then(() => toast.success("Lista copiada")).catch(() => {});
   }
 
@@ -1067,7 +1067,7 @@ function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
           <div>
             <h3 className="text-sm font-semibold leading-none">Liberar portal para todos</h3>
             <p className="mt-1 text-[12px] text-muted-foreground">
-              Libera o ExpedAmigo de todos os passageiros desta expedição e gera a senha provisória de quem ainda não tem.
+              Libera o ExpedAmigo de todos os passageiros desta expedição e gera um link mágico de acesso pra quem ainda não criou senha.
             </p>
           </div>
         </div>
@@ -1090,24 +1090,27 @@ function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
             <p className="text-[12px]">
               <span className="font-semibold text-vinculado-700">{resultado.total} liberados</span>
               {resultado.jaTinhamSenha > 0 && <span className="text-muted-foreground"> · {resultado.jaTinhamSenha} já tinham senha própria</span>}
-              {resultado.senhas.length > 0 && <span className="text-muted-foreground"> · {resultado.senhas.length} com senha provisória</span>}
+              {resultado.links.length > 0 && <span className="text-muted-foreground"> · {resultado.links.length} com link de acesso</span>}
             </p>
-            {resultado.senhas.length > 0 && (
+            {resultado.links.length > 0 && (
               <Button size="sm" variant="outline" onClick={copiarLista}><Copy className="h-3 w-3" /> Copiar lista</Button>
             )}
           </div>
-          {resultado.senhas.length > 0 && (
+          {resultado.links.length > 0 && (
             <div className="mt-2 max-h-72 overflow-auto rounded-md border border-border">
               <table className="w-full text-[12px]">
                 <thead className="sticky top-0 bg-muted/60 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <tr><th className="px-2 py-1">Passageiro</th><th className="px-2 py-1">CPF</th><th className="px-2 py-1">Senha provisória</th></tr>
+                  <tr><th className="px-2 py-1">Passageiro</th><th className="px-2 py-1">CPF</th><th className="px-2 py-1">Link de acesso</th><th className="px-2 py-1" /></tr>
                 </thead>
                 <tbody>
-                  {resultado.senhas.map((s, i) => (
+                  {resultado.links.map((s, i) => (
                     <tr key={i} className="border-t border-border">
                       <td className="px-2 py-1">{s.nome}</td>
                       <td className="px-2 py-1 font-mono">{formatarCpf(s.cpf)}</td>
-                      <td className="px-2 py-1 font-mono font-semibold">{s.senha}</td>
+                      <td className="px-2 py-1 font-mono text-[11px]"><span className="block max-w-[260px] truncate">{s.link}</span></td>
+                      <td className="px-2 py-1">
+                        <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(s.link).then(() => toast.success("Link copiado")).catch(() => {})}><Copy className="h-3 w-3" /></Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1115,7 +1118,7 @@ function LiberarTodosCard({ expedicaoId }: { expedicaoId: string }) {
             </div>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Repasse a senha provisória para cada viajante — no 1º acesso ele troca por uma própria.
+            Repasse o link para cada viajante — ao abrir, ele cria a própria senha (válido por 30 dias).
           </p>
         </div>
       )}

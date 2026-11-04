@@ -365,15 +365,25 @@ internas, identidade de marca "Se Tu For, Eu Vou", cara de produto do viajante).
 Espelha tecnicamente a Área do Líder: rota pública, server actions com **service
 role**, **só leitura**.
 
-- **Acesso (`/amigo`):** login por **CPF + senha**. A **1ª senha é ALEATÓRIA**
-  (`senha_provisoria` em `acesso_senhas`, guardada legível), gerada quando o operacional
-  **libera** o passageiro; no 1º acesso o viajante troca por uma própria (vira hash e a
-  provisória some). **A data de nascimento como senha foi REMOVIDA** (migration 0040).
-  Sem senha/provisória → "acesso não liberado".
+- **Acesso (`/amigo`):** login por **CPF + senha**. O **1º acesso é por LINK MÁGICO**
+  (`/a/<codigo>` ou `/amigo/acesso?t=…`): o viajante abre o link e **cria a própria senha**
+  (vira hash em `acesso_senhas`) sem precisar de senha anterior — o token já autentica.
+  **A senha provisória aleatória foi APOSENTADA** nos botões de admin (a coluna
+  `senha_provisoria` continua no schema e no login por legado, mas não é mais gerada).
+  **A data de nascimento como senha foi REMOVIDA** (migration 0040). Sem hash/provisória →
+  a pessoa só entra pelo link.
 - **Liberação por expedição (migration 0040):** `passageiros.liberado_expedamigo` — a
   expedição só aparece no portal quando o operacional libera. Botão **"Liberar ExpedAmigo"**
   no card admin da **página do passageiro** (`ExpedamigoPainel` + `expedamigo-actions.ts`):
-  marca a linha e **gera/mostra a senha** da pessoa (só admin: `getCurrentUser().papel`).
+  marca a linha e **gera um LINK MÁGICO** de acesso (só admin: `getCurrentUser().papel`),
+  com botões "Copiar link" e "Copiar mensagem" (a mensagem de onboarding pronta). O helper
+  compartilhado é **`lib/expedamigo/link-acesso.ts`** (`criarLinkAcesso` grava em
+  `acesso_links` → link curto `/a/<codigo>`, fallback token; `baseUrlPortal` =
+  `NEXT_PUBLIC_SITE_URL` ou headers), reaproveitado pelo onboarding do n8n. Actions:
+  `liberarExpedamigo`/`gerarLinkAcessoExpedamigo` (link sem invalidar),
+  `resetarAcessoExpedamigo`/`resetarAcessoCpf` (**reset invalida a senha atual na hora** —
+  zera hash+provisória — e gera novo link), `liberarExpedamigoTodos` (link mágico por
+  pessoa, no editor do portal), e as versões por CPF no perfil global (`SenhaExpedamigoPessoa`).
   A 1ª liberação é o **onboarding** da pessoa; depois disso, novas expedições dela entram
   **auto-liberadas** (`jaOnboarded` em `materializarInscricao`). O portal filtra por
   `liberado_expedamigo` (mostra as liberadas, inclusive antigas; não-canceladas).

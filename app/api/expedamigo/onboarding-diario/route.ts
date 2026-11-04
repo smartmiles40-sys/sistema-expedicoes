@@ -1,34 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
 import { assinarTokenAcesso } from "@/lib/expedamigo/first-access-token";
+import { criarLinkAcesso } from "@/lib/expedamigo/link-acesso";
 import { montarMensagemOnboarding } from "@/lib/expedamigo/onboarding";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-/** Código curto (sem caracteres ambíguos) pro link /a/<codigo>. */
-function gerarCodigo(n = 10): string {
-  const alfa = "abcdefghjkmnpqrstuvwxyz23456789";
-  const b = randomBytes(n);
-  let s = "";
-  for (let i = 0; i < n; i++) s += alfa[b[i] % alfa.length];
-  return s;
-}
-
-/** Cria o link CURTO (grava em acesso_links); cai no link longo se falhar. */
-async function criarLinkCurto(sb: ReturnType<typeof createServiceRoleClient>, passageiroId: string, base: string): Promise<string> {
-  const expira_em = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  for (let i = 0; i < 4; i++) {
-    const codigo = gerarCodigo();
-    const { error } = await sb.from("acesso_links").insert({ codigo, passageiro_id: passageiroId, expira_em });
-    if (!error) return `${base}/a/${codigo}`;
-    if (!/duplicate|unique/i.test(error.message)) break; // colisão → tenta outro; outro erro → fallback
-  }
-  return `${base}/amigo/acesso?t=${assinarTokenAcesso(passageiroId)}`;
-}
 
 /**
  * Onboarding diário do ExpedAmigo (chamado pelo cron do n8n, DEPOIS do sync do Bitrix).
@@ -85,7 +64,7 @@ export async function POST(req: NextRequest) {
     const exp = expById.get(p.expedicao_id);
     if (!exp) continue;
     // dryRun não grava nada → usa o link longo (por token). Real → link curto /a/<codigo>.
-    const link = dryRun ? `${base}/amigo/acesso?t=${assinarTokenAcesso(p.id)}` : await criarLinkCurto(sb, p.id, base);
+    const link = dryRun ? `${base}/amigo/acesso?t=${assinarTokenAcesso(p.id)}` : await criarLinkAcesso(sb, p.id, base);
     const mensagem = montarMensagemOnboarding({ nome: p.nome_completo, expedicao: exp.nome, link, tipo: exp.tipo ?? "expedicao" });
     const item = {
       passageiro_id: p.id,
