@@ -194,11 +194,13 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   `sincronizarExpedicaoBitrix(expedicaoId)` (`.../passageiros/bitrix-sync-actions.ts`) —
   lê `codigo`+`bitrix_stage_id` e chama o helper; **exige a etapa preenchida** (senão
   retorna erro). Reaproveita o placeholder antigo no `PassageirosTabela.tsx`.
-- **Sync AUTOMÁTICA:** `GET /api/bitrix/sync-todas` (cron, `Bearer CRON_SECRET`) roda o
-  fan-out; além disso o cron diário `/api/expedicoes/atualizar-status` já chama o fan-out
-  (best-effort) depois de ajustar os status — então a sync roda sozinha **1x/dia** sem
-  precisar de cron novo na Vercel (limite de 2 crons no Hobby). Pra mais frequência, dá
-  pra adicionar `/api/bitrix/sync-todas` ao `vercel.json` (precisa plano Pro) ou apontar
+- **Sync AUTOMÁTICA (fan-out diário 09:00 BRT):** o cron `/api/expedicoes/atualizar-status`
+  roda `vercel.json` `"0 12 * * *"` (= **09:00 de Brasília**, pois a Vercel agenda em UTC) e
+  chama `sincronizarTodasExpedicoesBitrix` **SEMPRE** (best-effort, mesmo se a atualização de
+  status falhar) — é o fan-out diário. Fica pendurado nesse cron pra não estourar o limite de
+  2 crons do plano Hobby. `GET /api/bitrix/sync-todas` (`Bearer CRON_SECRET`) roda o mesmo
+  fan-out sob demanda. Pra um cron DEDICADO só do fan-out (ou outro horário/frequência), dá
+  pra adicionar `/api/bitrix/sync-todas` ao `vercel.json` (precisa plano **Pro**) ou apontar
   um Schedule do n8n pra essa rota. `/api/bitrix` já está liberado no `middleware.ts`.
 - **`lib/bitrix/upsert-passageiro.ts`** (`upsertPassageiroBitrix`): grava/atualiza o
   passageiro; compartilhado por `/api/bitrix/passageiro-sync` (payload pronto) e

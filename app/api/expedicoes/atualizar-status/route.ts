@@ -72,22 +72,22 @@ async function handler(req: NextRequest) {
       .lt("data_retorno", hojeISO)
       .select("id");
 
-    if (r1.error || r2.error) {
-      return NextResponse.json(
-        { ok: false, error: r1.error?.message ?? r2.error?.message },
-        { status: 500 },
-      );
-    }
-
-    // Automático: depois de ajustar os status, sincroniza os passageiros de todas
-    // as expedições ativas a partir do Bitrix (fan-out pro webhook único do n8n).
-    // Best-effort — nunca derruba o cron de status.
+    // Fan-out diário (09:00 BRT): sincroniza os passageiros de TODAS as expedições
+    // ativas a partir do Bitrix (webhook único do n8n). Roda SEMPRE (best-effort),
+    // mesmo se a atualização de status acima falhar — é o "cron de sync de todas".
     let bitrix: { total: number; enviados: number; pulados: number } | { erro: string };
     try {
       const r = await sincronizarTodasExpedicoesBitrix(supabase);
       bitrix = r.ok ? { total: r.total, enviados: r.enviados, pulados: r.pulados } : { erro: r.error ?? "falha" };
     } catch (e) {
       bitrix = { erro: e instanceof Error ? e.message : "falha" };
+    }
+
+    if (r1.error || r2.error) {
+      return NextResponse.json(
+        { ok: false, error: r1.error?.message ?? r2.error?.message, bitrix },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
