@@ -85,9 +85,12 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
         );
     }
     if (existente) {
+      const ex = existente as unknown as { expedicao_id: string | null; pendente_aprovacao?: boolean; nova_venda?: boolean };
+      const avulso = ex.expedicao_id == null && ex.pendente_aprovacao !== true;
       const patch = patchVazios(existente as unknown as Record<string, unknown>);
-      if (Object.keys(patch).length) Object.assign(existente, patch, { updated_at: new Date().toISOString() });
-      return { ok: true, passageiro_id: existente.id, action: "updated" };
+      if (avulso) { ex.expedicao_id = expedicao.id; ex.nova_venda = true; }
+      if (Object.keys(patch).length || avulso) Object.assign(existente, patch, { updated_at: new Date().toISOString() });
+      return { ok: true, passageiro_id: existente.id, action: avulso ? "created" : "updated" };
     }
 
     const novo = {
@@ -146,7 +149,7 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
   const exp = expRes.data as { id: string };
 
   const cols =
-    "id, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, bitrix_deal_id, endereco_cep, endereco_rua";
+    "id, expedicao_id, pendente_aprovacao, nome_completo, cpf, passaporte, validade_passaporte, data_nascimento, email, telefone, observacoes, bitrix_contact_id, bitrix_deal_id, endereco_cep, endereco_rua";
   const cpfDig = soDig(data.cpf) || null;
   const contatoId = data.bitrix_contact_id ? String(data.bitrix_contact_id).trim() : null;
   const nomeN = data.nome_completo ? normNome(data.nome_completo) : null;
@@ -164,6 +167,23 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
       });
     }
     return { ok: true, passageiro_id: ex.id as string, action: "updated" };
+  };
+
+  /**
+   * Linha AVULSA (sem expedição) com o mesmo deal → anexa NESTA expedição e marca
+   * como venda nova. Resolve o caso de quem entrou avulso (ex.: import/sync antigo)
+   * e cujo deal agora está na coluna desta expedição — antes ficava "solto".
+   */
+  const atachar = async (ex: Record<string, unknown>): Promise<UpsertPassageiroResult> => {
+    const patch = { ...patchVazios(ex), expedicao_id: exp.id, nova_venda: true };
+    const { error } = await supabase.from("passageiros").update(patch).eq("id", ex.id as string);
+    if (error) return { ok: false, status: 500, error: error.message };
+    await supabase.from("audit_log").insert({
+      tabela: "passageiros", registro_id: ex.id as string, acao: "update",
+      dados_depois: patch, origem: "bitrix-webhook",
+    });
+    await gerarRequisitosPadrao(exp.id);
+    return { ok: true, passageiro_id: ex.id as string, action: "created" };
   };
 
   /**
@@ -194,7 +214,12 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
   if (data.bitrix_deal_id) {
     const { data: byDeal } = await supabase
       .from("passageiros").select(cols).eq("bitrix_deal_id", data.bitrix_deal_id).maybeSingle();
-    if (byDeal) return atualizar(byDeal as Record<string, unknown>);
+    if (byDeal) {
+      const ex = byDeal as Record<string, unknown>;
+      // Avulso (sem expedição) e não pendente de aprovação → anexa nesta expedição.
+      if (ex.expedicao_id == null && ex.pendente_aprovacao !== true) return atachar(ex);
+      return atualizar(ex);
+    }
   }
 
   // 2) Não achou pelo deal → casamento reforçado na expedição (CPF → contato → nome+nasc).

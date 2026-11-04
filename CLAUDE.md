@@ -207,6 +207,12 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   (dígitos), 3) `bitrix_contact_id`, 4) nome + data de nascimento (`acharNaExpedicao`). Só
   cria linha nova se nenhum casar (antes casava só por deal OU CPF, o que duplicava
   contato sem CPF/deal).
+  **Anexar avulso (fix):** se o casamento por `bitrix_deal_id` cai numa linha **AVULSA**
+  (`expedicao_id = null`) e **não-pendente** (`pendente_aprovacao ≠ true`), a sync
+  **ANEXA** essa linha nesta expedição (`expedicao_id = exp.id` + `nova_venda = true` +
+  gera requisitos) em vez de só atualizar no lugar — senão quem entrou avulso e cujo deal
+  está na coluna da expedição ficava "solto" (fora da expedição). Avulso pendente de
+  aprovação NÃO é anexado (respeita a fila de inscrição).
   **Política "SÓ PREENCHE VAZIO":** passageiro novo é criado completo; num que JÁ existe,
   só grava os campos que estão **vazios** no sistema — NUNCA sobrescreve dado já preenchido
   (protege edição manual do operacional). Correção feita no Bitrix num campo já preenchido
