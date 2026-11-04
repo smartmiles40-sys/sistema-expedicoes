@@ -4,7 +4,53 @@ import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { podeDecidirInscricao } from "@/lib/auth/permissoes";
+import { baseUrlPortal, criarLinkAcesso } from "@/lib/expedamigo/link-acesso";
+import { montarMensagemOnboarding } from "@/lib/expedamigo/onboarding";
 import { mockPassageiros, mockExpedicoes } from "@/lib/mock-data";
+
+/** Monta o link wa.me (com DDI 55 se faltar) + texto já codificado. Null se sem telefone. */
+function montarWhatsapp(telefone: string | null | undefined, texto: string): string | null {
+  const d = (telefone ?? "").replace(/\D/g, "");
+  if (d.length < 10) return null;
+  const comDDI = d.startsWith("55") ? d : "55" + d;
+  return `https://wa.me/${comDDI}?text=${encodeURIComponent(texto)}`;
+}
+
+export type PrepararWhatsappResult =
+  | { ok: true; link: string; mensagem: string; whatsapp: string | null; telefone: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Gera o LINK MÁGICO de acesso ao portal do passageiro, libera o ExpedAmigo e monta
+ * a MENSAGEM de boas-vindas (com o nome da expedição) + o link do WhatsApp pronto.
+ * Usado pelo botão "WhatsApp" da fila de Novas vendas.
+ */
+export async function prepararWhatsappVenda(passageiroId: string): Promise<PrepararWhatsappResult> {
+  const eu = await getCurrentUser();
+  if (!podeDecidirInscricao(eu?.papel)) return { ok: false, error: "Sem permissão." };
+  if (DEV_USE_MOCK_DATA) {
+    const link = "https://exemplo.local/a/dev-link";
+    const p = mockPassageiros.find((p) => p.id === passageiroId);
+    const e = mockExpedicoes.find((e) => e.id === p?.expedicao_id);
+    const mensagem = montarMensagemOnboarding({ nome: p?.nome_completo ?? "Viajante", expedicao: e?.nome ?? "sua viagem", link, tipo: (e as { tipo?: "expedicao" | "pacote" })?.tipo ?? "expedicao" });
+    return { ok: true, link, mensagem, whatsapp: montarWhatsapp(p?.telefone ?? null, mensagem), telefone: p?.telefone ?? null };
+  }
+  const sb = createServiceRoleClient();
+  const { data: p } = await sb.from("passageiros").select("nome_completo, telefone, expedicao_id, liberado_expedamigo").eq("id", passageiroId).maybeSingle();
+  const pax = p as { nome_completo: string | null; telefone: string | null; expedicao_id: string | null; liberado_expedamigo: boolean | null } | null;
+  if (!pax?.expedicao_id) return { ok: false, error: "Passageiro sem expedição." };
+  const { data: e } = await sb.from("expedicoes").select("nome, tipo").eq("id", pax.expedicao_id).maybeSingle();
+  const exp = e as { nome: string; tipo?: "expedicao" | "pacote" } | null;
+  // Libera o portal (onboarding) pra a expedição aparecer quando ele entrar.
+  if (pax.liberado_expedamigo !== true) await sb.from("passageiros").update({ liberado_expedamigo: true }).eq("id", passageiroId);
+  const base = await baseUrlPortal();
+  const link = await criarLinkAcesso(sb, passageiroId, base);
+  const mensagem = exp
+    ? montarMensagemOnboarding({ nome: pax.nome_completo ?? "", expedicao: exp.nome, link, tipo: exp.tipo ?? "expedicao" })
+    : link;
+  revalidatePath("/novas-vendas");
+  return { ok: true, link, mensagem, whatsapp: montarWhatsapp(pax.telefone, mensagem), telefone: pax.telefone };
+}
 
 export type NovaVenda = {
   passageiro_id: string;

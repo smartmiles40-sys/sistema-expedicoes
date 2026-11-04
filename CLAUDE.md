@@ -226,6 +226,12 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   "Marcar todas vistas" zeram o flag (`marcarVendaVista`/`marcarTodasVendasVistas`,
   `podeDecidirInscricao`). Espelha a feature "Receitas". Actions em
   `app/(app)/novas-vendas/actions.ts`. Degrada sem a coluna (lista vazia).
+  - **Botão "WhatsApp" (1 clique):** `prepararWhatsappVenda(passageiroId)` gera o **link
+    mágico** de acesso (`criarLinkAcesso`), **libera o ExpedAmigo** (`liberado_expedamigo`)
+    e monta a **mensagem de boas-vindas** (`montarMensagemOnboarding`, já com o nome da
+    expedição) + o link `wa.me/55<fone>?text=…`. A UI abre o WhatsApp do passageiro com
+    tudo pronto; depois mostra "Abrir WhatsApp" (âncora, fallback de popup) e "Copiar
+    mensagem" (copia o texto completo com o link). Sem telefone → copia a mensagem.
 
 ## 🚦 Estado atual
 

@@ -3,12 +3,14 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Sparkles, Check, CheckCheck, Search, ExternalLink } from "lucide-react";
+import { Sparkles, Check, CheckCheck, Search, ExternalLink, MessageCircle, Copy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
-import { marcarVendaVista, marcarTodasVendasVistas, type NovaVenda } from "./actions";
+import { marcarVendaVista, marcarTodasVendasVistas, prepararWhatsappVenda, type NovaVenda } from "./actions";
+
+type Gerado = { mensagem: string; whatsapp: string | null; link: string };
 
 /** Cor do badge por status da reserva. */
 function statusVariant(status: string): "vinculado" | "lista" | "atencao" {
@@ -22,6 +24,7 @@ export function NovasVendasTabela({ itens }: { itens: NovaVenda[] }) {
   const somenteLeitura = useSomenteLeitura();
   const [busca, setBusca] = React.useState("");
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [gerado, setGerado] = React.useState<Record<string, Gerado>>({});
 
   const filtrados = React.useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -42,6 +45,23 @@ export function NovasVendasTabela({ itens }: { itens: NovaVenda[] }) {
     setBusy(null);
     if (res.ok) { toast.success("Todas as novas vendas foram marcadas como vistas"); router.refresh(); }
     else toast.error("Erro", { description: res.error });
+  }
+  function copiarMsg(texto: string) {
+    navigator.clipboard?.writeText(texto).then(() => toast.success("Mensagem copiada — cola no WhatsApp")).catch(() => {});
+  }
+  async function whatsapp(r: NovaVenda) {
+    setBusy(r.passageiro_id);
+    const res = await prepararWhatsappVenda(r.passageiro_id);
+    setBusy(null);
+    if (!res.ok) return toast.error("Erro ao gerar link", { description: res.error });
+    setGerado((g) => ({ ...g, [r.passageiro_id]: { mensagem: res.mensagem, whatsapp: res.whatsapp, link: res.link } }));
+    if (res.whatsapp) {
+      window.open(res.whatsapp, "_blank", "noopener");
+      toast.success(`Link mágico gerado — abrindo WhatsApp de ${r.nome}`);
+    } else {
+      navigator.clipboard?.writeText(res.mensagem).catch(() => {});
+      toast.message("Passageiro sem telefone", { description: "Mensagem copiada — cola no WhatsApp manualmente." });
+    }
   }
 
   return (
@@ -106,11 +126,34 @@ export function NovasVendasTabela({ itens }: { itens: NovaVenda[] }) {
                   </td>
                   <td className="px-3 py-2"><Badge variant={statusVariant(r.status_reserva)}>{r.status_reserva}</Badge></td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.entrou_em ? formatDate(r.entrou_em) : "—"}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2">
                     {!somenteLeitura && (
-                      <Button size="sm" variant="brand" onClick={() => vista(r)} disabled={busy === r.passageiro_id}>
-                        <Check className="h-3.5 w-3.5" /> Marcar vista
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {gerado[r.passageiro_id] ? (
+                          <>
+                            {gerado[r.passageiro_id].whatsapp && (
+                              <a
+                                href={gerado[r.passageiro_id].whatsapp!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md bg-vinculado-600 px-2 py-1 text-[12px] font-medium text-white transition-colors hover:bg-vinculado-700"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" /> Abrir WhatsApp
+                              </a>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => copiarMsg(gerado[r.passageiro_id].mensagem)}>
+                              <Copy className="h-3.5 w-3.5" /> Copiar mensagem
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="brand" onClick={() => whatsapp(r)} disabled={busy === r.passageiro_id}>
+                            <MessageCircle className="h-3.5 w-3.5" /> {busy === r.passageiro_id ? "Gerando…" : "WhatsApp"}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => vista(r)} disabled={busy === r.passageiro_id} title="Marcar como vista">
+                          <Check className="h-3.5 w-3.5" /> Vista
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
