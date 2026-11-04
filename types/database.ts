@@ -112,6 +112,8 @@ export type ExpedicaoRow = {
   pax_cortesia: number;
   preco_venda_brl: number;
   bitrix_pipeline_id: string | null;
+  /** STAGE_ID completo do Bitrix (ex. "C29:UC_F6M93I") — alimenta a sync de passageiros (migration 0063). */
+  bitrix_stage_id?: string | null;
   observacoes: string | null;
   ordem: number | null;
   /** 'expedicao' = viagem em grupo (padrão) · 'pacote' = pacote personalizado (migration 0060). */

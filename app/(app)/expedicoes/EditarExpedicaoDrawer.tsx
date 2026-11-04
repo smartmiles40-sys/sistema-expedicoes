@@ -40,6 +40,7 @@ const schema = z.object({
   observacoes: z.string().nullable().optional(),
   responsavel_operacional_id: z.string().optional(),
   responsavel_comercial_id: z.string().optional(),
+  bitrix_stage_id: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -79,6 +80,7 @@ export function EditarExpedicaoDrawer({ expedicao, onOpenChange, usuarios }: Pro
       observacoes: expedicao.observacoes ?? "",
       responsavel_operacional_id: expedicao.responsavel_operacional_id ?? undefined,
       responsavel_comercial_id: expedicao.responsavel_comercial_id ?? undefined,
+      bitrix_stage_id: expedicao.bitrix_stage_id ?? "",
     });
   }, [expedicao, reset]);
 
@@ -93,6 +95,7 @@ export function EditarExpedicaoDrawer({ expedicao, onOpenChange, usuarios }: Pro
       observacoes: data.observacoes?.trim() ? data.observacoes.trim() : null,
       responsavel_operacional_id: data.responsavel_operacional_id ?? null,
       responsavel_comercial_id: data.responsavel_comercial_id ?? null,
+      bitrix_stage_id: data.bitrix_stage_id?.trim() ? data.bitrix_stage_id.trim() : null,
     });
     if (r.ok) {
       toast.success("Expedição atualizada");
@@ -255,6 +258,15 @@ export function EditarExpedicaoDrawer({ expedicao, onOpenChange, usuarios }: Pro
                 rows={3}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-editavel-600"
               />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-bitrix_stage_id">Etapa do Bitrix (STAGE_ID)</Label>
+              <Input id="edit-bitrix_stage_id" placeholder="ex. C29:UC_F6M93I" className="font-mono" {...register("bitrix_stage_id")} />
+              <p className="text-[11px] text-muted-foreground">
+                A coluna do Bitrix desta expedição. É o que a sincronização de passageiros usa
+                (botão &quot;Atualizar do Bitrix&quot; e a sync automática). Copie o STAGE_ID do funil no Bitrix.
+              </p>
             </div>
           </DrawerBody>
           <DrawerFooter>

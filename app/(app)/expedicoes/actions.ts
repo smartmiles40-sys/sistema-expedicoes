@@ -128,6 +128,7 @@ const CAMPOS_EXPEDICAO_EDITAVEIS = new Set([
   "responsavel_comercial_id",
   "dmc_principal_id",
   "ordem",
+  "bitrix_stage_id",
 ]);
 
 const editarLoteSchema = z.object({
@@ -144,6 +145,7 @@ const editarLoteSchema = z.object({
   observacoes: z.string().nullable().optional(),
   responsavel_operacional_id: z.string().nullable().optional(),
   responsavel_comercial_id: z.string().nullable().optional(),
+  bitrix_stage_id: z.string().nullable().optional(),
 });
 
 export type EditarExpedicaoInput = z.infer<typeof editarLoteSchema>;

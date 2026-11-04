@@ -176,15 +176,30 @@ Mapeamento de estágios: `lib/bitrix/stage-mapping.ts`. Campos custom (UF_CRM_CP
 
 Detalhes: `docs/N8N_INTEGRATION.md`.
 
-**Botão "Atualizar do Bitrix" (aba Passageiros, por expedição):** a server action
-`sincronizarExpedicaoBitrix(expedicaoId)` (`.../passageiros/bitrix-sync-actions.ts`)
-NÃO fala com o Bitrix direto — faz `fetch` num **webhook do n8n** (`N8N_SYNC_URL` +
-header `x-sync-secret` = `N8N_SYNC_SECRET`) passando o `codigo` da expedição. O n8n (só
-com nós HTTP Request, sem Code) puxa os deals daquela coluna, pega cada contato e manda o
-**contato cru** pro endpoint **`/api/bitrix/sync-contato`**, que TRADUZ os campos (CPF 2,
-passaporte, datas, telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime)
-atualiza sozinha. Fire-and-forget (webhook do n8n responde na hora). Botão reaproveita o
-placeholder antigo no `PassageirosTabela.tsx`; qualquer usuário logado usa.
+**Sync de passageiros do Bitrix (webhook único do n8n):** o n8n tem **UM só workflow**
+(HTTP Request, sem Code node) que recebe `{ expedicao_codigo, stage_id, category_id }`,
+filtra os deals daquela coluna, pega cada contato e manda o **contato cru** pro endpoint
+**`/api/bitrix/sync-contato`**, que TRADUZ os campos (CPF 2, passaporte, datas,
+telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza sozinha.
+- **Etapa do Bitrix por expedição (migration 0063):** `expedicoes.bitrix_stage_id` guarda
+  o **STAGE_ID completo** (ex. `C29:UC_F6M93I`) da coluna daquela expedição no Bitrix —
+  é o que removeu o de-para hardcoded de dentro do n8n (antes o workflow tinha um objeto
+  gigante `codigo→stage`). Agora o sistema manda a etapa pronta; a `category_id` sai do
+  prefixo `C<cat>:` (`categoriaDoStage`). Campo editável no `EditarExpedicaoDrawer`
+  ("Etapa do Bitrix (STAGE_ID)"); preencher UMA vez por expedição (vale pra 2027/2028+).
+- **Helper `lib/bitrix/sync-expedicao.ts`:** `dispararSyncExpedicaoN8n({codigo, stageId})`
+  (POST no `N8N_SYNC_URL` + header `x-sync-secret` = `N8N_SYNC_SECRET`) e o fan-out
+  `sincronizarTodasExpedicoesBitrix(sb)` (todas as ativas com etapa preenchida).
+- **Botão "Atualizar do Bitrix" (aba Passageiros, por expedição):** server action
+  `sincronizarExpedicaoBitrix(expedicaoId)` (`.../passageiros/bitrix-sync-actions.ts`) —
+  lê `codigo`+`bitrix_stage_id` e chama o helper; **exige a etapa preenchida** (senão
+  retorna erro). Reaproveita o placeholder antigo no `PassageirosTabela.tsx`.
+- **Sync AUTOMÁTICA:** `GET /api/bitrix/sync-todas` (cron, `Bearer CRON_SECRET`) roda o
+  fan-out; além disso o cron diário `/api/expedicoes/atualizar-status` já chama o fan-out
+  (best-effort) depois de ajustar os status — então a sync roda sozinha **1x/dia** sem
+  precisar de cron novo na Vercel (limite de 2 crons no Hobby). Pra mais frequência, dá
+  pra adicionar `/api/bitrix/sync-todas` ao `vercel.json` (precisa plano Pro) ou apontar
+  um Schedule do n8n pra essa rota. `/api/bitrix` já está liberado no `middleware.ts`.
 - **`lib/bitrix/upsert-passageiro.ts`** (`upsertPassageiroBitrix`): grava/atualiza o
   passageiro; compartilhado por `/api/bitrix/passageiro-sync` (payload pronto) e
   `/api/bitrix/sync-contato` (traduz o contato cru + endereço). **Casamento REFORÇADO**

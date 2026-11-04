@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { mockExpedicoes } from "@/lib/mock-data";
 import { isValidCronBearer } from "@/lib/security/secrets";
+import { sincronizarTodasExpedicoesBitrix } from "@/lib/bitrix/sync-expedicao";
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +79,23 @@ async function handler(req: NextRequest) {
       );
     }
 
+    // Automático: depois de ajustar os status, sincroniza os passageiros de todas
+    // as expedições ativas a partir do Bitrix (fan-out pro webhook único do n8n).
+    // Best-effort — nunca derruba o cron de status.
+    let bitrix: { total: number; enviados: number; pulados: number } | { erro: string };
+    try {
+      const r = await sincronizarTodasExpedicoesBitrix(supabase);
+      bitrix = r.ok ? { total: r.total, enviados: r.enviados, pulados: r.pulados } : { erro: r.error ?? "falha" };
+    } catch (e) {
+      bitrix = { erro: e instanceof Error ? e.message : "falha" };
+    }
+
     return NextResponse.json({
       ok: true,
       hoje: hojeISO,
       em_andamento: (r1.data ?? []).length,
       concluidas: (r2.data ?? []).length,
+      bitrix,
     });
   } catch (err) {
     return NextResponse.json(
