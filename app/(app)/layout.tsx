@@ -7,6 +7,7 @@ import { listExpedicoesComAgregados, getContagemAlertas } from "@/lib/data/exped
 import { listFornecedores } from "@/lib/data/fornecedores";
 import { contarInscricoesPendentes } from "./inscricoes/actions";
 import { contarReceitasNaHora } from "./receitas/actions";
+import { contarNovasVendas } from "./novas-vendas/actions";
 import { mockPassageiros } from "@/lib/mock-data";
 import { DEV_USE_MOCK_DATA } from "@/lib/dev-mode";
 import { getServerClient } from "@/lib/supabase/typed";
@@ -25,17 +26,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 1º acesso: conta com senha provisória precisa definir a própria senha antes de usar.
   if (user.senha_provisoria) redirect("/primeiro-acesso");
 
-  const [expedicoes, fornecedores, passageiros, alertas, inscricoesPendentes, receitasNaHora] = await Promise.all([
+  const [expedicoes, fornecedores, passageiros, alertas, inscricoesPendentes, receitasNaHora, novasVendas] = await Promise.all([
     listExpedicoesComAgregados(),
     listFornecedores(),
     listAllPassageiros(),
     getContagemAlertas(),
     contarInscricoesPendentes(),
     contarReceitasNaHora(),
+    contarNovasVendas(),
   ]);
 
   return (
-    <AppShell user={user} alertCount={alertas.total} inscricoesCount={inscricoesPendentes} receitasCount={receitasNaHora}>
+    <AppShell user={user} alertCount={alertas.total} inscricoesCount={inscricoesPendentes} receitasCount={receitasNaHora} novasVendasCount={novasVendas}>
       {children}
       <CommandPalette
         expedicoes={expedicoes}

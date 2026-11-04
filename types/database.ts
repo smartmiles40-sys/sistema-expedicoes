@@ -196,6 +196,8 @@ export type PassageiroRow = {
   /** Receita médica a emitir/enviar (~20 dias antes). Migration 0062. */
   receita_pendente?: boolean;
   receita_enviada_em?: string | null;
+  /** Veio NOVO da sync do Bitrix (venda nova), aguardando triagem em /novas-vendas. Migration 0064. */
+  nova_venda?: boolean;
   created_at: string;
   updated_at: string;
 }

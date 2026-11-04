@@ -211,6 +211,13 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   só grava os campos que estão **vazios** no sistema — NUNCA sobrescreve dado já preenchido
   (protege edição manual do operacional). Correção feita no Bitrix num campo já preenchido
   NÃO flui sozinha (de propósito). `status_reserva` só é setado na criação.
+- **Fila "Novas vendas" (migration 0064):** coluna `passageiros.nova_venda bool` — a sync
+  marca `true` só ao **CRIAR** uma linha nova (deal que não existia = venda nova); update
+  não mexe. Página **`/novas-vendas`** (item na Sidebar, badge verde, `contarNovasVendas`)
+  lista os `nova_venda=true` (exceto expedição cancelada) pra triagem; "Marcar vista" /
+  "Marcar todas vistas" zeram o flag (`marcarVendaVista`/`marcarTodasVendasVistas`,
+  `podeDecidirInscricao`). Espelha a feature "Receitas". Actions em
+  `app/(app)/novas-vendas/actions.ts`. Degrada sem a coluna (lista vazia).
 
 ## 🚦 Estado atual
 

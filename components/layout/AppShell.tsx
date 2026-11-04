@@ -13,12 +13,14 @@ export function AppShell({
   alertCount = 0,
   inscricoesCount = 0,
   receitasCount = 0,
+  novasVendasCount = 0,
 }: {
   user: CurrentUser | null;
   children: React.ReactNode;
   alertCount?: number;
   inscricoesCount?: number;
   receitasCount?: number;
+  novasVendasCount?: number;
 }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   // Perfis somente-leitura (relacionamento / leitura): mostram uma faixa e o servidor
@@ -35,6 +37,7 @@ export function AppShell({
         alertCount={alertCount}
         inscricoesCount={inscricoesCount}
         receitasCount={receitasCount}
+        novasVendasCount={novasVendasCount}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
       />

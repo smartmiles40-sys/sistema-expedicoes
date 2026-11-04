@@ -122,6 +122,7 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
       contrato_assinado: false,
       checkin_online_feito: false,
       observacoes: data.observacoes ?? null,
+      nova_venda: true,
       ...PASSAGEIRO_INSCRICAO_DEFAULTS,
       endereco_cep: extra?.endereco_cep ?? null,
       endereco_rua: extra?.endereco_rua ?? null,
@@ -217,6 +218,8 @@ export async function upsertPassageiroBitrix(data: SyncData, extra?: ExtraSync):
     observacoes: data.observacoes ?? null,
     endereco_cep: extra?.endereco_cep ?? null,
     endereco_rua: extra?.endereco_rua ?? null,
+    // Venda nova: entra na fila /novas-vendas pra triagem do operacional.
+    nova_venda: true,
   };
   const { data: result, error } = await supabase
     .from("passageiros").insert(registro).select("id").single();

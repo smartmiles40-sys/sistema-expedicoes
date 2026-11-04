@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Package,
   Pill,
+  Sparkles,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/avisos", label: "Avisos", icon: Bell },
   { href: "/passageiros", label: "Passageiros", icon: Users },
   { href: "/clientes", label: "Clientes & compras", icon: ShoppingBag },
+  { href: "/novas-vendas", label: "Novas vendas", icon: Sparkles },
   { href: "/inscricoes", label: "Inscrições", icon: UserPlus },
   { href: "/receitas", label: "Receitas", icon: Pill },
   { href: "/expedicoes", label: "Expedições", icon: Map },
@@ -41,6 +43,7 @@ export function Sidebar({
   alertCount = 0,
   inscricoesCount = 0,
   receitasCount = 0,
+  novasVendasCount = 0,
   mobileOpen = false,
   onClose,
 }: {
@@ -48,6 +51,7 @@ export function Sidebar({
   alertCount?: number;
   inscricoesCount?: number;
   receitasCount?: number;
+  novasVendasCount?: number;
   mobileOpen?: boolean;
   onClose?: () => void;
 }) {
@@ -105,6 +109,11 @@ export function Sidebar({
                   {item.href === "/avisos" && alertCount > 0 && (
                     <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-critico-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                       {alertCount > 99 ? "99+" : alertCount}
+                    </span>
+                  )}
+                  {item.href === "/novas-vendas" && novasVendasCount > 0 && (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-vinculado-600 px-1.5 text-[10px] font-semibold leading-none text-white">
+                      {novasVendasCount > 99 ? "99+" : novasVendasCount}
                     </span>
                   )}
                   {item.href === "/inscricoes" && inscricoesCount > 0 && (
