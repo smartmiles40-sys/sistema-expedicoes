@@ -194,14 +194,19 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   `sincronizarExpedicaoBitrix(expedicaoId)` (`.../passageiros/bitrix-sync-actions.ts`) —
   lê `codigo`+`bitrix_stage_id` e chama o helper; **exige a etapa preenchida** (senão
   retorna erro). Reaproveita o placeholder antigo no `PassageirosTabela.tsx`.
-- **Sync AUTOMÁTICA (fan-out diário 09:00 BRT):** o cron `/api/expedicoes/atualizar-status`
-  roda `vercel.json` `"0 12 * * *"` (= **09:00 de Brasília**, pois a Vercel agenda em UTC) e
-  chama `sincronizarTodasExpedicoesBitrix` **SEMPRE** (best-effort, mesmo se a atualização de
-  status falhar) — é o fan-out diário. Fica pendurado nesse cron pra não estourar o limite de
-  2 crons do plano Hobby. `GET /api/bitrix/sync-todas` (`Bearer CRON_SECRET`) roda o mesmo
-  fan-out sob demanda. Pra um cron DEDICADO só do fan-out (ou outro horário/frequência), dá
-  pra adicionar `/api/bitrix/sync-todas` ao `vercel.json` (precisa plano **Pro**) ou apontar
-  um Schedule do n8n pra essa rota. `/api/bitrix` já está liberado no `middleware.ts`.
+- **Sync AUTOMÁTICA (fan-out diário 09:00 BRT via n8n Schedule):** quem dispara o fan-out
+  diário é um **Schedule no n8n** (nó Schedule `0 9 * * *` timezone America/Sao_Paulo → nó
+  HTTP GET `https://sistema-expedicoes.vercel.app/api/bitrix/sync-todas` com header
+  `Authorization: Bearer <CRON_SECRET>`). A rota roda `sincronizarTodasExpedicoesBitrix`
+  (todas as ativas com etapa). Preferiu-se o n8n ao cron do Vercel porque o **Hobby tem
+  horário aproximado** e, principalmente, **exige `CRON_SECRET` setado na Vercel** (sem ele a
+  rota de cron dá 401 e não roda). `GET /api/bitrix/sync-todas` também serve pra disparo
+  manual. ⚠️ `CRON_SECRET` precisa existir na Vercel **e** no header do n8n (mesmo valor).
+  `/api/bitrix` já está liberado no `middleware.ts`.
+  - **Cron do Vercel (`vercel.json`, `"0 3 * * *"`):** `/api/expedicoes/atualizar-status`
+    faz **só** a atualização de status por data (Em andamento/Concluída) — **não** dispara
+    mais o fan-out (isso saiu daqui pra não rodar 2x junto com o n8n). Também exige o
+    `CRON_SECRET` (o Vercel injeta o `Authorization: Bearer` automaticamente quando a env existe).
 - **Rotas DESATIVADAS no app (`lib/feature-flags.ts`):** por decisão do operacional, as
   automações abaixo foram **bloqueadas direto no sistema** (respondem 403, independente do
   n8n) — pra reativar, flip da flag + deploy. Desativadas: `/api/expedamigo/onboarding-diario`

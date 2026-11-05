@@ -4,7 +4,6 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { mockExpedicoes } from "@/lib/mock-data";
 import { isValidCronBearer } from "@/lib/security/secrets";
-import { sincronizarTodasExpedicoesBitrix } from "@/lib/bitrix/sync-expedicao";
 
 export const dynamic = "force-dynamic";
 
@@ -72,20 +71,9 @@ async function handler(req: NextRequest) {
       .lt("data_retorno", hojeISO)
       .select("id");
 
-    // Fan-out diário (09:00 BRT): sincroniza os passageiros de TODAS as expedições
-    // ativas a partir do Bitrix (webhook único do n8n). Roda SEMPRE (best-effort),
-    // mesmo se a atualização de status acima falhar — é o "cron de sync de todas".
-    let bitrix: { total: number; enviados: number; pulados: number } | { erro: string };
-    try {
-      const r = await sincronizarTodasExpedicoesBitrix(supabase);
-      bitrix = r.ok ? { total: r.total, enviados: r.enviados, pulados: r.pulados } : { erro: r.error ?? "falha" };
-    } catch (e) {
-      bitrix = { erro: e instanceof Error ? e.message : "falha" };
-    }
-
     if (r1.error || r2.error) {
       return NextResponse.json(
-        { ok: false, error: r1.error?.message ?? r2.error?.message, bitrix },
+        { ok: false, error: r1.error?.message ?? r2.error?.message },
         { status: 500 },
       );
     }
@@ -95,7 +83,6 @@ async function handler(req: NextRequest) {
       hoje: hojeISO,
       em_andamento: (r1.data ?? []).length,
       concluidas: (r2.data ?? []).length,
-      bitrix,
     });
   } catch (err) {
     return NextResponse.json(
