@@ -5,8 +5,10 @@ import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { mockExpedicoes } from "@/lib/mock-data";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
 import { gerarChecklistPadrao } from "@/app/(app)/expedicoes/actions";
+import { ROTA_DESATIVADA, respostaRotaDesativada } from "@/lib/feature-flags";
 
 export async function POST(req: NextRequest) {
+  if (ROTA_DESATIVADA.bitrixExpedicaoSync) return respostaRotaDesativada();
   if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }

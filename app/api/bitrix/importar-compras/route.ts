@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
+import { ROTA_DESATIVADA, respostaRotaDesativada } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +42,7 @@ const compraSchema = z.object({
 const bodySchema = z.object({ compras: z.array(compraSchema).max(1000) });
 
 export async function POST(req: NextRequest) {
+  if (ROTA_DESATIVADA.importarCompras) return respostaRotaDesativada();
   if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }

@@ -202,6 +202,14 @@ telefone/e-mail) e faz o upsert. A tabela de passageiros (realtime) atualiza soz
   fan-out sob demanda. Pra um cron DEDICADO só do fan-out (ou outro horário/frequência), dá
   pra adicionar `/api/bitrix/sync-todas` ao `vercel.json` (precisa plano **Pro**) ou apontar
   um Schedule do n8n pra essa rota. `/api/bitrix` já está liberado no `middleware.ts`.
+- **Rotas DESATIVADAS no app (`lib/feature-flags.ts`):** por decisão do operacional, as
+  automações abaixo foram **bloqueadas direto no sistema** (respondem 403, independente do
+  n8n) — pra reativar, flip da flag + deploy. Desativadas: `/api/expedamigo/onboarding-diario`
+  (onboarding WhatsApp), `/api/bitrix/passageiro-sync` e `/api/bitrix/expedicao-sync` (sync
+  por **evento** do Bitrix), `/api/bitrix/importar-compras` (base Clientes & compras). ⚠️
+  **NÃO** desativadas (seguem ativas): `/api/bitrix/sync-contato` e `/api/bitrix/sync-todas`
+  (o fan-out das 09:00 usa) + `/api/health`. O acesso ao ExpedAmigo agora é por link mágico
+  gerado no app (aba Novas vendas / painel do passageiro), não mais pelo onboarding do n8n.
 - **`lib/bitrix/upsert-passageiro.ts`** (`upsertPassageiroBitrix`): grava/atualiza o
   passageiro; compartilhado por `/api/bitrix/passageiro-sync` (payload pronto) e
   `/api/bitrix/sync-contato` (traduz o contato cru + endereço). **Casamento REFORÇADO**

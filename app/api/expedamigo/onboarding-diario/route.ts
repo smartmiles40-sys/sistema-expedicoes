@@ -5,6 +5,7 @@ import { isValidWebhookSecret } from "@/lib/security/secrets";
 import { assinarTokenAcesso } from "@/lib/expedamigo/first-access-token";
 import { criarLinkAcesso } from "@/lib/expedamigo/link-acesso";
 import { montarMensagemOnboarding } from "@/lib/expedamigo/onboarding";
+import { ROTA_DESATIVADA, respostaRotaDesativada } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ export const runtime = "nodejs";
  * Body (opcional): { dryRun?: boolean, expedicao_codigo?: string }.
  */
 export async function POST(req: NextRequest) {
+  if (ROTA_DESATIVADA.onboardingDiario) return respostaRotaDesativada();
   if (!DEV_USE_MOCK_DATA && !isValidWebhookSecret(req.headers.get("x-webhook-secret"))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }

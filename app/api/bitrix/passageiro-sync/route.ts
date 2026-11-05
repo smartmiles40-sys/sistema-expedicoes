@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { passageiroSyncSchema } from "@/lib/bitrix/validators";
 import { upsertPassageiroBitrix } from "@/lib/bitrix/upsert-passageiro";
 import { isValidWebhookSecret } from "@/lib/security/secrets";
+import { ROTA_DESATIVADA, respostaRotaDesativada } from "@/lib/feature-flags";
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
 export async function POST(req: NextRequest) {
+  if (ROTA_DESATIVADA.bitrixPassageiroSync) return respostaRotaDesativada();
   if (!isValidWebhookSecret(req.headers.get("x-webhook-secret"))) return unauthorized();
 
   let body: unknown;
