@@ -478,7 +478,11 @@ role**, **só leitura**.
   - **Voucher por item (migration 0024):** `expedicao_voos.arquivo_id` e
     `expedicao_passeios.arquivo_id` (1 arquivo, categoria "Vouchers"). Anexo/remoção no
     editor via `atualizarItemPortal({arquivo_id})` + upload/DELETE de `/api/arquivos`.
-    No portal vira "Baixar voucher" (signed URL). A **hospedagem** tem um voucher
+    No portal vira "Baixar voucher" (signed URL). ⚠️ **Voucher de voo de GRUPO NÃO aparece
+    no portal/PDF** (o documento tem valores juntos do grupo): em `app/amigo/actions.ts`,
+    `voos_grupo[].voucher_url` só é exposto pra voo **individual** (`passageiro_id`
+    preenchido); voo de grupo (`passageiro_id = null`) vai como `null`. O voucher continua
+    anexável no editor (uso interno) — só não é exibido ao viajante. A **hospedagem** tem um voucher
     ÚNICO por expedição (`expedicoes.hospedagem_voucher_arquivo_id`, migration 0030 —
     todos no mesmo hotel), anexado no painel "Voucher da hospedagem" do editor do
     ExpedAmigo (`definirVoucherHospedagem`) e exibido na seção Hospedagem do portal.

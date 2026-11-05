@@ -544,7 +544,9 @@ export async function entrarExpedAmigo(
           trecho: v.trecho, companhia: v.companhia, numero_voo: v.numero_voo,
           origem: v.origem, destino: v.destino, partida: v.partida, chegada: v.chegada,
           localizador: v.localizador, observacoes: v.observacoes,
-          voucher_url: v.arquivo_id ? fotoUrl.get(v.arquivo_id) ?? null : null,
+          // Voucher de voo de GRUPO NÃO aparece no portal (o documento tem valores
+          // juntos do grupo). Só voo INDIVIDUAL (passageiro_id) mostra o voucher dele.
+          voucher_url: v.passageiro_id && v.arquivo_id ? fotoUrl.get(v.arquivo_id) ?? null : null,
         })),
       passeios: passeios
         .filter((p) => p.expedicao_id === e.id)
