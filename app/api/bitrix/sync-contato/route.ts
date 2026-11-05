@@ -74,6 +74,17 @@ export async function POST(req: NextRequest) {
     if (alt) cpf = alt.padStart(11, "0");
   }
 
+  // Deal SEM contato usável (sem nome E sem CPF) → não cria linha "Sem nome" lixo.
+  // Acontece quando o deal no Bitrix não tem contato vinculado (CONTACT_ID vazio).
+  if (!nome && !cpf) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      motivo: "deal sem contato (sem nome/CPF) — não cria passageiro",
+      bitrix_deal_id: body.bitrix_deal_id ?? null,
+    });
+  }
+
   const emailRaw = multi(c.EMAIL);
   const email = emailRaw && emailValido(emailRaw) ? emailRaw : null;
 
