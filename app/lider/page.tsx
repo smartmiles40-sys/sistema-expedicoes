@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   MapPin, Calendar, ChevronRight, FileText, ArrowLeft, RefreshCw, CalendarDays, Moon, Sun,
-  DownloadCloud, WifiOff, Trash2, HardDriveDownload,
+  DownloadCloud, WifiOff, Trash2, HardDriveDownload, Paperclip,
 } from "lucide-react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -27,9 +27,8 @@ import {
   salvarDoc, carregarDoc, coletarArquivosExpedicao,
   tamanhoOfflineExpedicao, formatarTamanho,
 } from "@/lib/lider/offline";
-import type { RoteiroLiderDiaRow } from "@/types/database";
-
 type VerDoc = (a: LiderArquivo) => void;
+type LiderDiaRoteiro = LiderExpedicao["roteiro"][number];
 
 const SEM_DOT: Record<string, string> = {
   ok: "bg-vinculado-600",
@@ -684,7 +683,7 @@ function ExpedicaoLiderCard({
       {aberta && (
         <div className="space-y-3 p-3">
           <DocsExpedicao exp={exp} onVerDoc={onVerDoc} />
-          <RoteiroLider exp={exp} meuNome={meuNome} />
+          <RoteiroLider exp={exp} meuNome={meuNome} onVerDoc={onVerDoc} />
           <Aniversariantes exp={exp} />
           {lideres.length > 0 && (
             <Secao titulo="Líderes" pax={lideres} onVerDoc={onVerDoc} />
@@ -760,7 +759,7 @@ function Aniversariantes({ exp }: { exp: LiderExpedicao }) {
 
 // ===================== Roteiro do Líder (dia a dia operacional) =====================
 
-type LiderDia = RoteiroLiderDiaRow;
+type LiderDia = LiderDiaRoteiro;
 
 const COR_GRUPO: Record<string, string> = {
   G1: "border-editavel-600 bg-editavel-50 text-editavel-700",
@@ -784,7 +783,7 @@ type BriefDia = {
   outros: { rotulo: string | null; lideres: string[] }[];
 };
 
-function RoteiroLider({ exp, meuNome }: { exp: LiderExpedicao; meuNome: string }) {
+function RoteiroLider({ exp, meuNome, onVerDoc }: { exp: LiderExpedicao; meuNome: string; onVerDoc: VerDoc }) {
   const [verTudo, setVerTudo] = React.useState(false);
   const roteiro = exp.roteiro;
   if (roteiro.length === 0) return null;
@@ -822,7 +821,7 @@ function RoteiroLider({ exp, meuNome }: { exp: LiderExpedicao; meuNome: string }
 
   return (
     <div className="space-y-2.5">
-      {foco && <DiaBrief dia={foco} info={brief(foco)} multi={multi} destaque label={focoLabel} />}
+      {foco && <DiaBrief dia={foco} info={brief(foco)} multi={multi} onVerDoc={onVerDoc} destaque label={focoLabel} />}
 
       <Recolhivel
         titulo={`Todos os dias (${roteiro.length})`}
@@ -831,7 +830,7 @@ function RoteiroLider({ exp, meuNome }: { exp: LiderExpedicao; meuNome: string }
         onToggle={() => setVerTudo((v) => !v)}
       >
         <div className="space-y-1.5">
-          {roteiro.map((d) => <DiaBrief key={d.id} dia={d} info={brief(d)} multi={multi} hoje={d.data === hoje} />)}
+          {roteiro.map((d) => <DiaBrief key={d.id} dia={d} info={brief(d)} multi={multi} onVerDoc={onVerDoc} hoje={d.data === hoje} />)}
         </div>
       </Recolhivel>
     </div>
@@ -851,7 +850,7 @@ function Recolhivel({ titulo, icone, aberto, onToggle, children }: { titulo: str
   );
 }
 
-function DiaBrief({ dia, info, multi, destaque, label, hoje }: { dia: LiderDia; info: BriefDia; multi: boolean; destaque?: boolean; label?: string; hoje?: boolean }) {
+function DiaBrief({ dia, info, multi, onVerDoc, destaque, label, hoje }: { dia: LiderDia; info: BriefDia; multi: boolean; onVerDoc: VerDoc; destaque?: boolean; label?: string; hoje?: boolean }) {
   const [aberto, setAberto] = React.useState(!!destaque);
   const md = info.meuDia;
   const nivel = md.alerta_nivel ? NIVEL_ALERTA[md.alerta_nivel] : null;
@@ -901,6 +900,16 @@ function DiaBrief({ dia, info, multi, destaque, label, hoje }: { dia: LiderDia; 
               <div className="text-[11px] font-bold">{nivel.emoji} Atenção</div>
               <div className="mt-0.5">{md.alerta_texto}</div>
               {md.alerta_acao && <div className="mt-1"><span className="font-semibold">O que fazer:</span> {md.alerta_acao}</div>}
+            </div>
+          )}
+          {dia.vouchers.length > 0 && (
+            <div className="rounded-lg border border-editavel-600 bg-editavel-50 p-2">
+              <div className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-editavel-700">
+                <Paperclip className="h-3 w-3" /> Você pode precisar
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {dia.vouchers.map((v) => <DocChip key={v.id} a={v} onVerDoc={onVerDoc} />)}
+              </div>
             </div>
           )}
         </div>

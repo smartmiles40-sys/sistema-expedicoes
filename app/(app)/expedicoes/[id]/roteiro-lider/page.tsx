@@ -20,7 +20,7 @@ export default async function RoteiroLiderPage({
   return (
     <div className="space-y-4">
       <DocsLiderPanel expedicaoId={id} docs={docs} />
-      <RoteiroLiderEditor expedicaoId={id} dias={dias} />
+      <RoteiroLiderEditor expedicaoId={id} dias={dias} docs={docs} />
     </div>
   );
 }

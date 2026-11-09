@@ -12,7 +12,7 @@ async function negarSeLeitura(): Promise<{ ok: false; error: string } | null> {
 
 // CRUD do Roteiro do Líder (migration 0029). Usa service role (lê/escreve no banco
 // real; sem branch de mock — a tabela não tem fixtures).
-type Valores = Record<string, string | number | null>;
+type Valores = Record<string, string | number | null | string[]>;
 
 interface LooseClient {
   from(t: string): {
