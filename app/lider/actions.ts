@@ -111,7 +111,9 @@ export type LiderPax = {
   checagens: LiderChecagem[];
   arquivos: LiderArquivo[];
 };
-export type LiderGrupoRoteiro = { rotulo: string | null; dias: RoteiroLiderDiaRow[] };
+/** Dia do roteiro do líder já com os vouchers/docs resolvidos (migration 0065). */
+export type LiderDiaRoteiro = RoteiroLiderDiaRow & { vouchers: LiderArquivo[] };
+export type LiderGrupoRoteiro = { rotulo: string | null; dias: LiderDiaRoteiro[] };
 export type LiderExpedicao = {
   id: string;
   codigo: string;
@@ -123,7 +125,7 @@ export type LiderExpedicao = {
   grupo_rotulo: string | null;
   viagem_grupo: string | null;
   /** Roteiro operacional do líder desta expedição (migration 0029). */
-  roteiro: RoteiroLiderDiaRow[];
+  roteiro: LiderDiaRoteiro[];
   /** Todos os grupos irmãos da viagem (inclui este) — para o Mapa de Líderes e alertas. */
   grupos: LiderGrupoRoteiro[];
   /** Documentos da EXPEDIÇÃO (não de um passageiro) — ex.: Manual do líder. */
@@ -289,6 +291,8 @@ export async function buscarDadosLider(
   const arqsPorPax = new Map<string, ArqTrab[]>();
   // Documentos de EXPEDIÇÃO (sem passageiro): manual do líder etc.
   const arqsPorExp = new Map<string, LiderArquivo[]>();
+  // id -> doc do líder (pra resolver os vouchers vinculados a cada dia do roteiro).
+  const docById = new Map<string, LiderArquivo>();
   for (const a of arqs) {
     if (a.passageiro_id) {
       const arr = arqsPorPax.get(a.passageiro_id) ?? [];
@@ -296,11 +300,18 @@ export async function buscarDadosLider(
       arqsPorPax.set(a.passageiro_id, arr);
     } else if (a.expedicao_id && (a.descricao ?? "") === MARCADOR_DOC_LIDER) {
       // Só documentos marcados p/ o líder — não fotos/vouchers de nível-expedição.
+      const la: LiderArquivo = { id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes };
       const arr = arqsPorExp.get(a.expedicao_id) ?? [];
-      arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes });
+      arr.push(la);
       arqsPorExp.set(a.expedicao_id, arr);
+      docById.set(a.id, la);
     }
   }
+  // Anexa os vouchers (resolvidos por id) a cada dia do roteiro do líder.
+  const comVouchers = (d: RoteiroLiderDiaRow): LiderDiaRoteiro => ({
+    ...d,
+    vouchers: (d.arquivo_ids ?? []).map((id) => docById.get(id)).filter((x): x is LiderArquivo => !!x),
+  });
 
   const expById = new Map(exps.map((e) => [e.id, e]));
   const rlByExp = new Map<string, RoteiroLiderDiaRow[]>();
@@ -314,12 +325,12 @@ export async function buscarDadosLider(
   for (const eid of expIds) {
     const e = expById.get(eid);
     if (!e) continue;
-    const roteiro = (rlByExp.get(eid) ?? []).slice().sort(ordenaDias);
+    const roteiro = (rlByExp.get(eid) ?? []).slice().sort(ordenaDias).map(comVouchers);
     const irmas = e.viagem_grupo
       ? exps.filter((x) => x.viagem_grupo && x.viagem_grupo === e.viagem_grupo)
       : [e];
     const grupos = irmas
-      .map((x) => ({ rotulo: x.grupo_rotulo ?? null, dias: (rlByExp.get(x.id) ?? []).slice().sort(ordenaDias) }))
+      .map((x) => ({ rotulo: x.grupo_rotulo ?? null, dias: (rlByExp.get(x.id) ?? []).slice().sort(ordenaDias).map(comVouchers) }))
       .filter((g) => g.dias.length > 0)
       .sort((a, b) => (a.rotulo ?? "").localeCompare(b.rotulo ?? ""));
     const paxDaExp = pax.filter((p) => p.expedicao_id === eid && p.status_reserva !== "Cancelado");

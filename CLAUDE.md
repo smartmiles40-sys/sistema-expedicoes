@@ -627,6 +627,14 @@ caso Japão & China, que roda **dois grupos irmãos (G1/G2)** — duas linhas de
   separados por " · "), `pax` (texto — aceita "18 → 25"), `observacoes` e alerta
   (`alerta_nivel` = Crítico/Atenção/Verificar, `alerta_texto`, `alerta_acao`,
   `alerta_responsavel`), `ordem`. Mesmo padrão de RLS/trigger das tabelas do portal.
+- **Vouchers por dia (migration `0065`):** coluna `roteiro_lider_dias.arquivo_ids text[]`
+  aponta pra arquivos já existentes (os **docs da Área do Líder** do MARCADOR_DOC_LIDER).
+  `buscarDadosLider` resolve cada id → `LiderArquivo` e devolve `roteiro[].vouchers`; a
+  Área do Líder (`DiaBrief`) mostra clicável dentro do dia na seção **"Você pode
+  precisar"**. No editor (`RoteiroLiderEditor`), checkboxes dos docs do líder anexam/
+  desanexam por dia; indicador 📎 na lista. Offline reaproveita os mesmos arquivos (já
+  baixados como docs da expedição). Os horários (voos/ferries/pick-ups) ficam no próprio
+  texto de `programacao` (linha com 🕐).
 - **Vínculo de grupos irmãos:** `expedicoes.viagem_grupo` (rótulo compartilhado entre
   irmãs) + `expedicoes.grupo_rotulo` ("G1"/"G2"), ambos nuláveis (migration 0029).
   Não confundir com `grupos_expedicao` (subgrupos DENTRO de uma expedição).

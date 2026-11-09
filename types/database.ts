@@ -599,6 +599,8 @@ export type RoteiroLiderDiaRow = {
   alerta_texto: string | null;
   alerta_acao: string | null;
   alerta_responsavel: string | null;
+  /** Arquivos (ids) vinculados a este dia — vouchers/docs da Área do Líder. Migration 0065. */
+  arquivo_ids: string[] | null;
   ordem: number;
   created_at: string;
   updated_at: string;

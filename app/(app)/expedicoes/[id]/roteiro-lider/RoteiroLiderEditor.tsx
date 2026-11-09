@@ -13,23 +13,25 @@ import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 const NIVEIS = ["", "Crítico", "Atenção", "Verificar"];
 const EMOJI: Record<string, string> = { "Crítico": "🔴", "Atenção": "🟠", "Verificar": "🟡" };
 
+type DocLider = { id: string; nome: string; mime: string | null };
 type Form = {
   dia: string; data: string; fase: string; local: string; programacao: string;
   lideres_ativos: string; pax: string; observacoes: string;
   alerta_nivel: string; alerta_texto: string; alerta_acao: string; alerta_responsavel: string;
+  arquivo_ids: string[];
 };
 const vazio = (): Form => ({
   dia: "", data: "", fase: "", local: "", programacao: "", lideres_ativos: "", pax: "",
-  observacoes: "", alerta_nivel: "", alerta_texto: "", alerta_acao: "", alerta_responsavel: "",
+  observacoes: "", alerta_nivel: "", alerta_texto: "", alerta_acao: "", alerta_responsavel: "", arquivo_ids: [],
 });
 const doRow = (d: RoteiroLiderDiaRow): Form => ({
   dia: String(d.dia ?? ""), data: d.data ?? "", fase: d.fase ?? "", local: d.local ?? "",
   programacao: d.programacao ?? "", lideres_ativos: d.lideres_ativos ?? "", pax: d.pax ?? "",
   observacoes: d.observacoes ?? "", alerta_nivel: d.alerta_nivel ?? "", alerta_texto: d.alerta_texto ?? "",
-  alerta_acao: d.alerta_acao ?? "", alerta_responsavel: d.alerta_responsavel ?? "",
+  alerta_acao: d.alerta_acao ?? "", alerta_responsavel: d.alerta_responsavel ?? "", arquivo_ids: d.arquivo_ids ?? [],
 });
 
-export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string; dias: RoteiroLiderDiaRow[] }) {
+export function RoteiroLiderEditor({ expedicaoId, dias, docs }: { expedicaoId: string; dias: RoteiroLiderDiaRow[]; docs: DocLider[] }) {
   const router = useRouter();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = React.useState<RoteiroLiderDiaRow | null>(null);
@@ -81,6 +83,7 @@ export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string;
                   {d.local && <span>{d.local}</span>}
                   {d.lideres_ativos && <span>👤 {d.lideres_ativos}</span>}
                   {d.pax && <span>{d.pax} pax</span>}
+                  {d.arquivo_ids && d.arquivo_ids.length > 0 && <span>📎 {d.arquivo_ids.length}</span>}
                   {d.alerta_nivel && <span>{EMOJI[d.alerta_nivel]} {d.alerta_nivel}</span>}
                 </div>
               </div>
@@ -99,6 +102,7 @@ export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string;
         <DrawerForm
           expedicaoId={expedicaoId}
           registro={editando}
+          docs={docs}
           onClose={fechar}
           onSaved={() => { fechar(); router.refresh(); }}
         />
@@ -107,8 +111,8 @@ export function RoteiroLiderEditor({ expedicaoId, dias }: { expedicaoId: string;
   );
 }
 
-function DrawerForm({ expedicaoId, registro, onClose, onSaved }: {
-  expedicaoId: string; registro: RoteiroLiderDiaRow | null; onClose: () => void; onSaved: () => void;
+function DrawerForm({ expedicaoId, registro, docs, onClose, onSaved }: {
+  expedicaoId: string; registro: RoteiroLiderDiaRow | null; docs: DocLider[]; onClose: () => void; onSaved: () => void;
 }) {
   const [form, setForm] = React.useState<Form>(registro ? doRow(registro) : vazio());
   const [salvando, setSalvando] = React.useState(false);
@@ -121,12 +125,13 @@ function DrawerForm({ expedicaoId, registro, onClose, onSaved }: {
     }
     setSalvando(true);
     const nn = (s: string) => (s.trim() === "" ? null : s.trim());
-    const valores: Record<string, string | number | null> = {
+    const valores: Record<string, string | number | null | string[]> = {
       dia: form.dia.trim() === "" ? 1 : parseInt(form.dia, 10) || 1,
       data: nn(form.data), fase: nn(form.fase), local: nn(form.local), programacao: nn(form.programacao),
       lideres_ativos: nn(form.lideres_ativos), pax: nn(form.pax), observacoes: nn(form.observacoes),
       alerta_nivel: nn(form.alerta_nivel), alerta_texto: nn(form.alerta_texto),
       alerta_acao: nn(form.alerta_acao), alerta_responsavel: nn(form.alerta_responsavel),
+      arquivo_ids: form.arquivo_ids.length ? form.arquivo_ids : null,
     };
     const r = registro
       ? await atualizarDiaLider(registro.id, expedicaoId, valores)
@@ -157,6 +162,29 @@ function DrawerForm({ expedicaoId, registro, onClose, onSaved }: {
           </div>
           <Campo label="Líderes ativos" hint="separe por ·"><Input value={form.lideres_ativos} onChange={(e) => set("lideres_ativos", e.target.value)} placeholder="Everton · Jacqueline · Beatriz" /></Campo>
           <Campo label="Observações"><Area value={form.observacoes} onChange={(v) => set("observacoes", v)} /></Campo>
+
+          {docs.length > 0 && (
+            <Campo label="Vouchers / documentos deste dia" hint="aparecem como “Você pode precisar” na Área do Líder">
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                {docs.map((d) => {
+                  const on = form.arquivo_ids.includes(d.id);
+                  return (
+                    <label key={d.id} className="flex cursor-pointer items-center gap-2 text-[12px]">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) => setForm((f) => ({
+                          ...f,
+                          arquivo_ids: e.target.checked ? [...f.arquivo_ids, d.id] : f.arquivo_ids.filter((x) => x !== d.id),
+                        }))}
+                      />
+                      <span className="truncate">{d.nome}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Campo>
+          )}
 
           <div className="rounded-lg border border-border p-3">
             <div className="mb-2 text-[12px] font-semibold">Alerta operacional (opcional)</div>
