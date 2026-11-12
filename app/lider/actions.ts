@@ -293,7 +293,10 @@ export async function buscarDadosLider(
   const arqsPorExp = new Map<string, LiderArquivo[]>();
   // id -> doc do líder (pra resolver os vouchers vinculados a cada dia do roteiro).
   const docById = new Map<string, LiderArquivo>();
+  // id -> QUALQUER arquivo (pra resolver o passaporte por-pessoa via passaporte_arquivo_id).
+  const arqById = new Map<string, LiderArquivo>();
   for (const a of arqs) {
+    arqById.set(a.id, { id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes });
     if (a.passageiro_id) {
       const arr = arqsPorPax.get(a.passageiro_id) ?? [];
       arr.push({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho_bytes, descricao: a.descricao });
@@ -347,7 +350,15 @@ export async function buscarDadosLider(
           const arqsDaChecagem = cat
             ? arquivosPax.filter((a) => a.categoria === cat && (a.descricao ?? "").startsWith(c.tipo))
             : [];
-          return { ...c, arquivos: arqsDaChecagem.map(semDescricao) };
+          let lista = arqsDaChecagem.map(semDescricao);
+          // Passaporte é anexo POR PESSOA: o id (passaporte_arquivo_id) propaga entre as
+          // linhas da pessoa, mas o arquivo fica fichado só na expedição onde subiu. Resolve
+          // pelo id p/ o passaporte aparecer em TODA expedição que a pessoa participa.
+          if (c.tipo === "Passaporte" && p.passaporte_arquivo_id) {
+            const pp = arqById.get(p.passaporte_arquivo_id);
+            if (pp && !lista.some((a) => a.id === pp.id)) lista = [pp, ...lista];
+          }
+          return { ...c, arquivos: lista };
         });
         return {
           id: p.id,
@@ -371,7 +382,14 @@ export async function buscarDadosLider(
           acompanhante_nome: p.acompanhante_nome,
           prontidao: res.prontidao,
           checagens,
-          arquivos: arquivosPax.map(semDescricao),
+          arquivos: (() => {
+            const base = arquivosPax.map(semDescricao);
+            if (p.passaporte_arquivo_id) {
+              const pp = arqById.get(p.passaporte_arquivo_id);
+              if (pp && !base.some((a) => a.id === pp.id)) return [pp, ...base];
+            }
+            return base;
+          })(),
         };
       })
       .sort((a, b) => (a.tipo === "Líder" ? 0 : 1) - (b.tipo === "Líder" ? 0 : 1) || a.nome_completo.localeCompare(b.nome_completo, "pt-BR"));
@@ -477,6 +495,26 @@ export async function linkAssinadoLider(
       .eq("expedicao_id", a.expedicao_id)
       .eq("tipo", "Líder");
     autorizado = (liderRows ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
+  }
+  if (!autorizado) {
+    // Passaporte é anexo POR PESSOA: o arquivo pode estar fichado em OUTRA expedição que
+    // não a que o líder lidera. Libera se o CPF lidera alguma expedição onde esse arquivo
+    // é o passaporte de um passageiro.
+    const { data: paxComEsse } = await sb
+      .from("passageiros")
+      .select("expedicao_id")
+      .eq("passaporte_arquivo_id", arquivoId);
+    const expIds = [...new Set((paxComEsse ?? [])
+      .map((r) => (r as { expedicao_id: string | null }).expedicao_id)
+      .filter((id): id is string => !!id))];
+    if (expIds.length > 0) {
+      const { data: liderRows2 } = await sb
+        .from("passageiros")
+        .select("cpf")
+        .in("expedicao_id", expIds)
+        .eq("tipo", "Líder");
+      autorizado = (liderRows2 ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
+    }
   }
   if (!autorizado) return { ok: false, error: "Sem acesso a este documento" };
 
