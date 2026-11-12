@@ -339,8 +339,13 @@ export async function buscarDadosLider(
     const paxDaExp = pax.filter((p) => p.expedicao_id === eid && p.status_reserva !== "Cancelado");
     const passageiros: LiderPax[] = paxDaExp
       .map((p) => {
-        const res = avaliarProntidao({ passageiro: p, expedicao: e, destino: e.destino, requisitos: reqsPorPax.get(p.id) ?? [] });
+        const reqsDoP = reqsPorPax.get(p.id) ?? [];
+        const res = avaliarProntidao({ passageiro: p, expedicao: e, destino: e.destino, requisitos: reqsDoP });
         const arquivosPax = arqsPorPax.get(p.id) ?? [];
+        // tipo -> arquivo_id da PRÓPRIA instância de requisito (a evidência pode estar
+        // fichada em outra linha da pessoa; aí não entra em arquivosPax desta linha).
+        const arqIdPorTipo = new Map<string, string>();
+        for (const r of reqsDoP) if (r.arquivo_id) arqIdPorTipo.set(r.tipo, r.arquivo_id);
         const semDescricao = (a: ArqTrab): LiderArquivo => ({ id: a.id, nome: a.nome, mime: a.mime, categoria: a.categoria, tamanho: a.tamanho });
         const checagens: LiderChecagem[] = res.checagens.map((c) => {
           const cat = CATEGORIA_REQUISITO[c.tipo];
@@ -351,6 +356,13 @@ export async function buscarDadosLider(
             ? arquivosPax.filter((a) => a.categoria === cat && (a.descricao ?? "").startsWith(c.tipo))
             : [];
           let lista = arqsDaChecagem.map(semDescricao);
+          // Evidência da instância (ex.: Vacina): o arquivo_id pode apontar pra um arquivo
+          // fichado em OUTRA linha da pessoa — resolve pelo id p/ aparecer aqui também.
+          const instArqId = arqIdPorTipo.get(c.tipo);
+          if (instArqId) {
+            const ia = arqById.get(instArqId);
+            if (ia && !lista.some((a) => a.id === ia.id)) lista = [ia, ...lista];
+          }
           // Passaporte é anexo POR PESSOA: o id (passaporte_arquivo_id) propaga entre as
           // linhas da pessoa, mas o arquivo fica fichado só na expedição onde subiu. Resolve
           // pelo id p/ o passaporte aparecer em TODA expedição que a pessoa participa.
@@ -497,21 +509,29 @@ export async function linkAssinadoLider(
     autorizado = (liderRows ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
   }
   if (!autorizado) {
-    // Passaporte é anexo POR PESSOA: o arquivo pode estar fichado em OUTRA expedição que
-    // não a que o líder lidera. Libera se o CPF lidera alguma expedição onde esse arquivo
-    // é o passaporte de um passageiro.
-    const { data: paxComEsse } = await sb
-      .from("passageiros")
-      .select("expedicao_id")
-      .eq("passaporte_arquivo_id", arquivoId);
-    const expIds = [...new Set((paxComEsse ?? [])
-      .map((r) => (r as { expedicao_id: string | null }).expedicao_id)
-      .filter((id): id is string => !!id))];
-    if (expIds.length > 0) {
+    // Documento POR PESSOA (passaporte) ou evidência de requisito (vacina etc.): o arquivo
+    // pode estar fichado em OUTRA expedição que não a que o líder lidera. Libera se o CPF
+    // lidera alguma expedição onde esse arquivo é o passaporte, ou a evidência de um
+    // requisito, de um passageiro.
+    const [paxPass, reqArq] = await Promise.all([
+      sb.from("passageiros").select("expedicao_id").eq("passaporte_arquivo_id", arquivoId),
+      sb.from("passageiro_requisitos").select("passageiros!inner(expedicao_id)").eq("arquivo_id", arquivoId),
+    ]);
+    const expIds = new Set<string>();
+    for (const r of (paxPass.data ?? [])) {
+      const id = (r as { expedicao_id: string | null }).expedicao_id;
+      if (id) expIds.add(id);
+    }
+    for (const r of (reqArq.data ?? [])) {
+      const j = (r as { passageiros: { expedicao_id: string | null } | { expedicao_id: string | null }[] }).passageiros;
+      const rows = Array.isArray(j) ? j : [j];
+      for (const x of rows) if (x?.expedicao_id) expIds.add(x.expedicao_id);
+    }
+    if (expIds.size > 0) {
       const { data: liderRows2 } = await sb
         .from("passageiros")
         .select("cpf")
-        .in("expedicao_id", expIds)
+        .in("expedicao_id", [...expIds])
         .eq("tipo", "Líder");
       autorizado = (liderRows2 ?? []).some((r) => soDigitosCpf((r as { cpf: string | null }).cpf ?? "") === cpf);
     }
