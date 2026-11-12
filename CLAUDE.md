@@ -307,6 +307,18 @@ de processos do P8 (catálogo + instâncias + status):
   da pessoa; migration `0026`). O drawer (modo `soAnexo`) grava via `atualizarAnexoPassaporte`
   (não na instância). O **item "Documento Pessoal" foi REMOVIDO** (migration `0026` apaga
   instâncias + arquivos "Documento Pessoal — prontidão"; enum mantém o valor, inofensivo).
+- **Vacina UNIVERSAL da pessoa (`lib/prontidao/vacina-sync.ts`):** o Certificado de Febre
+  Amarela vale pra vida toda, mas o requisito "Vacina" é instância **por expedição** (um
+  destino pode DISPENSAR). O estado da vacina (arquivo + status + validade) **espelha entre
+  TODAS as linhas da pessoa** (casadas por CPF, dígitos ou formatado): editar
+  arquivo_id/status/validade de "Vacina" no `atualizarRequisitoCampo` chama
+  `propagarVacinaPessoa(..., {sobrescrever:true})` → mexeu numa, vale em todas. **Exceção:**
+  slot **"Dispensado"** (destino não exige) NUNCA é tocado nem propagado — é decisão
+  por-destino. `espalharCertificadoVacina` é o modo **herança** (`sobrescrever:false`, só
+  preenche slot vazio) usado ao semear requisitos de nova expedição / incluir pax / inscrição.
+  A Área do Líder resolve o anexo da checagem pelo **`arquivo_id` da própria instância** (não
+  só pelos arquivos fichados na linha), e `linkAssinadoLider` libera o download de passaporte/
+  evidência fichados em OUTRA expedição que o CPF lidere.
 - **Ingressos Machu Picchu (só Peru):** requisitos "Ingresso Machu Picchu" (**até 2 anexos**
   — `maxAnexos`) e "Ingresso Trem Machu Picchu" (**vários** — ida/volta), ambos no fluxo
   `soAnexoMultiplo` do `ProntidaoPaxDrawer`; só entram no template de Peru; OPCIONAIS e
