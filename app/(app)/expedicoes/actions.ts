@@ -18,7 +18,7 @@ import {
 import { construirChecklistPadrao } from "@/lib/processos/template";
 import { construirRequisitosPadrao } from "@/lib/prontidao/template";
 import { requisitosDoDestino } from "@/lib/prontidao/requisitos-destino";
-import { espalharCertificadoVacina } from "@/lib/prontidao/vacina-sync";
+import { espalharCertificadoVacina, propagarVacinaPessoa } from "@/lib/prontidao/vacina-sync";
 import { ETAPA_CHECKLIST, STATUS_CHECKLIST, STATUS_REQUISITO, TIPO_PASSAGEIRO, STATUS_RESERVA, CAPACIDADE_QUARTO } from "@/lib/constants";
 import { cpfDigitos } from "@/lib/csv/passageiros-import";
 import { cpfValido } from "@/lib/cpf";
@@ -2599,10 +2599,10 @@ export async function atualizarRequisitoCampo(
     .eq("id", requisitoId);
   if (error) return { ok: false, error: error.message };
 
-  // Vacina é universal da pessoa: ao anexar o certificado numa expedição, reflete
-  // o arquivo no slot "Vacina" de todas as outras expedições dela (slot vazio,
-  // sem mexer em Dispensado/Reprovado). Só na ADIÇÃO de anexo (não na remoção).
-  if (campo === "arquivo_id" && typeof valor === "string" && valor) {
+  // Vacina é UNIVERSAL da pessoa (Certificado de Febre Amarela vale pra vida toda):
+  // mexer no arquivo/status/validade numa expedição ESPELHA nas outras linhas dela
+  // (menos as "Dispensado", que é decisão por-destino). Mexer numa vale pra todas.
+  if ((campo === "arquivo_id" || campo === "status" || campo === "validade")) {
     const { data: req } = await supabase
       .from("passageiro_requisitos")
       .select("tipo, passageiro_id")
@@ -2612,7 +2612,7 @@ export async function atualizarRequisitoCampo(
     if (r?.tipo === "Vacina") {
       const { data: pax } = await supabase.from("passageiros").select("cpf").eq("id", r.passageiro_id).maybeSingle();
       const cpf = (pax as { cpf: string | null } | null)?.cpf ?? null;
-      await espalharCertificadoVacina(supabase, cpf, valor);
+      await propagarVacinaPessoa(supabase, cpf, { [campo]: valor } as { arquivo_id?: string | null; status?: string; validade?: string | null }, { sobrescrever: true });
     }
   }
 
