@@ -596,11 +596,12 @@ export async function entrarExpedAmigo(
         .map((a) => fotoUrl.get(a.id) ?? "")
         .filter((url) => url)
         .map((url, i, all) => ({ nome: all.length > 1 ? `Seguro viagem ${i + 1}` : "Seu seguro viagem", url })),
+      // Vouchers do próprio passageiro: o NOME exibido no portal é editável pelo
+      // operacional (campo `descricao` do arquivo); sem descrição, cai no nome do arquivo.
       vouchers_voo: vvoucherArqs
         .filter((a) => !!row && a.passageiro_id === row.id)
-        .map((a) => fotoUrl.get(a.id) ?? "")
-        .filter((url) => url)
-        .map((url, i, all) => ({ nome: all.length > 1 ? `Voucher de voo ${i + 1}` : "Seu voucher de voo", url })),
+        .map((a) => ({ nome: (a.descricao ?? "").trim() || a.nome, url: fotoUrl.get(a.id) ?? "" }))
+        .filter((x) => x.url),
       // Rótulo amigável ("Seu cartão de embarque"), não o nome do arquivo; numera se >1.
       cartoes_embarque: cartaoArqs
         .filter((a) => !!row && a.passageiro_id === row.id)

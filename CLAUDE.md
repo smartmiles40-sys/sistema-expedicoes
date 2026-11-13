@@ -468,6 +468,15 @@ role**, **só leitura**.
   `cartoes_embarque` — o operacional faz o check-in e anexa no Drive do passageiro;
   aparece no bloco Voos do portal e no PDF; migration **0051** amplia o enum
   `categoria_arquivo`). Passeios não têm mais "incluso/opcional" (tudo que se cadastra é incluído).
+  E os **Vouchers do próprio passageiro** (categoria "Vouchers" com `passageiro_id`,
+  `vvoucherArqs` → campo `vouchers_voo`, bloco Voos do portal + PDF): **TUDO que o
+  operacional joga na pasta Vouchers do passageiro aparece pra ele**. O **nome exibido é
+  EDITÁVEL** — vem do campo `arquivos.descricao` (vazio → cai no nome do arquivo). Edição
+  no painel de documentos (`components/arquivos/Drive.tsx`, botão lápis só nos Vouchers,
+  mostra "No portal: …") via **`PATCH /api/arquivos/[id]`** (`{descricao}`), que é
+  **restrito à categoria "Vouchers"** — `descricao` nas outras categorias é marcador
+  funcional (prontidão "<tipo> — prontidão", `MARCADOR_DOC_LIDER`) e não pode ser
+  sobrescrito ali.
 - **Baixar PDF da viagem:** botão por viagem (`app/amigo/ViagemPDF.tsx`, **`@react-pdf/renderer`**)
   gerado **no cliente** sob demanda (import() dinâmico → fora do bundle principal). Reaproveita
   os dados já carregados (sem rota/re-login). Capa + roteiro (com fotos embutidas, JPG/PNG via

@@ -17,6 +17,7 @@ import {
   Eye,
   FileSignature,
   PlaneTakeoff,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -102,6 +103,29 @@ export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGO
     } finally {
       setUploading(false);
     }
+  }
+
+  // Nome que o passageiro vê no portal (ExpedAmigo) — só pra Vouchers. Guardado no
+  // campo `descricao` do arquivo; em branco, o portal usa o nome do arquivo.
+  async function renomearExibicao(arq: ArquivoRow) {
+    const atual = (arq.descricao ?? "").trim();
+    const novo = window.prompt(
+      "Nome que o passageiro vê no portal (deixe em branco pra usar o nome do arquivo):",
+      atual,
+    );
+    if (novo === null) return; // cancelou
+    const res = await fetch(`/api/arquivos/${arq.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descricao: novo.trim() }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      toast.error("Erro ao renomear", { description: json.error });
+      return;
+    }
+    toast.success("Nome de exibição atualizado");
+    router.refresh();
   }
 
   async function deletar(arq: ArquivoRow) {
@@ -216,7 +240,22 @@ export function Drive({ expedicaoId, passageiroId, arquivos, categorias = CATEGO
                     {a.tamanho_bytes != null && <span>· {formatSize(a.tamanho_bytes)}</span>}
                     <span>· {new Date(a.created_at).toLocaleDateString("pt-BR")}</span>
                   </div>
+                  {a.categoria === "Vouchers" && (
+                    <div className="text-[10px] text-vinculado-700 flex items-center gap-1 mt-0.5">
+                      <Eye className="h-3 w-3 shrink-0" />
+                      No portal: <strong className="font-medium">{(a.descricao ?? "").trim() || a.nome}</strong>
+                    </div>
+                  )}
                 </div>
+                {a.categoria === "Vouchers" && (
+                  <button
+                    onClick={() => renomearExibicao(a)}
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                    title="Editar o nome que aparece no portal"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {ehImagem && (
                   <button
                     onClick={() => setPreview(a)}

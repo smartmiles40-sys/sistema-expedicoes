@@ -86,6 +86,18 @@ export async function getArquivoMock(
   }
 }
 
+export async function updateArquivoDescricaoMock(
+  id: string,
+  descricao: string | null,
+): Promise<boolean> {
+  const rows = await readIndex();
+  const row = rows.find((r) => r.id === id);
+  if (!row) return false;
+  row.descricao = descricao;
+  await writeIndex(rows);
+  return true;
+}
+
 export async function removeArquivoMock(id: string): Promise<boolean> {
   const rows = await readIndex();
   const idx = rows.findIndex((r) => r.id === id);
