@@ -14,6 +14,7 @@ import { CATEGORIA_ARQUIVO } from "@/lib/constants";
 const CATEGORIAS_SEM_DOC_PESSOAL = CATEGORIA_ARQUIVO.filter((c) => c !== "Documentos pessoais");
 import { formatDate, aniversarioNaViagem } from "@/lib/utils";
 import { ExpedamigoPainel } from "../ExpedamigoPainel";
+import { ExtrairDadosClaude } from "@/components/extrair/ExtrairDadosClaude";
 import type { StatusReserva } from "@/types/database";
 
 const STATUS_VARIANT: Record<StatusReserva, "lista" | "atencao" | "vinculado" | "critico"> = {
@@ -68,6 +69,7 @@ export default async function PerfilPassageiroPage({
             </Badge>
           </div>
         </div>
+        <ExtrairDadosClaude expedicaoId={id} passageiroId={paxId} />
       </div>
 
       <ExpedamigoPainel passageiroId={paxId} expedicaoId={id} />

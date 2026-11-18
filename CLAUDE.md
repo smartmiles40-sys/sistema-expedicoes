@@ -637,6 +637,22 @@ role**, **só leitura**.
   o portal). Visualização no operacional: **`/acessos-expedamigo`** (`AcessosTabela`, busca +
   filtro por evento; resolve o nome pela linha de passageiro do CPF). Item na Sidebar.
 
+## 🤖 Extrair dados p/ Claude (double check do Relacionamento)
+
+Botão **"Extrair p/ Claude"** no header da expedição/pacote (`ExpedicaoHeader`), no drawer do
+passageiro (`EditarPassageiroDrawer`) e na página do passageiro (`[paxId]/page.tsx`).
+Componente `components/extrair/ExtrairDadosClaude.tsx` → server action
+`app/(app)/expedicoes/[id]/extrair-actions.ts` (só leitura, qualquer perfil logado) →
+`lib/extrair/dossie.ts` (`montarDossieClaude(expId, paxId?)`). Gera um **dossiê Markdown**
+com instruções do double check pra Claude + alertas automáticos (dia sem data/fora do período,
+buraco no roteiro, noite sem hotel, voo/passeio/hospedagem sem voucher, passaporte sem anexo ou
+< 6 meses, pax sem quarto, prontidão ≠ Apto) + roteiro, voos, passeios, hospedagem/rooming,
+extensões, info, roteiro do líder, e por passageiro (quartos, opcionais, prontidão, documentos).
+Modo passageiro filtra roteiro/voos com a MESMA regra do portal (`veSegmento`/`veVoo`).
+Saídas: copiar texto, baixar `.md`, ou **ZIP montado no navegador** (`fflate`; baixa cada
+arquivo via `/api/arquivos/[id]/download` — não passa pela função da Vercel, teto 4,5 MB) com
+`00-LEIA-PRIMEIRO-dossie.md` + arquivos em pastas; checkbox exclui documentos pessoais.
+
 ## 🧭 Roteiro do Líder (resumo diário operacional)
 
 Resumo dia a dia **para os líderes** (separado do roteiro do passageiro). Nasceu do

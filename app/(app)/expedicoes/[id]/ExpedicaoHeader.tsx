@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { formatDate, formatPercent, daysUntil } from "@/lib/utils";
 import type { ExpedicaoComAgregados, StatusExpedicao } from "@/types/database";
+import { ExtrairDadosClaude } from "@/components/extrair/ExtrairDadosClaude";
 
 const STATUS_PILL: Record<StatusExpedicao, string> = {
   Planejamento: "bg-white/15 text-white",
@@ -113,7 +114,10 @@ export function ExpedicaoHeader({ expedicao }: { expedicao: ExpedicaoComAgregado
           big={`${expedicao.prontidao_aptos}/${expedicao.prontidao_total}`}
           sub="aptos p/ embarque"
         />
-        <button className="ml-auto inline-flex items-center gap-1.5 self-center rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+        <div className="ml-auto self-center">
+          <ExtrairDadosClaude expedicaoId={expedicao.id} variante="hero" />
+        </div>
+        <button className="inline-flex items-center gap-1.5 self-center rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <RefreshCw className="h-3.5 w-3.5" /> Sync Bitrix
         </button>
       </div>

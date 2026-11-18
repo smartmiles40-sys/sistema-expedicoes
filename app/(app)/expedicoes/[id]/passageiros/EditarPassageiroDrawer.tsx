@@ -38,6 +38,7 @@ import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { atualizarPassageiroLote, excluirPassageiro } from "@/app/(app)/expedicoes/actions";
 import { ProntidaoConteudo } from "./ProntidaoPaxDrawer";
 import { ExpedamigoPainel } from "./ExpedamigoPainel";
+import { ExtrairDadosClaude } from "@/components/extrair/ExtrairDadosClaude";
 import { useSomenteLeitura } from "@/components/layout/PermissoesContext";
 import { PasseiosOpcionaisCompra } from "./PasseiosOpcionaisCompra";
 import { ExtensoesCompra } from "./ExtensoesCompra";
@@ -178,12 +179,15 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
           </DrawerTitle>
           <DrawerDescription>Dados pessoais, prontidão e saúde do passageiro.</DrawerDescription>
           {passageiro && (
-            <Link
-              href={`/expedicoes/${expedicaoId}/passageiros/${passageiro.id}`}
-              className="mt-1.5 inline-flex w-fit items-center gap-1 text-[12px] font-medium text-editavel-700 hover:underline"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> Abrir página completa
-            </Link>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              <Link
+                href={`/expedicoes/${expedicaoId}/passageiros/${passageiro.id}`}
+                className="inline-flex w-fit items-center gap-1 text-[12px] font-medium text-editavel-700 hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Abrir página completa
+              </Link>
+              <ExtrairDadosClaude expedicaoId={expedicaoId} passageiroId={passageiro.id} />
+            </div>
           )}
         </DrawerHeader>
 
