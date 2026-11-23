@@ -64,6 +64,7 @@ const schema = z.object({
   voo_nacional_necessario: z.boolean().optional(),
   contrato_assinado: z.boolean().optional(),
   checkin_online_feito: z.boolean().optional(),
+  aereo_proprio: z.boolean().optional(),
   observacoes: z.string().optional(),
   endereco_cep: z.string().optional(),
   endereco_rua: z.string().optional(),
@@ -120,6 +121,7 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
       voo_nacional_necessario: passageiro.voo_nacional_necessario ?? false,
       contrato_assinado: passageiro.contrato_assinado ?? false,
       checkin_online_feito: passageiro.checkin_online_feito ?? false,
+      aereo_proprio: passageiro.aereo_proprio ?? false,
       observacoes: passageiro.observacoes ?? "",
       endereco_cep: passageiro.endereco_cep ?? "",
       endereco_rua: passageiro.endereco_rua ?? "",
@@ -302,6 +304,21 @@ export function EditarPassageiroDrawer({ expedicaoId, passageiro, arquivos, dest
                 );
               })()}
             </div>
+
+            {/* Aéreo próprio: esconde os voos de grupo no portal do ExpedAmigo (migration 0066). */}
+            <label htmlFor="ep-aereo" className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-muted/20 p-2.5">
+              <input
+                id="ep-aereo"
+                type="checkbox"
+                checked={watch("aereo_proprio") ?? false}
+                onChange={(e) => setValue("aereo_proprio", e.target.checked, { shouldDirty: true })}
+                className="mt-0.5 h-4 w-4 accent-editavel-600"
+              />
+              <span className="text-[12px] leading-snug">
+                <span className="font-medium">Aéreo próprio</span> — comprou a passagem por conta própria (não com a agência).
+                <span className="mt-0.5 block text-muted-foreground">Oculta os voos de grupo no portal do ExpedAmigo deste passageiro.</span>
+              </span>
+            </label>
 
             <div className="space-y-1">
               <Label htmlFor="ep-obs">Observações</Label>

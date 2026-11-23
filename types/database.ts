@@ -198,6 +198,8 @@ export type PassageiroRow = {
   receita_enviada_em?: string | null;
   /** Veio NOVO da sync do Bitrix (venda nova), aguardando triagem em /novas-vendas. Migration 0064. */
   nova_venda?: boolean;
+  /** Comprou o aéreo por conta própria (não com a agência) → esconde voos de grupo no portal. Migration 0066. */
+  aereo_proprio?: boolean;
   created_at: string;
   updated_at: string;
 }

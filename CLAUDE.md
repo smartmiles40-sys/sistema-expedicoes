@@ -596,6 +596,15 @@ role**, **só leitura**.
   e esconde os de grupo; quem não tem voo próprio vê os de grupo normal. Preenchido via
   script hoje (sem seletor no editor ainda). Ex.: Consuelo (Japão G1 emenda Tailândia via
   Bangkok) e as saídas individuais de Japão G1/G2 poderiam migrar pra cá no futuro.
+- **Aéreo próprio — esconde voo de grupo (migration 0066):** coluna
+  `passageiros.aereo_proprio bool` (default false) — pra quem **comprou a passagem por conta
+  própria** (não com a agência). No portal (`entrarExpedAmigo`, `veVoo`), o ramo do voo de
+  GRUPO (`passageiro_id = null`) só passa se `comprouAereoConosco = !row || !row.aereo_proprio`
+  — ou seja, passageiro com `aereo_proprio = true` **não vê nenhum voo de grupo** (nem no
+  PDF, que reusa o mesmo filtro); admin (`row` null) vê tudo. Voo **individual** atribuído a
+  ele (`passageiro_id` preenchido) continua aparecendo. Toggle no operacional:
+  `EditarPassageiroDrawer` (aba Passageiro, checkbox "Aéreo próprio"), salvo via
+  `atualizarPassageiroLote` (campo de RESERVA — não propaga entre expedições).
 - **Onboarding automático (link de 1º acesso via n8n):** cron diário do n8n chama
   **`POST /api/expedamigo/onboarding-diario`** (auth `x-webhook-secret` = `WEBHOOK_SECRET`;
   body opcional `{ dryRun?, expedicao_codigo? }`). Seleciona quem **comprou** (`status_reserva

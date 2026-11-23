@@ -474,10 +474,13 @@ export async function entrarExpedAmigo(
     // Voo INDIVIDUAL (migration 0057): se o passageiro tem voo próprio nesta expedição,
     // o portal mostra SÓ os dele (ignora os de grupo). Quem não tem, vê os de grupo normal.
     const temVoosProprios = !!row && voosGrupo.some((v) => v.expedicao_id === e.id && v.passageiro_id === row.id);
+    // Aéreo próprio (migration 0066): quem comprou o aéreo por conta própria NÃO vê os voos
+    // de grupo (admin/row null vê tudo). Voos individuais atribuídos a ele continuam aparecendo.
+    const comprouAereoConosco = !row || !row.aereo_proprio;
     const veVoo = (v: ExpedicaoVooRow): boolean =>
       v.passageiro_id != null
         ? !!row && v.passageiro_id === row.id
-        : !temVoosProprios && veSegmento(v.extensao_id, v.apenas_sem_extensao) && veGrupo(v.grupo_id);
+        : comprouAereoConosco && !temVoosProprios && veSegmento(v.extensao_id, v.apenas_sem_extensao) && veGrupo(v.grupo_id);
     const meusQuartos = row
       ? alocacoes
           .filter((a) => a.passageiro_id === row.id)

@@ -276,6 +276,7 @@ const editarPassageiroLoteSchema = z.object({
   voo_nacional_necessario: z.boolean().optional(),
   contrato_assinado: z.boolean().optional(),
   checkin_online_feito: z.boolean().optional(),
+  aereo_proprio: z.boolean().optional(),
   observacoes: z.string().nullable().optional(),
   saude: z.record(z.string(), z.string()).nullable().optional(),
   // Dados complementares da inscrição (endereço/contato → pessoais; prefs/acompanhante → reserva)
@@ -498,6 +499,7 @@ const CAMPOS_PASSAGEIRO_EDITAVEIS = new Set([
   "voo_nacional_necessario",
   "contrato_assinado",
   "checkin_online_feito",
+  "aereo_proprio",
   // Dados PESSOAIS (propagam pra todas as linhas da pessoa — ver CAMPOS_PESSOAIS)
   "nome_completo",
   "cpf",
