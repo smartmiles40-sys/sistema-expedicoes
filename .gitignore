@@ -53,3 +53,7 @@ scripts/_*.json
 # Backups do banco (CPF + saude = PII) — por padrao gravam em ~/Backups, fora do
 # repo; isto e so uma rede de seguranca caso BACKUP_DIR aponte pra dentro do repo.
 /backups/
+
+# Listas operacionais com nomes de passageiros (não versionar)
+Islandia-fora-de-SP-contato-relacionamento.txt
+*-contato-relacionamento.txt
