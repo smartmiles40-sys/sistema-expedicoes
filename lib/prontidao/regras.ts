@@ -76,6 +76,25 @@ export const ANEXO_OPCIONAL: ReadonlySet<TipoRequisito> = new Set([
   "Ingresso Trem Machu Picchu",
 ]);
 
+/**
+ * "Aéreo Nacional" (conexão brasileira até o embarque internacional) é obrigatório
+ * em toda expedição, mas só BLOQUEIA quem precisa: quem embarca da cidade de São
+ * Paulo (voo direto de GRU) não usa voo nacional, então o requisito fica N/A pra ele.
+ * Sem cidade cadastrada = assume que precisa (o operacional resolve: emite o bilhete
+ * ou marca "Dispensado"). Normaliza acentos/caixa pra casar "São Paulo"/"sao paulo".
+ */
+function ehDaCidadeDeSaoPaulo(p: PassageiroRow): boolean {
+  const c = (p.endereco_cidade ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  return c === "sao paulo";
+}
+function precisaAereoNacional(p: PassageiroRow): boolean {
+  return !ehDaCidadeDeSaoPaulo(p);
+}
+
 export type Semaforo = "ok" | "atencao" | "bloqueio" | "na";
 
 /** Severidade relativa dos semáforos (pra combinar duas checagens no pior caso). */
@@ -261,6 +280,36 @@ export function avaliarProntidao(params: {
         semaforo: "na" as Semaforo,
         detalhe: "Não necessário (líder)",
         requisito_id: porTipo.get(t.tipo)?.id ?? null,
+      };
+    }
+    // Aéreo Nacional: obrigatório em toda expedição, mas só BLOQUEIA quem precisa.
+    // Quem é da cidade de São Paulo embarca direto (sem voo nacional) → N/A. "Dispensado"
+    // libera qualquer um (ex.: quem vai de carro). Sem cidade = assume que precisa.
+    if (t.tipo === "Aéreo Nacional") {
+      const inst = porTipo.get("Aéreo Nacional");
+      if (inst?.status === "Dispensado") {
+        return {
+          tipo: t.tipo, descricao: t.descricao, obrigatoriedade: t.obrigatoriedade,
+          bloqueia_embarque: t.bloqueia_embarque, semaforo: "ok", detalhe: "Dispensado",
+          requisito_id: inst.id,
+        };
+      }
+      if (!precisaAereoNacional(passageiro)) {
+        return {
+          tipo: t.tipo, descricao: t.descricao, obrigatoriedade: t.obrigatoriedade,
+          bloqueia_embarque: t.bloqueia_embarque, semaforo: "na",
+          detalhe: "Não requer (embarca de São Paulo)", requisito_id: inst?.id ?? null,
+        };
+      }
+      const semaforo = inst ? checarInstancia(inst, expedicao) : (t.bloqueia_embarque ? "bloqueio" : "atencao");
+      return {
+        tipo: t.tipo,
+        descricao: inst?.descricao ?? t.descricao,
+        obrigatoriedade: inst?.obrigatoriedade ?? t.obrigatoriedade,
+        bloqueia_embarque: inst?.bloqueia_embarque ?? t.bloqueia_embarque,
+        semaforo,
+        detalhe: detalheInstancia(inst, semaforo),
+        requisito_id: inst?.id ?? null,
       };
     }
     // Passaporte: HÍBRIDO — validade (colunas) + anexo (foto/PDF). O anexo é 1 por

@@ -38,6 +38,10 @@ const BASE_INTERNACIONAL: RequisitoDestinoTemplate[] = [
   { tipo: "Contrato", descricao: "Contrato assinado", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
   { tipo: "Seguro", descricao: "Seguro viagem emitido cobrindo todo o período", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "comercial" },
   { tipo: "Aéreo Internacional", descricao: "Bilhete internacional emitido (localizador)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional" },
+  // Aéreo NACIONAL: a conexão brasileira até o embarque internacional (ex.: Fortaleza→GRU).
+  // Obrigatório em toda expedição, mas só BLOQUEIA quem precisa — quem é da cidade de São
+  // Paulo (embarca direto) não é bloqueado por isso (ramo próprio em avaliarProntidao).
+  { tipo: "Aéreo Nacional", descricao: "Bilhete do voo nacional emitido (conexão até o embarque internacional)", obrigatoriedade: "Obrigatório", bloqueia_embarque: true, papel_responsavel: "operacional", observacoes: "Só quem embarca de fora de São Paulo. Marcar \"Dispensado\" para quem não usa voo nacional." },
 ];
 
 const VACINA_FEBRE_AMARELA: RequisitoDestinoTemplate = {

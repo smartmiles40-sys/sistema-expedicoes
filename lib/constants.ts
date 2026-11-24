@@ -181,6 +181,7 @@ export const TIPO_REQUISITO = [
   "Vacina",
   "Seguro",
   "Aéreo Internacional",
+  "Aéreo Nacional",
   "Aéreo Doméstico",
   "Voo Interno",
   "Contrato",

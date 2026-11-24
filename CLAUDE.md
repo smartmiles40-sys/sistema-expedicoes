@@ -345,6 +345,19 @@ de processos do P8 (catálogo + instâncias + status):
   e o botão "Gerar requisitos de {destino}". `passageiros/page.tsx` carrega
   `getProntidaoExpedicao()` + `listUsuarios()`. Card no dashboard
   (`getResumoProntidao()`) e avisos linkam pra `/expedicoes/[id]/passageiros`.
+- **Aéreo Nacional (migration 0067):** requisito `"Aéreo Nacional"` = a conexão
+  brasileira até o embarque internacional (ex.: Fortaleza→GRU). Está na
+  `BASE_INTERNACIONAL` (`requisitos-destino.ts`), então é **Obrigatório/bloqueante em
+  TODA expedição**, mas tem **ramo próprio** em `avaliarProntidao` (`regras.ts`) que só
+  bloqueia **quem precisa**: `precisaAereoNacional` = passageiro cuja `endereco_cidade`
+  normalizada **não é "são paulo"** (capital). Quem é de São Paulo embarca direto → semáforo
+  **"na"** ("Não requer"). Sem cidade cadastrada = assume que precisa (operacional resolve:
+  emite o bilhete ou marca **"Dispensado"**, que libera qualquer um — ex.: quem vai de
+  carro). Não exige anexo (status-based, igual ao "Visto"); o `ProntidaoPaxDrawer` renderiza
+  como instância comum (pílulas de status), sem toggle "necessário?". NÃO precisa de backfill:
+  `avaliarProntidao` avalia o template mesmo sem instância (não-SP sem bilhete → bloqueio).
+  ⚠️ A migration 0067 só faz `ALTER TYPE tipo_requisito ADD VALUE` (a view SQL
+  `vw_prontidao_passageiro` NÃO foi atualizada — o app usa só o `regras.ts`).
 - **Enums:** `TIPO_REQUISITO`, `OBRIGATORIEDADE`, `STATUS_REQUISITO`, `PRONTIDAO`,
   `COR_PRONTIDAO` em `lib/constants.ts`.
 

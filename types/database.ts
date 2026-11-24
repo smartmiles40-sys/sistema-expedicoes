@@ -40,6 +40,7 @@ export type TipoRequisito =
   | "Vacina"
   | "Seguro"
   | "Aéreo Internacional"
+  | "Aéreo Nacional"
   | "Aéreo Doméstico"
   | "Voo Interno"
   | "Contrato"
