@@ -34,7 +34,7 @@ const NAV = [
   { href: "/pacotes", label: "Pacotes", icon: Package },
   { href: "/fornecedores", label: "Fornecedores", icon: Building2 },
   { href: "/cambios", label: "Câmbios", icon: Coins },
-  { href: "/acessos-expedamigo", label: "Acessos ExpedAmigo", icon: ScrollText },
+  { href: "/acessos-expedamigo", label: "Acessos ao Portal do Viajante", icon: ScrollText },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 

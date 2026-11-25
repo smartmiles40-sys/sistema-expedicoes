@@ -316,6 +316,7 @@ export function InscricaoForm({ expedicoes, token = null }: { expedicoes: Expedi
       if (passaporteComp) fd.append("passaporte", passaporteComp);
       if (fotoComp) fd.append("foto", fotoComp);
       if (certComp) fd.append("certificado", certComp);
+      if (token) fd.append("via_portal", "1"); // veio do Portal do Viajante (link ?t=…)
       const r = await enviarInscricao(fd);
       if (r.ok) setOk(r.completou ? "completou" : "novo");
       else toast.error("Não foi possível enviar", { description: r.error });

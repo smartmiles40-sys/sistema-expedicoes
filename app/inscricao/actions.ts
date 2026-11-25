@@ -12,6 +12,7 @@ import {
   type Pax, type ValoresInscricao,
 } from "@/lib/inscricao/core";
 import { verificarTokenInscricao } from "@/lib/inscricao/token";
+import { registrarAcessoExpedamigo } from "@/app/amigo/actions";
 import type { ExpedicaoRow, InscricaoPendenteRow, Json } from "@/types/database";
 import type { CategoriaArquivo } from "@/lib/constants";
 
@@ -180,6 +181,8 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   const parsed = dadosSchema.safeParse(dadosRaw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Revise os campos." };
   const d = parsed.data;
+  // Formulário aberto pelo Portal do Viajante (link ?t=…) — vira origem + evento no log.
+  const viaPortal = formData.get("via_portal") === "1";
 
   const cpf = soDigitosCpf(d.cpf);
   if (!cpfValido(cpf)) return { ok: false, error: "CPF inválido." };
@@ -272,7 +275,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     dados: d as unknown as Json,
     passaporte_arquivo_id: passaporteArqId,
     foto_arquivo_id: fotoArqId,
-    origem: "Formulário público",
+    origem: viaPortal ? "Portal do Viajante" : "Formulário público",
     // Reenvio de quem tinha sido recusado volta pra fila como pendente.
     status: "pendente",
     recusada_em: null,
@@ -290,6 +293,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
     }
     // Cinto de segurança: grava o perfil na base global já no envio (não perde o dado).
     await salvarPerfilGlobalInscricao(d, cpf, passaporteArqId, fotoArqId);
+    if (viaPortal) await registrarAcessoExpedamigo(cpf, "formulario_preenchido", d.expedicao_id);
     return { ok: true, completou: !!(existente || perfil) };
   }
 
@@ -299,5 +303,7 @@ export async function enviarInscricao(formData: FormData): Promise<InscricaoResu
   // Cinto de segurança: grava o perfil na base global já no envio (não perde o dado
   // mesmo antes/independente da aprovação). Best-effort — não quebra o envio.
   await salvarPerfilGlobalInscricao(d, cpf, passaporteArqId, fotoArqId);
+  // Log do Portal do Viajante: preencheu o formulário pelo portal (best-effort).
+  if (viaPortal) await registrarAcessoExpedamigo(cpf, "formulario_preenchido", d.expedicao_id);
   return { ok: true, completou: !!(existente || perfil) };
 }

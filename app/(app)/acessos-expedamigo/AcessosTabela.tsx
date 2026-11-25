@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { ScrollText, Search, LogIn, FileDown, BookOpen, Ticket, KeyRound } from "lucide-react";
+import { ScrollText, Search, LogIn, FileDown, BookOpen, Ticket, KeyRound, ClipboardCheck } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { StatPill } from "@/components/ui/StatPill";
@@ -12,13 +12,14 @@ export type AcessoLog = {
   id: string;
   cpf: string;
   nome: string | null;
-  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher" | "primeiro_acesso";
+  evento: "login" | "download_pdf" | "viagem_aberta" | "download_voucher" | "primeiro_acesso" | "formulario_preenchido";
   expedicao_nome: string | null;
   created_at: string;
 };
 
 const EVENTOS: { chave: AcessoLog["evento"]; label: string; variant: "lista" | "vinculado" | "atencao"; Icon: typeof LogIn }[] = [
   { chave: "primeiro_acesso", label: "1º acesso", variant: "vinculado", Icon: KeyRound },
+  { chave: "formulario_preenchido", label: "Preencheu formulário", variant: "vinculado", Icon: ClipboardCheck },
   { chave: "login", label: "Login", variant: "lista", Icon: LogIn },
   { chave: "viagem_aberta", label: "Abriu viagem", variant: "atencao", Icon: BookOpen },
   { chave: "download_pdf", label: "Baixou PDF", variant: "vinculado", Icon: FileDown },
@@ -49,10 +50,10 @@ export function AcessosTabela({ rows }: { rows: AcessoLog[] }) {
     <div className="space-y-3">
       <div>
         <h1 className="flex items-center gap-2 text-base font-semibold">
-          <ScrollText className="h-4 w-4 text-editavel-600" /> Acessos ao ExpedAmigo
+          <ScrollText className="h-4 w-4 text-editavel-600" /> Acessos ao Portal do Viajante
         </h1>
         <p className="text-xs text-muted-foreground">
-          Registro de quem criou o acesso (1º acesso pelo link), entrou no portal, abriu uma viagem e baixou arquivos. Só CPF, evento e data/hora (sem IP/dispositivo).
+          Registro de quem criou o acesso (1º acesso pelo link), entrou no portal, preencheu o formulário, abriu uma viagem e baixou arquivos. Só CPF, evento e data/hora (sem IP/dispositivo).
         </p>
       </div>
 

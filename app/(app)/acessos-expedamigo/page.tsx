@@ -5,7 +5,7 @@ import { soDigitosCpf } from "@/lib/cpf";
 import { AcessosTabela, type AcessoLog } from "./AcessosTabela";
 import type { ExpedamigoAcessoRow, ExpedicaoRow } from "@/types/database";
 
-export const metadata = { title: "Acessos ExpedAmigo" };
+export const metadata = { title: "Acessos ao Portal do Viajante" };
 
 export default async function AcessosExpedamigoPage() {
   let acessos: ExpedamigoAcessoRow[];
