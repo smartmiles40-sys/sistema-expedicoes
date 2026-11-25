@@ -353,8 +353,11 @@ de processos do P8 (catálogo + instâncias + status):
   normalizada **não é "são paulo"** (capital). Quem é de São Paulo embarca direto → semáforo
   **"na"** ("Não requer"). Sem cidade cadastrada = assume que precisa (operacional resolve:
   emite o bilhete ou marca **"Dispensado"**, que libera qualquer um — ex.: quem vai de
-  carro). Não exige anexo (status-based, igual ao "Visto"); o `ProntidaoPaxDrawer` renderiza
-  como instância comum (pílulas de status), sem toggle "necessário?". NÃO precisa de backfill:
+  carro). **Fluxo igual ao "Aéreo Internacional"** (não status-based): está em
+  `REQUISITOS_COM_ANEXO_OBRIGATORIO` + `ehAereo` no `ProntidaoPaxDrawer` → mostra "Aéreo
+  comprado com a gente?" + anexar voucher/bilhete + localizador (sem pílulas de status); quem
+  precisa só fica Apto com o **voucher anexado** (`checarDocumentoAnexo`) ou "Dispensado".
+  `ANEXO_CONFIG["Aéreo Nacional"]` (categoria "Aéreos"). NÃO precisa de backfill:
   `avaliarProntidao` avalia o template mesmo sem instância (não-SP sem bilhete → bloqueio).
   ⚠️ A migration 0067 só faz `ALTER TYPE tipo_requisito ADD VALUE` (a view SQL
   `vw_prontidao_passageiro` NÃO foi atualizada — o app usa só o `regras.ts`).
