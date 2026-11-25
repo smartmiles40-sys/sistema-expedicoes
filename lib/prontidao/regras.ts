@@ -60,6 +60,7 @@ export const REQUISITOS_COM_ANEXO_OBRIGATORIO: ReadonlySet<TipoRequisito> = new 
   "Ingresso Machu Picchu",
   "Ingresso Trem Machu Picchu",
   "Aéreo Internacional",
+  "Aéreo Nacional",
   "Aéreo Doméstico",
   "Voo Interno",
   "Seguro",
@@ -301,14 +302,15 @@ export function avaliarProntidao(params: {
           detalhe: "Não requer (embarca de São Paulo)", requisito_id: inst?.id ?? null,
         };
       }
-      const semaforo = inst ? checarInstancia(inst, expedicao) : (t.bloqueia_embarque ? "bloqueio" : "atencao");
+      // Quem precisa: exige o VOUCHER anexado (igual ao Aéreo Internacional).
+      const semaforo = inst ? checarDocumentoAnexo(inst) : (t.bloqueia_embarque ? "bloqueio" : "atencao");
       return {
         tipo: t.tipo,
         descricao: inst?.descricao ?? t.descricao,
         obrigatoriedade: inst?.obrigatoriedade ?? t.obrigatoriedade,
         bloqueia_embarque: inst?.bloqueia_embarque ?? t.bloqueia_embarque,
         semaforo,
-        detalhe: detalheInstancia(inst, semaforo),
+        detalhe: detalheAnexo(inst),
         requisito_id: inst?.id ?? null,
       };
     }

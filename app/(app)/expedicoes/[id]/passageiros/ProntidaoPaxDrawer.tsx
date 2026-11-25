@@ -64,6 +64,11 @@ const ANEXO_CONFIG: Partial<Record<TipoRequisito, { categoria: CategoriaArquivo;
     label: "Anexar voucher / bilhete aéreo",
     dica: "Anexar o voucher já deixa o aéreo internacional aprovado.",
   },
+  "Aéreo Nacional": {
+    categoria: "Aéreos",
+    label: "Anexar voucher / bilhete aéreo",
+    dica: "Anexar o voucher já deixa o aéreo nacional aprovado.",
+  },
   "Aéreo Doméstico": {
     categoria: "Aéreos",
     label: "Anexar voucher / bilhete (trecho doméstico)",
@@ -411,7 +416,7 @@ function RequisitoDrawer({
   const anexoCfg = ANEXO_CONFIG[req.tipo];
   const ehVooInterno = req.tipo === "Voo Interno";
   // Voo Interno segue o mesmo racional do Aéreo Doméstico (necessário? + voucher).
-  const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Doméstico" || ehVooInterno;
+  const ehAereo = req.tipo === "Aéreo Internacional" || req.tipo === "Aéreo Nacional" || req.tipo === "Aéreo Doméstico" || ehVooInterno;
   const ehDomestico = req.tipo === "Aéreo Doméstico";
   const ehVacina = req.tipo === "Vacina";
   const ehSeguro = req.tipo === "Seguro";
